@@ -36,6 +36,7 @@ function zoomAt(sx, sy, zoom) {
 }
 
 function handleTap(sx, sy) {
+  G.lastTap = { x: sx, y: sy }; // 大地图用：点在哪里
   const hit = hitUI(sx, sy);
   if (hit) { if (hit.onClick) hit.onClick(); return; }
   if (G.scene !== 'game' || G.state !== 'play') return;
@@ -133,8 +134,10 @@ function setupInput(canvas) {
       e.preventDefault();
       return;
     }
+    if (key === 'm' && G.scene === 'game' && G.state === 'play') { G.mapOpen = !G.mapOpen; return; } // M 键：大地图
     if (key === 'escape') {
       if (G.confirm) G.confirm = null;
+      else if (G.mapOpen) G.mapOpen = false;
       else if (G.buildMode || G.selected) { G.buildMode = null; G.selected = null; }
       else if (G.state === 'play') G.state = 'paused';
       else if (G.state === 'paused' || G.state === 'tech' || G.state === 'equip' || G.state === 'members') G.state = 'play';

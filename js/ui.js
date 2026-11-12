@@ -206,7 +206,10 @@ function drawUI(ctx) {
   ctx.fillRect(lx, ly, lw, 26);
   drawText(ctx, label, lx + lw / 2, ly + 13, 14, G.phase === 'day' ? '#ffcd75' : '#f4f4f4', 'center');
   if (showNightBtn) drawButton(ctx, lx + lw + 4, ly, 58, 26, '入夜▶', startNightEarly, { color: '#5d275d', size: 12 });
-  if (G.def.hooks.hud) drawPills(ctx, G.def.hooks.hud(), ly + 32, sw - 16);
+  // 小地图在右上角，状态条往中间收一点，避免挡住
+  const mini = !G.inside && G.state === 'play' ? miniLayout() : null;
+  if (G.def.hooks.hud) drawPills(ctx, G.def.hooks.hud(), ly + 32, mini ? Math.max(160, sw - 2 * (mini.w + 20)) : sw - 16);
+  drawMinimap(ctx);
 
   // ---- 底部栏：科技/装备 + 建造（可翻页） ----
   const by = sh - UI.bottomH;
@@ -285,6 +288,7 @@ function drawUI(ctx) {
   if (G.state === 'dialog') drawDialog(ctx);
   if (G.state === 'over') drawEndOverlay(ctx, false);
   if (G.state === 'victory') drawEndOverlay(ctx, true);
+  drawBigMap(ctx);
   if (G.state === 'paused') drawPauseMenu(ctx);
   else drawConfirm(ctx); // 确认框（例如吃第 5 颗晶核、拆床）要画在最上面
 }

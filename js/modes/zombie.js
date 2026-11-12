@@ -170,7 +170,7 @@ function newPerson(name, forced) {
   p.hp = personMaxHp(p);
   return p;
 }
-const PERSON_KEYS = ['name', 'baseHp', 'hp', 'weapon', 'armor', 'traits', 'skills', 'xp', 'stats', 'morale', 'look', 'joined', 'down', 'x', 'y', 'ab'];
+const PERSON_KEYS = ['name', 'baseHp', 'hp', 'weapon', 'armor', 'traits', 'skills', 'xp', 'stats', 'morale', 'look', 'joined', 'down', 'x', 'y', 'ab', 'stay', 'lastOut'];
 function personSave(p) { const o = {}; for (const k of PERSON_KEYS) o[k] = p[k]; return o; }
 function personLoad(o) { return Object.assign(newPerson(o.name), { cd: 0, face: 1, hit: 0 }, o); }
 
@@ -219,8 +219,9 @@ function placeSurvivors() {
   const c = G.core, n = G.survivors.length;
   G.survivors.forEach((s, i) => {
     const a = i / Math.max(1, n) * Math.PI * 2 + 0.4;
-    s.x = c.cx + Math.cos(a) * 2.3 * T;
-    s.y = c.cy + Math.sin(a) * 2.0 * T + 6;
+    s.hx = c.cx + Math.cos(a) * 2.3 * T;
+    s.hy = c.cy + Math.sin(a) * 2.0 * T + 6;
+    if (!s.state || s.state === 'base') { s.x = s.hx; s.y = s.hy; }
   });
 }
 // 开局自带的建筑：放在避难所附近的空地上
@@ -704,6 +705,11 @@ function drawPersonDetail(ctx, p, x, y, w, bottom) {
   drawText(ctx, role + ' · ' + state + ' · 士气' + (p.morale >= 60 ? '高昂' : p.morale >= 30 ? '一般' : '低落'), x + 76, y + 36, 12, down ? '#ef7d57' : '#c8d6e5', 'left', false);
   if (p.morale < 30) drawText(ctx, '士气低落：伤害 -25%，可能离开营地', x + 76, y + 54, 11, '#ef7d57', 'left', false);
   y += 74;
+  if (p !== G.player) {
+    drawButton(ctx, x, y, 150, 30, p.stay ? '白天：留守营地' : '白天：外出搜刮', () => { p.stay = !p.stay; if (p.stay && p.state !== 'base' && !p.down) goHome(p); }, { size: 12, color: p.stay ? '#333c57' : '#1f5e3a' });
+    drawText(ctx, '状态：' + survivorTripText(p) + (p.bag ? '（背包：食物' + p.bag.food + ' 水' + p.bag.water + ' 零件' + p.bag.parts + (p.bag.items.length ? ' +' + p.bag.items.length + '件' : '') + '）' : ''), x + 160, y + 15, 12, '#73eff7', 'left', false);
+    y += 40;
+  }
 
   const two = w >= 540, cw = two ? (w - 16) / 2 : w;
   let ly = y, ry = y;
@@ -1039,7 +1045,8 @@ MODES.zombie = {
       else { updatePlayer(dt); abilityTick(G.player, dt, allPeople()); }
       for (const s of G.survivors) {
         s.hit = Math.max(0, s.hit - dt);
-        if (!s.down) personAttack(s, dt, G.mods.survDmg);
+        updateSurvivorTrip(s, dt); // 白天自己出门搜刮（js/scavenge.js）
+        if (!s.down && s.state !== 'in') personAttack(s, dt, G.mods.survDmg);
         abilityTick(s, dt, allPeople());
       }
       if (G.phase === 'day') {
@@ -1072,12 +1079,14 @@ MODES.zombie = {
         return true;
       }
       for (const s of G.survivors) {
-        if (s.down || Math.hypot(s.x - m.x, s.y - m.y) > T * 0.7) continue;
+        if (s.down || s.state === 'in' || Math.hypot(s.x - m.x, s.y - m.y) > T * 0.7) continue;
         if (m.cd <= 0) { m.cd = 1 / m.def.rate; hurtSurvivor(s, m.dmg, m); }
         return true;
       }
       if (m.wander) {
         if (pd < (m.def.aggro || 6) * T) { moveFree(m, p.x, p.y, monsterSpeed(m), dt); return true; }
+        const out = G.survivors.find((s) => !s.down && (s.state === 'go' || s.state === 'home') && Math.hypot(s.x - m.x, s.y - m.y) < 4 * T);
+        if (out) { moveFree(m, out.x, out.y, monsterSpeed(m), dt); return true; }
         const nz = G.noise;
         if (nz && G.clock < nz.until && Math.hypot(nz.x - m.x, nz.y - m.y) < 11 * T) {
           moveFree(m, nz.x, nz.y, monsterSpeed(m), dt);
@@ -1095,6 +1104,8 @@ MODES.zombie = {
       // 营地附近游荡的丧尸也被吸引过来（远处的继续游荡）
       for (const m of G.monsters) if (m.wander && m.type !== 'bandit' && Math.hypot(m.x - G.core.cx, m.y - G.core.cy) < 18 * T) m.wander = false;
       const p = G.player, px = G.inside ? p.cityX : p.x, py = G.inside ? p.cityY : p.y;
+      const rep = scavReport();
+      if (rep) G.nightNote = rep;
       if (G.inside && !G.inside.home) showBanner('天黑了！', '尸潮正在围攻营地，快离开建筑回去', 3, '#ef7d57');
       else if (!G.inside && Math.hypot(px - G.core.cx, py - G.core.cy) > 8 * T) {
         G.dawnMsg = null;
@@ -1141,6 +1152,7 @@ MODES.zombie = {
       for (const q of allPeople()) {
         const mx = personMaxHp(q);
         if (q !== p && q.down) { q.down = false; q.hp = mx * 0.5; }
+        if (q !== p && q.state !== 'base') { q.state = 'base'; q.target = null; q.bag = null; q.path = []; q.x = q.hx; q.y = q.hy; }
         q.hp = Math.min(mx, q.hp + mx * (0.4 + (medic ? 0.25 : 0)));
         if (G.camp.fullHeal) q.hp = mx;
       }
@@ -1213,6 +1225,7 @@ MODES.zombie = {
       }
       // 幸存者
       for (const s of G.survivors) {
+        if (s.state === 'in') continue; // 在楼里搜刮
         const spr = personSprite(s);
         ctx.globalAlpha = s.down ? 0.4 : 1;
         drawShadow(ctx, s.x, s.y + 1, 11);

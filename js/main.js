@@ -23,6 +23,7 @@ function setupMode(mode) {
     camFollow: false, moveMarker: null,
     roads: null, natTer: null, fields: null, crosswalks: null, parking: null, structOrder: null, // 城市地图专用
     inside: null, home: null, citySeed: 0, cityCam: null, // 丧尸模式：建筑内部
+    mapOpen: false, miniBase: null, scavLog: [], // 小地图、同伴搜刮记录
   });
 }
 
