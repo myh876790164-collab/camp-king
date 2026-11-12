@@ -5,7 +5,51 @@ const UI = { topH: 44, bottomH: 84 };
 let uiButtons = [];
 
 // onClick 为 null 的区域只用来“挡住”点击，不让点穿到地图上
-function addButton(x, y, w, h, onClick) { uiButtons.push({ x, y, w, h, onClick }); }
+// 在可滚动区域里时：按钮跟着内容一起上下移动，超出区域的部分点不到
+function addButton(x, y, w, h, onClick) {
+  if (uiClip) {
+    y -= uiOffY;
+    const top = Math.max(y, uiClip.y), bot = Math.min(y + h, uiClip.y + uiClip.h);
+    if (bot <= top) return;
+    h = bot - top; y = top;
+  }
+  uiButtons.push({ x, y, w, h, onClick });
+}
+
+// ---------- 可滚动区域（文字太多时可以拖动 / 滚轮查看） ----------
+let uiClip = null, uiOffY = 0, scrollAreas = [];
+function beginScroll(ctx, key, x, y, w, h) {
+  G.scroll = G.scroll || {};
+  uiOffY = G.scroll[key] || 0;
+  uiClip = { key, x, y, w, h };
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x - 2, y, w + 4, h); ctx.clip();
+  ctx.translate(0, -uiOffY);
+}
+// contentBottom = 内容最下面的 y（滚动前的坐标）
+function endScroll(ctx, contentBottom) {
+  const c = uiClip;
+  ctx.restore();
+  uiClip = null; uiOffY = 0;
+  const contentH = contentBottom - c.y, max = Math.max(0, contentH - c.h + 12);
+  G.scroll[c.key] = Math.max(0, Math.min(max, G.scroll[c.key] || 0));
+  scrollAreas.push({ x: c.x, y: c.y, w: c.w, h: c.h, key: c.key, max });
+  if (max > 0) {
+    // 右边的滚动条
+    const th = Math.max(30, c.h * c.h / (contentH + 12)), ty = c.y + (c.h - th) * (G.scroll[c.key] / max);
+    ctx.fillStyle = 'rgba(148,176,194,0.18)'; ctx.fillRect(c.x + c.w + 2, c.y, 4, c.h);
+    ctx.fillStyle = 'rgba(255,205,117,0.75)'; ctx.fillRect(c.x + c.w + 2, ty, 4, th);
+    if (G.scroll[c.key] < max - 4) drawText(ctx, '▼ 拖动查看更多', c.x + c.w / 2, c.y + c.h - 8, 11, '#94b0c2', 'center', false);
+  }
+}
+function scrollAreaAt(sx, sy) {
+  for (let i = scrollAreas.length - 1; i >= 0; i--) {
+    const a = scrollAreas[i];
+    if (a.max > 0 && sx >= a.x && sy >= a.y && sx < a.x + a.w + 8 && sy < a.y + a.h) return a;
+  }
+  return null;
+}
+function scrollBy(a, dy) { G.scroll[a.key] = Math.max(0, Math.min(a.max, (G.scroll[a.key] || 0) + dy)); }
 function hitUI(sx, sy) {
   for (let i = uiButtons.length - 1; i >= 0; i--) {
     const b = uiButtons[i];
@@ -132,6 +176,7 @@ function unlockedBuildList() {
 
 function drawUI(ctx) {
   uiButtons = [];
+  scrollAreas = [];
   const sw = G.sw, sh = G.sh;
   ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
   const playing = G.state === 'play';
@@ -241,6 +286,7 @@ function drawUI(ctx) {
   if (G.state === 'over') drawEndOverlay(ctx, false);
   if (G.state === 'victory') drawEndOverlay(ctx, true);
   if (G.state === 'paused') drawPauseMenu(ctx);
+  else drawConfirm(ctx); // 确认框（例如吃第 5 颗晶核、拆床）要画在最上面
 }
 
 function drawSelectedPanel(ctx, by) {

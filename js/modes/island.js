@@ -629,11 +629,12 @@ function drawMembersPanel(ctx) {
   if (wide) {
     const lw = 250;
     drawMemberList(ctx, px + 12, y0, lw, bottom - 8);
-    if (G.memberSel) drawMemberDetail(ctx, G.memberSel, px + lw + 24, y0, pw - lw - 36, bottom - 8);
+    if (G.memberSel) { beginScroll(ctx, 'md_' + G.memberSel.id, px + lw + 24, y0, pw - lw - 36, bottom - 8 - y0); endScroll(ctx, drawMemberDetail(ctx, G.memberSel, px + lw + 24, y0, pw - lw - 36, bottom - 8)); }
     else drawText(ctx, '← 点左边的成员查看详情', px + lw + 40, y0 + 20, 14, '#94b0c2');
   } else if (G.memberSel) {
     drawButton(ctx, px + pw - 110, top + 44, 98, 28, '◀ 返回列表', () => { G.memberSel = null; G.pickSlot = null; }, { size: 12 });
-    drawMemberDetail(ctx, G.memberSel, px + 12, y0, pw - 24, bottom - 8);
+    beginScroll(ctx, 'md_' + G.memberSel.id, px + 12, y0, pw - 24, bottom - 8 - y0);
+    endScroll(ctx, drawMemberDetail(ctx, G.memberSel, px + 12, y0, pw - 24, bottom - 8));
   } else {
     drawMemberList(ctx, px + 12, y0, pw - 24, bottom - 8);
   }
@@ -740,7 +741,7 @@ function drawMemberDetail(ctx, m, x, y, w, bottom) {
       drawButton(ctx, ix, y, bw, 30, label, () => { equipIslandItem(m, k); G.pickSlot = null; }, { size: 12, color: '#29366f' });
       ix += bw + 6;
     }
-    return;
+    return y + 40;
   }
 
   // 任务分配
@@ -750,11 +751,11 @@ function drawMemberDetail(ctx, m, x, y, w, bottom) {
   ids.forEach((id, i) => {
     const why = taskProblem(m, id), active = m.task === id;
     const bx = x + (i % tc) * (tw + 6), by = y + Math.floor(i / tc) * (th + 6);
-    if (by + th > bottom) return;
     drawButton(ctx, bx, by, tw, th, '', why ? null : () => { m.task = id; m.target = null; m.path = []; m.workT = 0; }, { active, dim: !!why, color: active ? '#1f5e3a' : '#333c57' });
     drawText(ctx, ISLAND_TASKS[id].name, bx + tw / 2, by + (why ? 13 : th / 2), 13, why ? '#94b0c2' : '#f4f4f4', 'center');
     if (why) drawText(ctx, why, bx + tw / 2, by + 28, 10, '#ef7d57', 'center', false);
   });
+  return y + Math.ceil(ids.length / tc) * (th + 6);
 }
 
 function drawCraftTab(ctx, x, y, w, bottom) {

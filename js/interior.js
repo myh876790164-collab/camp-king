@@ -436,10 +436,18 @@ function enterStruct(s) {
     const i = y * it.W + x;
     if (it.t[i] === IT.FLOOR && !it.occ[i] && Math.hypot(x - it.door.x, y - it.door.y) > 5) floors.push([x, y]);
   }
+  // 上次离开时留下的丧尸（种类、是否变异、剩余血量）原样还在；之后新来的才随机
+  const known = s.zs || [];
   for (let k = 0; k < (s.zIn || 0) && floors.length; k++) {
     const [x, y] = floors.splice(Math.floor(Math.random() * floors.length), 1)[0];
-    const m = spawnMonster(G.day >= 2 && Math.random() < 0.3 ? 'runner' : 'walker', (x + 0.5) * T, (y + 0.5) * T, { wander: true });
+    const prev = known[k];
+    const type = prev ? prev[0] : G.day >= 2 && Math.random() < 0.3 ? 'runner' : 'walker';
+    const m = spawnMonster(type, (x + 0.5) * T, (y + 0.5) * T, { wander: true, noSpecial: !!prev });
     G.monsters.pop();
+    if (prev) {
+      if (prev[1]) makeSpecial(m, prev[1]);
+      m.hp = Math.max(1, m.maxHp * (prev[2] || 1));
+    }
     it.zombies.push(m);
   }
   G.cityCam = G.cam;
@@ -454,7 +462,9 @@ function enterStruct(s) {
 function exitInterior() {
   const it = G.inside, p = G.player;
   if (!it) return;
-  it.s.zIn = it.zombies.filter((m) => m.alive).length;
+  const alive = it.zombies.filter((m) => m.alive);
+  it.s.zIn = alive.length;
+  it.s.zs = alive.map((m) => [m.type, m.special || '', Math.round(m.hp / m.maxHp * 100) / 100]); // 记住每只丧尸
   it.s.left = structLeftCount(it.s);
   G.inside = null;
   p.x = p.cityX; p.y = p.cityY;

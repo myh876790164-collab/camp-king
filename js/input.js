@@ -62,7 +62,7 @@ function setupInput(canvas) {
     pointers.set(e.pointerId, p);
     if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
     if (pointers.size === 1) {
-      drag = { sx: p.x, sy: p.y, lx: p.x, ly: p.y, moved: false, onUI: !!hitUI(p.x, p.y), button: e.button };
+      drag = { sx: p.x, sy: p.y, lx: p.x, ly: p.y, moved: false, onUI: !!hitUI(p.x, p.y), button: e.button, scroll: scrollAreaAt(p.x, p.y) };
     } else if (pointers.size === 2 && G.cam) {
       const [a, b] = [...pointers.values()];
       pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, zoom: G.cam.zoom };
@@ -83,6 +83,7 @@ function setupInput(canvas) {
     }
     if (drag && pointers.size === 1) {
       if (!drag.moved && Math.hypot(p.x - drag.sx, p.y - drag.sy) > 8) drag.moved = true;
+      if (drag.moved && drag.scroll) scrollBy(drag.scroll, -(p.y - drag.ly)); // 拖动滚动面板里的文字
       if (drag.moved && !drag.onUI && G.state === 'play') {
         G.cam.x -= (p.x - drag.lx) / G.cam.zoom;
         G.cam.y -= (p.y - drag.ly) / G.cam.zoom;
@@ -117,6 +118,9 @@ function setupInput(canvas) {
     e.preventDefault();
     if (G.scene !== 'game' || !G.cam) return;
     const p = getPos(e);
+    const area = scrollAreaAt(p.x, p.y);
+    if (area) { scrollBy(area, e.deltaY > 0 ? 48 : -48); return; } // 滚轮滚动面板
+    if (G.state !== 'play') return; // 打开面板时不缩放地图
     zoomAt(p.x, p.y, G.cam.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15));
   }, { passive: false });
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());

@@ -155,7 +155,7 @@ function makeSpecial(m, t) {
 }
 // 刚生成的丧尸：有一定几率变成变异丧尸
 function maybeSpecial(m) {
-  if (m.type === 'bandit' || m.def.boss || m.special) return;
+  if (m.type === 'bandit' || m.def.boss || m.special || m.noSpecial) return;
   if (Math.random() < specialChance()) makeSpecial(m, pick(ABIL_KEYS));
 }
 
@@ -428,7 +428,7 @@ function initAbilitySprites() {
 function drawAbilityTab(ctx, x, y, w, bottom) {
   const people = allPeople();
   if (!G.zSel || !people.includes(G.zSel)) G.zSel = G.player;
-  if (G.abGuide) { drawAbilityGuide(ctx, x, y, w, bottom); return; }
+  if (G.abGuide) return drawAbilityGuide(ctx, x, y, w, bottom);
   // 选人
   let bx = x;
   for (const p of people) {
@@ -488,7 +488,6 @@ function drawAbilityTab(ctx, x, y, w, bottom) {
       // 名字一行，说明自动换行（手机上也能看全）
       const lines = wrapText(ctx, c.need.map((t) => ABIL[t].name).join(' + ') + '：' + c.desc, w - 16, 11);
       const rh = 20 + lines.length * 15;
-      if (y + rh > bottom - 70) break;
       ctx.fillStyle = '#3a2a4a'; ctx.fillRect(x, y, w, rh);
       drawText(ctx, c.name, x + 8, y + 11, 12, '#ffe066');
       lines.forEach((ln, k) => drawText(ctx, ln, x + 8, y + 27 + k * 15, 11, '#f4f4f4', 'left', false));
@@ -520,6 +519,7 @@ function drawAbilityTab(ctx, x, y, w, bottom) {
       ix += bw + 6;
     }
   }
+  return y + 44;
 }
 
 // 图鉴：15 种异能 + 所有化学反应（分页）
@@ -537,15 +537,16 @@ function drawAbilityGuide(ctx, x, y, w, bottom) {
   else if (G.abPage === 1) items = COMBOS.filter((c) => c.need.length === 2).map((c) => ({ title: c.name, color: '#ffe066', text: c.need.map((t) => ABIL[t].name).join(' + ') + '：' + c.desc }));
   else items = COMBOS.filter((c) => c.need.length === 3).map((c) => ({ title: c.name, color: '#ffe066', text: c.need.map((t) => ABIL[t].name).join(' + ') + '：' + c.desc }))
     .concat(ABIL_KEYS.map((t) => ({ icon: t, title: SPECIALS[t].name, color: ABIL[t].color, text: '变异丧尸（掉落' + CORES[t].name + '）' })));
-  const rh = G.abPage === 2 ? 30 : 38;
+  const colY = [y, y];
   items.forEach((it, i) => {
-    const ix = x + (i % cols) * (cw + 8), iy = y + Math.floor(i / cols) * (rh + 4);
-    if (iy + rh > bottom) return;
+    const col = cols === 2 && colY[1] < colY[0] ? 1 : 0, ix = x + col * (cw + 8), iy = colY[col];
+    const tx = ix + (it.icon ? 30 : 8);
+    const lines = wrapText(ctx, it.text, cw - (tx - ix) - 8, 11), rh = 22 + lines.length * 15;
     ctx.fillStyle = '#262b44'; ctx.fillRect(ix, iy, cw, rh);
-    let tx = ix + 6;
-    if (it.icon) { ctx.drawImage(SPR['icon_core_' + it.icon].img, ix + 4, iy + (rh - 22) / 2, 22, 22); tx = ix + 30; }
-    drawText(ctx, it.title, tx, iy + (rh > 32 ? 11 : rh / 2), 12, it.color);
-    if (rh > 32) drawText(ctx, wrapText(ctx, it.text, cw - (tx - ix) - 6, 11)[0], tx, iy + 27, 11, '#c8d6e5', 'left', false);
-    else drawText(ctx, it.text, tx + 64, iy + rh / 2, 11, '#c8d6e5', 'left', false);
+    if (it.icon) ctx.drawImage(SPR['icon_core_' + it.icon].img, ix + 4, iy + 5, 22, 22);
+    drawText(ctx, it.title, tx, iy + 11, 12, it.color);
+    lines.forEach((ln, k) => drawText(ctx, ln, tx, iy + 27 + k * 15, 11, '#c8d6e5', 'left', false));
+    colY[col] = iy + rh + 4;
   });
+  return Math.max(colY[0], colY[1]);
 }

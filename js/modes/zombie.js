@@ -619,9 +619,15 @@ function drawEquipPanel(ctx) {
     drawButton(ctx, px + 12 + i * 92, top + 44, 86, 28, label, () => { G.equipTab = id; G.pickSlot = null; }, { active: tab === id, size: 13 });
   });
   const y0 = top + 82;
-  if (tab === 'craft') { drawZCraft(ctx, px + 12, y0, pw - 24, bottom - 8); return; }
-  if (tab === 'bag') { drawZBag(ctx, px + 12, y0, pw - 24, bottom - 8); return; }
-  if (tab === 'ability') { drawAbilityTab(ctx, px + 12, y0, pw - 24, bottom - 8); return; }
+  // 内容放在可滚动区域里：太长时可以拖动 / 滚轮查看
+  const area = (key, x, w, fn) => { beginScroll(ctx, key, x, y0, w, bottom - 8 - y0); endScroll(ctx, fn()); };
+  if (tab === 'craft') { area('craft', px + 12, pw - 24, () => drawZCraft(ctx, px + 12, y0, pw - 24, bottom - 8)); return; }
+  if (tab === 'bag') { area('bag', px + 12, pw - 24, () => drawZBag(ctx, px + 12, y0, pw - 24, bottom - 8)); return; }
+  if (tab === 'ability') {
+    const key = 'ab_' + (G.abGuide ? 'guide' + (G.abPage || 0) : (G.zSel ? G.zSel.name : ''));
+    area(key, px + 12, pw - 24, () => drawAbilityTab(ctx, px + 12, y0, pw - 24, bottom - 8));
+    return;
+  }
 
   const people = allPeople();
   if (G.zSel && !people.includes(G.zSel)) G.zSel = null;
@@ -630,10 +636,10 @@ function drawEquipPanel(ctx) {
     if (!G.zSel) G.zSel = G.player;
     const lw = 250;
     drawPeopleList(ctx, people, px + 12, y0, lw, bottom - 8);
-    drawPersonDetail(ctx, G.zSel, px + lw + 26, y0, pw - lw - 38, bottom - 8);
+    area('pd_' + G.zSel.name, px + lw + 26, pw - lw - 38, () => drawPersonDetail(ctx, G.zSel, px + lw + 26, y0, pw - lw - 38, bottom - 8));
   } else if (G.zSel) {
     drawButton(ctx, px + pw - 110, top + 44, 98, 28, '◀ 返回列表', () => { G.zSel = null; G.pickSlot = null; }, { size: 12 });
-    drawPersonDetail(ctx, G.zSel, px + 12, y0, pw - 24, bottom - 8);
+    area('pd_' + G.zSel.name, px + 12, pw - 24, () => drawPersonDetail(ctx, G.zSel, px + 12, y0, pw - 24, bottom - 8));
   } else drawPeopleList(ctx, people, px + 12, y0, pw - 24, bottom - 8);
 }
 
@@ -764,7 +770,7 @@ function drawPersonDetail(ctx, p, x, y, w, bottom) {
     ly += 42;
   }
   if (!two) ry = ly;
-  if (!two && G.pickSlot) return; // 窄屏打开选择列表时，下面的内容先不画
+  if (!two && G.pickSlot) return ly; // 窄屏打开选择列表时，下面的内容先不画
 
   // 天赋词条
   sectionTitle(ctx, '天赋', rx, ry); ry += 20;
@@ -802,10 +808,11 @@ function drawPersonDetail(ctx, p, x, y, w, bottom) {
     drawText(ctx, String(v), dx + dw / 2, ry + 13, 15, '#ffcd75', 'center');
     drawText(ctx, label, dx + dw / 2, ry + 30, 10, '#94b0c2', 'center', false);
   });
+  return Math.max(ly, ry + 44);
 }
 
 function drawZCraft(ctx, x, y, w, bottom) {
-  if (!countType('workbench')) { drawText(ctx, '需要先建造「工作台」才能制作', x, y + 10, 14, '#ef7d57'); return; }
+  if (!countType('workbench')) { drawText(ctx, '需要先建造「工作台」才能制作', x, y + 10, 14, '#ef7d57'); return y + 24; }
   const list = [];
   for (const k in WEAPONS) if (WEAPONS[k].craft) list.push('w:' + k);
   for (const k in ARMORS) if (ARMORS[k].craft) list.push('a:' + k);
@@ -817,7 +824,6 @@ function drawZCraft(ctx, x, y, w, bottom) {
   const cols = w >= 600 ? 2 : 1, cw = (w - (cols - 1) * 8) / cols, rh = 42;
   list.forEach((k, i) => {
     const it = itemDef(k), rx = x + (i % cols) * (cw + 8), ry = y + Math.floor(i / cols) * (rh + 6);
-    if (ry + rh > bottom) return;
     const locked = it.tier > G.mods.craftTier;
     drawButton(ctx, rx, ry, cw, rh, '', () => { if (!locked) craftItem(k); }, { dim: locked });
     ctx.drawImage(itemIcon(k).img, rx + 6, ry + 7, 28, 28);
@@ -825,6 +831,7 @@ function drawZCraft(ctx, x, y, w, bottom) {
     drawText(ctx, locked ? '需要研究「军火工艺」' : itemStat(k), rx + 40, ry + 31, 11, '#c8d6e5', 'left', false);
     if (!locked) drawCost(ctx, craftCostZ(it), rx + cw - 50, ry + rh / 2, 90, 12);
   });
+  return y + Math.ceil(list.length / cols) * (rh + 6);
 }
 
 function drawZBag(ctx, x, y, w, bottom) {
@@ -832,11 +839,10 @@ function drawZBag(ctx, x, y, w, bottom) {
   const target = G.zSel || G.player;
   drawText(ctx, '点击武器/护甲去「幸存者」页给人装备；点击药品给「' + target.name + '」使用', x, y + 6, 12, '#94b0c2', 'left', false);
   y += 20;
-  if (!keys.length) { drawText(ctx, '背包空空如也——去城市里搜索建筑吧', x, y + 14, 13, '#94b0c2', 'left', false); return; }
+  if (!keys.length) { drawText(ctx, '背包空空如也——去城市里搜索建筑吧', x, y + 14, 13, '#94b0c2', 'left', false); return y + 30; }
   const cols = Math.max(1, Math.floor(w / 260)), cw = (w - (cols - 1) * 8) / cols, rh = 48;
   keys.forEach((k, i) => {
     const rx = x + (i % cols) * (cw + 8), ry = y + Math.floor(i / cols) * (rh + 6);
-    if (ry + rh > bottom) return;
     drawButton(ctx, rx, ry, cw, rh, '', () => {
       if (k[0] === 'c') useItem(target, k);
       else if (k[0] === 'k') { G.equipTab = 'ability'; G.zSel = target; G.abGuide = false; }
@@ -846,6 +852,7 @@ function drawZBag(ctx, x, y, w, bottom) {
     drawText(ctx, itemName(k) + ' ×' + G.inventory[k], rx + 46, ry + 15, 14, '#ffcd75');
     drawText(ctx, itemStat(k), rx + 46, ry + 34, 11, '#c8d6e5', 'left', false);
   });
+  return y + Math.ceil(keys.length / cols) * (rh + 6);
 }
 
 // ---------- 选择初始营地 ----------
@@ -1001,7 +1008,7 @@ MODES.zombie = {
         survivors: G.survivors.map(personSave),
         inventory: G.inventory,
         npcs: G.npcs.map((n) => ({ x: n.x, y: n.y, kind: n.kind, name: n.name, person: n.person ? personSave(n.person) : null })),
-        structs: G.structs.map((s) => [s.type, s.x, s.y, s.v, s.left, s.restock, s.home ? 1 : 0, s.opened || {}, s.zIn || 0, s.nc || 0]),
+        structs: G.structs.map((s) => [s.type, s.x, s.y, s.v, s.left, s.restock, s.home ? 1 : 0, s.opened || {}, s.zIn || 0, s.nc || 0, s.zs || null]),
         decor: G.decor,
       };
     },
@@ -1015,9 +1022,9 @@ MODES.zombie = {
       G.structs = [];
       G.structAt = new Int16Array(MAP_W * MAP_H).fill(-1);
       G.home = d.home || { beds: [] }; G.citySeed = d.citySeed || 1; G.inside = null;
-      for (const [type, x, y, v, left, restock, home, opened, zIn, nc] of d.structs) {
+      for (const [type, x, y, v, left, restock, home, opened, zIn, nc, zs] of d.structs) {
         const sd = STRUCTS[type], si = G.structs.length;
-        G.structs.push({ type, x, y, w: sd.w, h: sd.h, v, left, restock, home: !!home, opened: opened || {}, zIn: zIn || 0, nc: nc || 0 });
+        G.structs.push({ type, x, y, w: sd.w, h: sd.h, v, left, restock, home: !!home, opened: opened || {}, zIn: zIn || 0, nc: nc || 0, zs: zs || null });
         for (let yy = y; yy < y + sd.h; yy++) for (let xx = x; xx < x + sd.w; xx++) G.structAt[idx(xx, yy)] = si;
       }
       G.decor = d.decor || [];
