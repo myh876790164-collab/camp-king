@@ -45,7 +45,7 @@ function createBuilding(type, x, y) {
 function refreshBuilding(b) {
   const ratio = b.maxHp ? b.hp / b.maxHp : 1;
   b.maxHp = Math.round(b.def.hp * levelMult(b.level) * G.mods.hp *
-    (b.def.wall ? G.mods.wallHp : 1) * (b.type === 'core' ? G.mods.coreHp : 1));
+    (b.def.wall || b.def.door ? G.mods.wallHp : 1) * (b.type === 'core' ? G.mods.coreHp : 1));
   b.hp = Math.max(1, ratio * b.maxHp);
 }
 function refreshAllBuildings() { for (const b of G.buildings) refreshBuilding(b); }
@@ -141,7 +141,7 @@ function damageBuilding(b, dmg, attacker) {
   if (!b.alive) return;
   b.hp -= dmg;
   b.hit = 0.12;
-  if (attacker && b.def.wall && G.mods.thorns) hurtMonster(attacker, dmg * G.mods.thorns);
+  if (attacker && (b.def.wall || b.def.door) && G.mods.thorns) hurtMonster(attacker, dmg * G.mods.thorns);
   if (b.hp <= 0) {
     b.alive = false;
     if (b.type === 'core') gameOver(G.def.loseText || '营地被攻破了！');
@@ -316,11 +316,12 @@ function spawnMonster(type, x, y, opts) {
   };
   Object.assign(m, opts || {});
   G.monsters.push(m);
+  if (G.def.hooks.onSpawn) G.def.hooks.onSpawn(m); // 丧尸模式：几率变成变异丧尸
   return m;
 }
 
 function monsterSpeed(m) {
-  return m.def.speed * T * (m.slowUntil > G.clock ? m.slowFactor : 1);
+  return m.def.speed * T * (m.slowUntil > G.clock ? m.slowFactor : 1) * (m.speedMul || 1) * (m.buffUntil > G.clock ? 1.4 : 1);
 }
 
 function moveMonster(m, tx, ty, dt) {
@@ -333,21 +334,22 @@ function moveMonster(m, tx, ty, dt) {
 }
 
 // 带碰撞的自由移动（玩家、白天游荡的丧尸）。返回 true 表示已到达
-function solidAt(px, py) {
+function solidAt(px, py, friendly) {
   const r = 4;
-  return isBlocked(Math.floor((px - r) / T), Math.floor((py - r) / T)) ||
-    isBlocked(Math.floor((px + r) / T), Math.floor((py - r) / T)) ||
-    isBlocked(Math.floor((px - r) / T), Math.floor((py + r) / T)) ||
-    isBlocked(Math.floor((px + r) / T), Math.floor((py + r) / T));
+  return isBlocked(Math.floor((px - r) / T), Math.floor((py - r) / T), friendly) ||
+    isBlocked(Math.floor((px + r) / T), Math.floor((py - r) / T), friendly) ||
+    isBlocked(Math.floor((px - r) / T), Math.floor((py + r) / T), friendly) ||
+    isBlocked(Math.floor((px + r) / T), Math.floor((py + r) / T), friendly);
 }
 function moveFree(e, tx, ty, speed, dt) {
   const dx = tx - e.x, dy = ty - e.y, d = Math.hypot(dx, dy);
   if (d < 1) return true;
   const step = Math.min(d, speed * dt);
   const nx = e.x + dx / d * step, ny = e.y + dy / d * step;
-  const stuckBefore = solidAt(e.x, e.y); // 已经卡在障碍里时允许走出来
-  if (stuckBefore || !solidAt(nx, e.y)) e.x = nx;
-  if (stuckBefore || !solidAt(e.x, ny)) e.y = ny;
+  const fr = !!e.skills; // 有技能的 = 自己人（玩家、幸存者、岛民），可以穿过门
+  const stuckBefore = solidAt(e.x, e.y, fr); // 已经卡在障碍里时允许走出来
+  if (stuckBefore || !solidAt(nx, e.y, fr)) e.x = nx;
+  if (stuckBefore || !solidAt(e.x, ny, fr)) e.y = ny;
   if (Math.abs(dx) > 0.5) e.face = dx < 0 ? -1 : 1;
   return false;
 }
@@ -396,6 +398,7 @@ function updateMonster(m, dt) {
 
 function hurtMonster(m, dmg) {
   if (!m.alive) return;
+  if (m.armorMul) dmg *= m.armorMul; // 铁甲尸、岩尸：减伤
   m.hp -= dmg;
   m.hit = Math.max(m.hit, dmg >= 1 ? 0.1 : 0);
   if (m.hp <= 0) {
@@ -428,7 +431,7 @@ function applyHitFx(m, p) {
 // ---------- 弹道 ----------
 // 子弹由谁打出（丧尸模式记录幸存者的击杀和伤害）
 function creditOwner(p, m, wasAlive) {
-  if (p.owner && G.def.hooks.credit) G.def.hooks.credit(p.owner, p.dmg, wasAlive && !m.alive);
+  if (p.owner && G.def.hooks.credit) G.def.hooks.credit(p.owner, p.dmg, wasAlive && !m.alive, m);
 }
 function updateProjectile(p, dt) {
   if (p.target && p.target.alive) { p.tx = p.target.x; p.ty = p.target.y - 4; }

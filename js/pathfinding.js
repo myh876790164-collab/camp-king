@@ -44,12 +44,14 @@ class MinHeap {
   }
 }
 
-function isBlocked(x, y) {
+// friendly = 自己人（玩家、幸存者、岛民）：门对自己人是开着的，对怪物是关着的
+function isBlocked(x, y, friendly) {
   if (!inMap(x, y)) return true;
   const i = idx(x, y);
   if (solidTer(G.terrain[i]) || G.nodes[i]) return true;
   const b = G.bld[i];
-  return !!(b && !b.def.passable);
+  if (!b || b.def.passable) return false;
+  return !(friendly && b.def.door);
 }
 
 // 走进格子 i 的代价（有建筑 = 要先拆掉）
@@ -58,8 +60,8 @@ function enterCost(i) {
   return b && b !== G.core && !b.def.passable ? CONFIG.PATH_BUILDING_COST : 0;
 }
 
-function canStepDiag(x, y, dx, dy) {
-  return !isBlocked(x + dx, y) && !isBlocked(x, y + dy);
+function canStepDiag(x, y, dx, dy, friendly) {
+  return !isBlocked(x + dx, y, friendly) && !isBlocked(x, y + dy, friendly);
 }
 
 // 地图变化时只标记“需要重算”，每帧最多重算一次（同一帧采完多个资源也只算一遍）
@@ -133,7 +135,7 @@ function findPath(sx, sy, tx, ty) {
   const N = MAP_W * MAP_H;
   const prev = new Int32Array(N).fill(-1), seen = new Uint8Array(N);
   const start = idx(sx, sy), goal = idx(tx, ty);
-  const goalBlocked = isBlocked(tx, ty);
+  const goalBlocked = isBlocked(tx, ty, true);
   const q = [start];
   seen[start] = 1;
   let found = -1;
@@ -144,8 +146,8 @@ function findPath(sx, sy, tx, ty) {
       const nx = x + dx, ny = y + dy;
       if (!inMap(nx, ny)) continue;
       const j = idx(nx, ny);
-      if (seen[j] || isBlocked(nx, ny)) continue;
-      if (dx !== 0 && dy !== 0 && !canStepDiag(x, y, dx, dy)) continue;
+      if (seen[j] || isBlocked(nx, ny, true)) continue;
+      if (dx !== 0 && dy !== 0 && !canStepDiag(x, y, dx, dy, true)) continue;
       seen[j] = 1;
       prev[j] = i;
       q.push(j);

@@ -21,7 +21,8 @@ function setupMode(mode) {
     player: null, survivors: [], npcs: [], inventory: {}, villagers: [], furnace: null, keys: {},
     dawnMsg: null, nightNote: null, buildPage: 0, techPage: 0, equipSel: 0, equipTab: 'equip',
     camFollow: false, moveMarker: null,
-    roads: null, natTer: null, fields: null, crosswalks: null, structOrder: null, // 城市地图专用
+    roads: null, natTer: null, fields: null, crosswalks: null, parking: null, structOrder: null, // 城市地图专用
+    inside: null, home: null, citySeed: 0, cityCam: null, // 丧尸模式：建筑内部
   });
 }
 

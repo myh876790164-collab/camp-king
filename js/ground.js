@@ -246,68 +246,137 @@ function buildGround() {
   G.groundTer = ter; // 渲染水面波光时用（半格精度的地形）
 }
 
-// ---------- 城市地图：用平滑曲线画路（参考《僵尸毁灭工程》，不是全横平竖直） ----------
-// 每种路 3 层：外沿（人行道/路肩）→ 边线 → 沥青；所有路先画完同一层再画下一层，路口才能自然连在一起
+// ---------- 城市地图：用平滑曲线画路 ----------
+// 每种路 3 层：外沿（人行道/路肩）→ 路沿/边线 → 沥青；所有路先画完同一层再画下一层，路口才能自然连在一起
+// 所有道路都在地面上，路口是平面交叉
 const ROAD_STYLE = {
+  ave: [[2, '#8d909c'], [0.3, '#b3b7c2'], [0, '#454959']],
   street: [[2, '#8d909c'], [0.3, '#b3b7c2'], [0, '#4b4f5e']],
+  local: [[2, '#959aa6'], [0.3, '#b3b7c2'], [0, '#555a69']],
+  alley: [[0.2, '#5d606b'], [0.2, '#5d606b'], [0, '#7a7d88']],
   hwy: [[0.8, '#2b2e38'], [0, '#c8ccd8'], [-0.3, '#454959']],
   rural: [[0.4, '#3b3e4a'], [0.4, '#3b3e4a'], [0, '#555a69']],
   dirt: [[0.6, '#6a5838'], [0.6, '#6a5838'], [0, '#8a7650']],
-  circle: [[2, '#8d909c'], [0.3, '#b3b7c2'], [0, '#4b4f5e']],
+  rail: [[0.5, '#5a5248'], [0.5, '#5a5248'], [0, '#7a7064']],
+  circle: [[2, '#959aa6'], [0.3, '#b3b7c2'], [0, '#555a69']],
+  ring: [[2, '#8d909c'], [0.3, '#b3b7c2'], [0, '#454959']],
 };
+
+// 把折线往左右平移 d 格（画车道线用）
+function offsetPts(pts, d) {
+  return pts.map(([x, y], i) => {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    return [x - (b[1] - a[1]) / len * d, y + (b[0] - a[0]) / len * d];
+  });
+}
+
 function drawRoadsHD(g, S) {
   const TS = T * S, nat = G.natTer;
-  const path = (r) => { g.beginPath(); r.pts.forEach(([x, y], i) => (i ? g.lineTo(x * TS, y * TS) : g.moveTo(x * TS, y * TS))); };
+  const path = (pts) => { g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x * TS, y * TS) : g.moveTo(x * TS, y * TS))); };
+  const strokeRoad = (r, extra, col) => {
+    const w = (r.w + extra) * TS;
+    g.strokeStyle = g.fillStyle = col;
+    if (r.kind === 'ring') { g.lineWidth = w; g.beginPath(); g.arc(r.pts[0][0] * TS, r.pts[0][1] * TS, r.r * TS, 0, 7); g.stroke(); return; }
+    if (r.pts.length === 1) { g.beginPath(); g.arc(r.pts[0][0] * TS, r.pts[0][1] * TS, w / 2, 0, 7); g.fill(); return; }
+    g.lineWidth = w;
+    path(r.pts);
+    g.stroke();
+  };
   g.lineCap = 'round';
   g.lineJoin = 'round';
-  // 桥：过河的路段先画桥面和栏杆
+  const ground = G.roads; // 所有道路都在同一平面（没有高架桥）
+
+  // 1) 桥：过河的路段先画桥墩和栏杆
   for (const r of G.roads) {
-    if (r.kind === 'circle' || r.kind === 'dirt') continue;
+    if (r.pts.length < 2 || r.kind === 'dirt') continue;
     for (let k = 1; k < r.pts.length; k++) {
       const [x, y] = r.pts[k], [px, py] = r.pts[k - 1];
       if (!inMap(Math.floor(x), Math.floor(y)) || nat[idx(Math.floor(x), Math.floor(y))] !== TER.WATER) continue;
-      const len = Math.hypot(x - px, y - py) || 1, nx = -(y - py) / len, ny = (x - px) / len, o = r.w / 2 + 0.55;
+      const len = Math.hypot(x - px, y - py) || 1, nx = -(y - py) / len, ny = (x - px) / len, o = r.w / 2 + (r.kind === 'ave' ? 1.4 : 0.55);
       g.fillStyle = '#3a3f4d';
-      g.beginPath(); g.arc(x * TS, y * TS, (r.w / 2 + 0.75) * TS, 0, 7); g.fill();
+      g.beginPath(); g.arc(x * TS, y * TS, o * TS + 4, 0, 7); g.fill();
       if (k % 2 === 0) for (const s of [-1, 1]) {
         g.fillStyle = '#1a1c2c'; g.fillRect((x + nx * o * s) * TS - 3, (y + ny * o * s) * TS - 3, 6, 6);
         g.fillStyle = '#c8ccd8'; g.fillRect((x + nx * o * s) * TS - 2, (y + ny * o * s) * TS - 2, 4, 4);
       }
     }
   }
-  for (let layer = 0; layer < 3; layer++) {
-    for (const r of G.roads) {
-      const [extra, col] = ROAD_STYLE[r.kind][layer], w = (r.w + extra) * TS;
-      g.strokeStyle = g.fillStyle = col;
-      if (r.pts.length === 1) { g.beginPath(); g.arc(r.pts[0][0] * TS, r.pts[0][1] * TS, w / 2, 0, 7); g.fill(); continue; }
-      g.lineWidth = w;
-      path(r);
-      g.stroke();
+
+  // 2) 地面上的路（3 层）
+  for (let layer = 0; layer < 3; layer++) for (const r of ground) if (r.kind !== 'rail') strokeRoad(r, ...ROAD_STYLE[r.kind][layer]);
+  // 环岛中间的绿岛
+  for (const r of ground) {
+    if (r.kind !== 'ring') continue;
+    const cx = r.pts[0][0] * TS, cy = r.pts[0][1] * TS, ri = (r.r - r.w / 2) * TS;
+    g.fillStyle = '#b3b7c2'; g.beginPath(); g.arc(cx, cy, ri, 0, 7); g.fill();
+    g.fillStyle = '#4a8c3f'; g.beginPath(); g.arc(cx, cy, ri - 3, 0, 7); g.fill();
+    g.fillStyle = '#56994a'; g.beginPath(); g.arc(cx - 3, cy - 3, ri - 8, 0, 7); g.fill();
+    g.setLineDash([10, 10]); g.lineWidth = 2; g.strokeStyle = '#d8dde6';
+    g.beginPath(); g.arc(cx, cy, r.r * TS, 0, 7); g.stroke(); g.setLineDash([]);
+  }
+
+  // 3) 停车场：沥青 + 白色车位线
+  for (const [px, py, pw, ph] of G.parking || []) {
+    g.fillStyle = '#b3b7c2'; g.fillRect(px * TS - 2, py * TS - 2, pw * TS + 4, ph * TS + 4);
+    g.fillStyle = '#4b4f5e'; g.fillRect(px * TS, py * TS, pw * TS, ph * TS);
+    g.fillStyle = '#d8dde6';
+    for (let x = px; x <= px + pw; x++) {
+      g.fillRect(x * TS - 1, py * TS, 2, TS * 1.1);
+      g.fillRect(x * TS - 1, (py + ph) * TS - TS * 1.1, 2, TS * 1.1);
+    }
+    g.fillStyle = '#c9a23a'; g.fillRect(px * TS + 4, (py + ph / 2) * TS - 1, pw * TS - 8, 2);
+  }
+
+  // 4) 车道标线
+  g.lineCap = 'butt';
+  const dashed = (pts, col, w, dash) => { g.setLineDash(dash || []); g.lineWidth = w; g.strokeStyle = col; path(pts); g.stroke(); g.setLineDash([]); };
+  for (const r of ground) {
+    if (r.pts.length < 2) continue;
+    if (r.kind === 'ave') {
+      // 4 车道：中间双黄实线 + 两边白色虚线车道线
+      dashed(offsetPts(r.pts, 0.08), '#c9a23a', 2);
+      dashed(offsetPts(r.pts, -0.08), '#c9a23a', 2);
+      dashed(offsetPts(r.pts, r.w / 4), '#d8dde6', 2, [14, 14]);
+      dashed(offsetPts(r.pts, -r.w / 4), '#d8dde6', 2, [14, 14]);
+    } else if (r.kind === 'hwy') {
+      // 高速公路：3 车道，两条白色虚线车道线
+      dashed(offsetPts(r.pts, r.w / 6), '#d8dde6', 2, [16, 14]);
+      dashed(offsetPts(r.pts, -r.w / 6), '#d8dde6', 2, [16, 14]);
+    } else if (r.kind === 'street' || r.kind === 'rural') {
+      dashed(r.pts, '#c9a23a', 2, [12, 12]);
     }
   }
-  // 中间的黄色虚线
-  g.setLineDash([12, 12]);
-  g.lineWidth = 2;
-  g.strokeStyle = '#c9a23a';
-  for (const r of G.roads) {
-    if (r.pts.length < 2 || r.kind === 'dirt' || r.kind === 'circle') continue;
-    path(r);
-    g.stroke();
-  }
-  g.setLineDash([]);
-  // 路口斑马线（只在真的有路的方向画）
+
+  // 5) 斑马线（垂直于路的方向，一条条平行于车流）
   g.fillStyle = '#d8dde6';
-  for (const [x, y] of G.crosswalks || []) {
-    const road = (xx, yy) => inMap(Math.floor(xx), Math.floor(yy)) && G.terrain[idx(Math.floor(xx), Math.floor(yy))] === TER.ROAD;
-    if (!road(x - 0.5, y - 0.5)) continue;
-    for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
-      if (!road(x + dx * 2.6 - (dx ? 0 : 0.5), y + dy * 2.6 - (dy ? 0 : 0.5))) continue;
-      for (let k = 0; k < 5; k++) {
-        if (dx === 0) g.fillRect((x - 1) * TS + 4 + k * 12, (y + dy * 1.6 - 0.25) * TS, 6, 0.5 * TS);
-        else g.fillRect((x + dx * 1.6 - 0.25) * TS, (y - 1) * TS + 4 + k * 12, 0.5 * TS, 6);
-      }
-    }
+  for (const cw of G.crosswalks || []) {
+    if (cw.length < 4) continue;
+    const [x, y, a, w] = cw, n = Math.max(3, Math.round(w * 2));
+    g.save();
+    g.translate(x * TS, y * TS);
+    g.rotate(a);
+    for (let k = 0; k < n; k++) g.fillRect(-0.3 * TS, (-w / 2 + (k + 0.2) / n * w) * TS, 0.6 * TS, (w / n) * TS * 0.55);
+    g.fillRect(-0.55 * TS, -w / 2 * TS, 2, w * TS); // 停车线
+    g.restore();
   }
+
+  // 6) 铁路：碎石路基 + 枕木 + 两条钢轨（压在马路上面 = 平交道口）
+  for (const r of ground) {
+    if (r.kind !== 'rail') continue;
+    g.lineCap = 'round';
+    for (let layer = 0; layer < 3; layer++) strokeRoad(r, ...ROAD_STYLE.rail[layer]);
+    for (let k = 0; k < r.pts.length - 1; k++) {
+      const [x, y] = r.pts[k], [bx, by] = r.pts[k + 1], a = Math.atan2(by - y, bx - x);
+      g.save(); g.translate(x * TS, y * TS); g.rotate(a);
+      g.fillStyle = '#4a3a2a'; g.fillRect(-3, -0.55 * TS, 6, 1.1 * TS);
+      g.restore();
+    }
+    g.lineCap = 'butt';
+    for (const s of [-0.3, 0.3]) { dashed(offsetPts(r.pts, s), '#2b2e38', 4); dashed(offsetPts(r.pts, s), '#a7b2c2', 2); }
+  }
+
+  g.lineCap = 'round';
 }
 
 // 曲线路上的颗粒、裂缝、油渍、血迹

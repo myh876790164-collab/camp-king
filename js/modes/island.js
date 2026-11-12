@@ -850,7 +850,7 @@ MODES.island = {
     scatterNearCore('rock', 4, ang + 4.2, 0.5);
   },
 
-  buildList: ['shelter', 'workbench', 'farm', 'house', 'smelter', 'palisade', 'watchtower', 'garden', 'tavern', 'statue', 'signal'],
+  buildList: ['shelter', 'workbench', 'farm', 'house', 'smelter', 'palisade', 'gate', 'watchtower', 'garden', 'tavern', 'statue', 'signal'],
   buildings: {
     core: { name: '篝火营地', size: 2, hp: 500, housing: 2, happy: 5, light: 5, upgrade: { wood: 60, stone: 30, food: 20 }, desc: '大家围坐的地方，升级可多住 1 人' },
     shelter: { name: '草棚', hp: 80, cost: { wood: 15 }, housing: 2, desc: '简陋的住处，可住 2 人' },
@@ -858,7 +858,8 @@ MODES.island = {
     farm: { name: '农田', hp: 60, cost: { wood: 20, food: 5 }, farm: true, locked: true, desc: '派拿锄头的成员来务农' },
     house: { name: '木屋', hp: 150, cost: { wood: 40, stone: 15 }, housing: 4, happy: 3, locked: true, desc: '舒适的家，可住 4 人' },
     smelter: { name: '熔炼炉', hp: 150, cost: { wood: 20, stone: 40 }, light: 2, locked: true, desc: '可以制作铁器工具' },
-    palisade: { name: '木栅栏', sprite: 'wall', hp: 200, cost: { wood: 8 }, wall: true, locked: true, desc: '阻挡食人族' },
+    palisade: { name: '木栅栏', sprite: 'wall_log', wallStyle: 'log', hp: 200, cost: { wood: 8 }, wall: true, locked: true, desc: '阻挡食人族，相邻的栅栏和门会自动连成一片' },
+    gate: { name: '栅栏门', sprite: 'door_log', wallStyle: 'log', hp: 170, cost: { wood: 12 }, door: true, locked: true, desc: '成员可以进出，食人族过不去（比栅栏略脆）' },
     watchtower: { name: '瞭望塔', sprite: 'tower', hp: 150, cost: { wood: 40, stone: 15 }, attack: 'arrow', range: 5, dmg: 9, rate: 1.2, light: 2.5, locked: true, desc: '自动射击来犯的敌人' },
     garden: { name: '花园', hp: 60, cost: { wood: 10, food: 10 }, happy: 6, locked: true, desc: '让大家心情变好' },
     tavern: { name: '酒馆', hp: 150, cost: { wood: 60, stone: 30, food: 20 }, happy: 14, locked: true, desc: '大幅提升心情' },
@@ -873,7 +874,7 @@ MODES.island = {
     { id: 'stonetools', name: '石器', desc: '解锁 工作台，可以制作石器工具（干活速度 ×1.5）', cost: { wood: 30, stone: 20 }, unlock: ['workbench'] },
     { id: 'farming', name: '农耕', desc: '解锁 农田，可以制作锄头', cost: { wood: 40, food: 15 }, unlock: ['farm'] },
     { id: 'carpentry', name: '木工', desc: '解锁 木屋（可住 4 人）', cost: { wood: 60, stone: 20 }, unlock: ['house'] },
-    { id: 'defense', name: '防御工事', desc: '解锁 木栅栏、瞭望塔，可以制作矛', cost: { wood: 50, stone: 20 }, unlock: ['palisade', 'watchtower'] },
+    { id: 'defense', name: '防御工事', desc: '解锁 木栅栏、栅栏门、瞭望塔，可以制作矛', cost: { wood: 50, stone: 20 }, unlock: ['palisade', 'gate', 'watchtower'] },
     { id: 'irontools', name: '冶铁', desc: '解锁 熔炼炉，可以制作铁器工具（干活速度 ×2.2）', cost: { wood: 40, stone: 60 }, req: ['stonetools'], unlock: ['smelter'] },
     { id: 'gardening', name: '园艺', desc: '解锁 花园', cost: { wood: 20, food: 20 }, req: ['farming'], unlock: ['garden'] },
     { id: 'cooking', name: '烹饪', desc: '吃一顿饭顶得更久，所有人心情 +5', cost: { wood: 30, food: 30 }, req: ['fishing'], apply: (m) => { m.foodSave = 1; m.happy += 5; } },

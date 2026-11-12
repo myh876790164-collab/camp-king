@@ -511,4 +511,7 @@ function initSprites() {
   SPR.ctree = makeSprite(SPR_TREE, { G: 'g', l: 'Z', e: 'e' });
   SPR.zpine = makeSprite(SPR_PINE, { w: 'G' });
   SPR.dumpster = makeSprite(SPR_DUMPSTER);
+  initWallSprites(); // 墙和门的建造按钮图标（js/walls.js）
+  initInteriorSprites(); // 床的图标（js/interior.js）
+  initAbilitySprites(); // 晶核图标（js/abilities.js）
 }

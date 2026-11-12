@@ -11,14 +11,17 @@ function getPos(e) {
   return { x: e.clientX - r.left, y: e.clientY - r.top };
 }
 
-function minZoom() { return Math.max(0.8, Math.min(G.sw / (MAP_W * T), G.sh / (MAP_H * T)) * 0.95); }
+// 当前地图大小（在建筑里面时是室内地图）
+function worldW() { return G.inside ? G.inside.W * T : MAP_W * T; }
+function worldH() { return G.inside ? G.inside.H * T : MAP_H * T; }
+function minZoom() { return G.inside ? 1.6 : Math.max(0.8, Math.min(G.sw / (MAP_W * T), G.sh / (MAP_H * T)) * 0.95); }
 function defaultZoom() { return Math.max(2, Math.min(5, G.sw / (22 * T), G.sh / (16 * T))); }
 
 function clampCamera() {
   if (!G.cam) return;
   const z = G.cam.zoom, margin = 3 * T;
   const hw = G.sw / 2 / z, hh = G.sh / 2 / z;
-  const mw = MAP_W * T, mh = MAP_H * T;
+  const mw = worldW(), mh = worldH();
   G.cam.x = mw + margin * 2 < hw * 2 ? mw / 2 : Math.max(hw - margin, Math.min(mw + margin - hw, G.cam.x));
   G.cam.y = mh + margin * 2 < hh * 2 ? mh / 2 : Math.max(hh - margin, Math.min(mh + margin - hh, G.cam.y));
 }
@@ -37,6 +40,7 @@ function handleTap(sx, sy) {
   if (hit) { if (hit.onClick) hit.onClick(); return; }
   if (G.scene !== 'game' || G.state !== 'play') return;
   const t = screenToTile(sx, sy), w = screenToWorld(sx, sy);
+  if (G.inside && G.def.hooks.tapInside) { G.def.hooks.tapInside(t.x, t.y, w.x, w.y); return; } // 丧尸模式：在建筑里面
   if (G.buildMode) { tryBuild(G.buildMode, t.x, t.y); return; }
   if (G.def.hooks.onWorldTap && G.def.hooks.onWorldTap(w.x, w.y)) return;
   const b = inMap(t.x, t.y) ? G.bld[idx(t.x, t.y)] : null;

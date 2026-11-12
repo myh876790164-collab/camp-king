@@ -42,6 +42,14 @@ function render() {
   ctx.fillStyle = '#1a1c2c';
   ctx.fillRect(0, 0, G.canvas.width, G.canvas.height);
   if (G.scene !== 'game') { drawScene(ctx); return; }
+  // 丧尸模式：在建筑里面时画室内地图
+  if (G.inside && G.def.hooks.renderInside) {
+    G.def.hooks.renderInside(ctx);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawVignette(ctx);
+    drawUI(ctx);
+    return;
+  }
 
   const z = G.cam.zoom, hooks = G.def.hooks;
   const ox = Math.round((G.sw / 2 - G.cam.x * z) * dpr);
@@ -89,10 +97,11 @@ function render() {
   if (hooks.drawUnder) hooks.drawUnder(ctx, x0, y0, x1, y1);
 
   // 建筑（先画所有阴影，再画建筑本体）
-  for (const b of G.buildings) drawShadow(ctx, (b.x + b.size / 2) * T + 1, (b.y + b.size) * T - 1.5, b.size * T * 0.95, 0.75);
+  for (const b of G.buildings) if (!isWallLike(b)) drawShadow(ctx, (b.x + b.size / 2) * T + 1, (b.y + b.size) * T - 1.5, b.size * T * 0.95, 0.75);
   for (const b of G.buildings) {
-    const spr = buildingSprite(b), s = b.size * T;
-    ctx.drawImage(b.hit > 0 ? spr.white : spr.img, b.x * T, b.y * T, s, s);
+    const s = b.size * T;
+    if (isWallLike(b)) drawWallBuilding(ctx, b); // 墙和门自动拼接（js/walls.js）
+    else { const spr = buildingSprite(b); ctx.drawImage(b.hit > 0 ? spr.white : spr.img, b.x * T, b.y * T, s, s); }
     for (let i = 1; i < b.level; i++) {
       ctx.fillStyle = '#1a1c2c';
       ctx.fillRect(b.x * T + i * 3 - 2.5, b.y * T + 0.5, 3, 3);
@@ -128,7 +137,9 @@ function render() {
   if (G.buildMode && G.hover && inMap(G.hover.x, G.hover.y) && G.state === 'play') {
     const hx = G.hover.x, hy = G.hover.y, ok = !placeProblem(G.buildMode, hx, hy);
     ctx.globalAlpha = 0.6;
-    ctx.drawImage(SPR[bdef(G.buildMode).sprite || G.buildMode].img, hx * T, hy * T, 16, 16);
+    const bd = bdef(G.buildMode);
+    if (bd.wall || bd.door) drawWallPreview(ctx, G.buildMode, hx, hy);
+    else ctx.drawImage(SPR[bd.sprite || G.buildMode].img, hx * T, hy * T, 16, 16);
     ctx.globalAlpha = 1;
     ctx.fillStyle = ok ? 'rgba(56,183,100,0.35)' : 'rgba(177,62,83,0.45)';
     ctx.fillRect(hx * T, hy * T, T, T);
@@ -141,6 +152,7 @@ function render() {
   G.monsters.sort((a, b) => a.y - b.y);
   for (const m of G.monsters) {
     const spr = SPR[m.def.sprite || m.type], s = m.def.scale || 1, w = spr.w * s, h = spr.h * s;
+    if (hooks.drawMonsterFx) hooks.drawMonsterFx(ctx, m); // 丧尸模式：变异光环、冻结、混乱等
     const bob = m.def.fly ? Math.sin(G.time * 10 + m.bob) * 2 : -Math.abs(Math.sin(G.time * 8 + m.bob)) * 1.5 * s;
     drawShadow(ctx, m.x, m.y + (m.def.fly ? 4 : 2.5) * s, (m.def.fly ? 8 : 12) * s, m.def.fly ? 0.5 : 0.9);
     const img = m.hit > 0 ? spr.white : (m.face < 0 ? spr.flip : spr.img);
@@ -186,7 +198,11 @@ function drawProjectilesAndEffects(ctx) {
   }
   ctx.stroke();
   for (const p of G.projectiles) {
-    if (p.kind === 'rock') {
+    if (p.kind === 'blade') { // 御剑：银色飞刃
+      ctx.strokeStyle = '#dff6ff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(p.x - p.vx * 6, p.y - p.vy * 6); ctx.lineTo(p.x, p.y); ctx.stroke();
+      ctx.lineWidth = 1;
+    } else if (p.kind === 'rock') {
       ctx.fillStyle = '#1a1c2c'; ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
       ctx.fillStyle = '#94b0c2'; ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3);
     } else if (p.kind === 'ice') {
@@ -210,8 +226,15 @@ function drawProjectilesAndEffects(ctx) {
         const a = j * 0.785 + e.size;
         ctx.fillRect(e.x + Math.cos(a) * r - q / 2, e.y + Math.sin(a) * r * 0.8 - q / 2 - k * 3, q, q);
       }
+    } else if (e.type === 'ring') { // 精神冲击之类的扩散圆环
+      ctx.strokeStyle = e.color || '#f4f4f4';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.size * (0.2 + k * 0.8), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.lineWidth = 1;
     } else if (e.type === 'boom') {
-      ctx.fillStyle = '#ef7d57';
+      ctx.fillStyle = e.color || '#ef7d57';
       ctx.beginPath();
       ctx.arc(e.x, e.y, e.size * (0.5 + k * 0.5), 0, Math.PI * 2);
       ctx.fill();
@@ -228,7 +251,7 @@ function drawProjectilesAndEffects(ctx) {
       }
       ctx.lineWidth = 1;
     } else if (e.type === 'tracer') {
-      ctx.strokeStyle = '#ef7d57';
+      ctx.strokeStyle = e.color || '#ef7d57';
       ctx.beginPath();
       ctx.moveTo(e.x, e.y);
       ctx.lineTo(e.tx, e.ty);

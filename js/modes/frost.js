@@ -66,14 +66,16 @@ MODES.frost = {
     coal: { name: '煤矿石', res: 'coal', amount: 30, clusters: 5, perCluster: 4, spread: 1.4, regrow: 3 },
   },
 
-  buildList: ['wall', 'stonewall', 'tower', 'cannon', 'flame', 'heater', 'lumber', 'quarry', 'coalmine'],
+  buildList: ['wall', 'door', 'stonewall', 'stonedoor', 'tower', 'cannon', 'flame', 'heater', 'lumber', 'quarry', 'coalmine'],
   buildings: {
     core: {
       name: '熔炉', size: 2, hp: 700, attack: 'arrow', range: 4, dmg: 8, rate: 1, light: 6,
       upgrade: { wood: 80, stone: 60 }, desc: '营地的心脏，升级提高热量',
     },
-    wall: { name: '木墙', hp: 200, cost: { wood: 8 }, wall: true, desc: '阻挡怪物前进' },
-    stonewall: { name: '石墙', hp: 600, cost: { stone: 12 }, wall: true, locked: true, desc: '非常结实的墙' },
+    wall: { name: '木墙', hp: 200, cost: { wood: 8 }, wall: true, wallStyle: 'wood', sprite: 'wall_wood', desc: '阻挡怪物前进，相邻的墙和门会自动连成一片' },
+    door: { name: '木门', hp: 170, cost: { wood: 12 }, door: true, wallStyle: 'wood', sprite: 'door_wood', desc: '自己人可以进出，怪物过不去（比木墙略脆）' },
+    stonewall: { name: '石墙', hp: 600, cost: { stone: 12 }, wall: true, wallStyle: 'stone', sprite: 'wall_stone', locked: true, desc: '非常结实的墙' },
+    stonedoor: { name: '石门', hp: 500, cost: { stone: 14, wood: 4 }, door: true, wallStyle: 'stone', sprite: 'door_stone', locked: true, desc: '自己人可以进出，怪物过不去（比石墙略脆）' },
     tower: { name: '箭塔', hp: 150, cost: { wood: 30, stone: 10 }, attack: 'arrow', range: 5, dmg: 10, rate: 1.5, light: 2.5, desc: '快速射击单个敌人' },
     cannon: { name: '投石塔', hp: 220, cost: { wood: 40, stone: 40, coal: 5 }, attack: 'rock', range: 4.5, dmg: 22, rate: 0.5, splash: 1.3, light: 2, desc: '范围伤害' },
     flame: {
@@ -92,7 +94,7 @@ MODES.frost = {
   techs: [
     { id: 'heating', name: '供暖技术', desc: '解锁 加热器（局部升温）', cost: { stone: 30, coal: 15 }, unlock: ['heater'] },
     { id: 'insulation', name: '保温材料', desc: '所有地方温度 +5°C', cost: { wood: 80, stone: 30 }, apply: (m) => { m.warm += 5; } },
-    { id: 'mason', name: '石工', desc: '解锁 石墙', cost: { wood: 40, stone: 30 }, unlock: ['stonewall'] },
+    { id: 'mason', name: '石工', desc: '解锁 石墙、石门', cost: { wood: 40, stone: 30 }, unlock: ['stonewall', 'stonedoor'] },
     { id: 'tools', name: '精良工具', desc: '自动采集速度 +25%，点击采集 +1', cost: { wood: 60, stone: 40 }, apply: (m) => { m.gather *= 1.25; m.tap += 1; } },
     { id: 'steam', name: '蒸汽核心', desc: '炉火最高等级提升到 4', cost: { stone: 80, coal: 40 }, req: ['heating'], apply: (m) => { m.furnaceMax = 4; } },
     { id: 'pyro', name: '火焰学', desc: '解锁 火焰塔（燃烧敌人并供暖）', cost: { stone: 50, coal: 30 }, req: ['heating'], unlock: ['flame'] },

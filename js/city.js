@@ -17,6 +17,7 @@ const STRUCTS = {
   school: { name: '学校', w: 6, h: 4, ex: 10, search: 4, dur: 2, danger: 3, loot: { food: [2, 6, 0.6], water: [2, 6, 0.6], parts: [1, 4, 0.5], c: 0.15 } },
   factory: { name: '工厂', w: 6, h: 4, ex: 14, search: 5, dur: 2.4, danger: 3, loot: { parts: [6, 14, 0.95] } },
   gasstation: { name: '加油站', w: 4, h: 3, ex: 8, search: 3, dur: 1.8, danger: 1, loot: { parts: [3, 8, 0.8], food: [1, 4, 0.5], water: [1, 4, 0.5] } },
+  warehouse: { name: '仓库', w: 6, h: 4, ex: 8, search: 4, dur: 2.2, danger: 2, loot: { parts: [4, 10, 0.9], food: [1, 4, 0.4], water: [1, 4, 0.4] } },
   barn: { name: '谷仓', w: 4, h: 3, ex: 12, search: 3, dur: 1.8, danger: 1, loot: { food: [3, 8, 0.7], parts: [2, 5, 0.6], w: 0.1, wPool: ['axe', 'bat', 'knife'] } },
   fountain: { name: '喷泉', w: 2, h: 2, ex: 0, search: 1, dur: 1.2, danger: 0, restock: 1, loot: { water: [4, 9, 1] } },
 };
@@ -336,6 +337,28 @@ const STRUCT_PAINT = {
     P(10, 30, 2, H - 34, '#8b93a3'); P(42, 30, 2, H - 34, '#8b93a3'); // 柱子
     P(20, 14, 14, 6, '#b13e53'); P(22, 15.5, 10, 3, '#f4f4f4');
   },
+  warehouse(p) {
+    const { W, H, P, R } = p;
+    const fh = 20;
+    p.roofFlat(1, 1, W - 2, H - fh, '#9aa0ad');
+    for (let x = 8; x < W - 10; x += 16) { P(x, 6, 10, 4, '#1a1c2c'); P(x + 0.5, 6.5, 9, 3, '#73a7e0'); P(x + 1, 7, 3, 0.75, '#c8e0ff'); } // 天窗
+    for (let x = 6; x < W - 6; x += 18) { P(x, 22, 10, 4, '#1a1c2c'); P(x + 0.5, 22.5, 9, 3, '#73a7e0'); }
+    p.facade(1, H - fh, W - 2, fh, '#b0b6c4');
+    for (let x = 3; x < W - 2; x += 3) P(x, H - fh + 2, 0.5, fh - 4, '#8b93a3');
+    P(1.5, H - fh + 1.5, W - 3, 1.5, '#41579a');
+    // 三个装卸口（编号、有的卷帘门半开）
+    for (let k = 0; k < 3; k++) {
+      const x = 6 + k * 30;
+      P(x, H - 15, 22, 14, '#1a1c2c');
+      const open = R() < 0.4 ? 6 : 0;
+      P(x + 0.5, H - 14.5, 21, 13 - open, '#8b93a3');
+      for (let yy = H - 13; yy < H - 1.5 - open; yy += 2) P(x + 0.5, yy, 21, 0.5, '#6b7282');
+      if (open) P(x + 0.5, H - 1.5 - open, 21, open, '#262b3a');
+      P(x + 9, H - 18.5, 4, 3, '#ffcd75'); P(x + 10, H - 18, 2, 2, '#1a1c2c');
+      P(x - 1, H - 4, 1.5, 3, '#1a1c2c'); P(x + 21.5, H - 4, 1.5, 3, '#1a1c2c'); // 防撞墩
+    }
+    p.decay(1, H - fh, W - 2, fh);
+  },
   barn(p) {
     const { W, H, P, box, R } = p;
     const fh = 22, rh = H - fh + 2;
@@ -398,6 +421,12 @@ const DECOR_PAINT = {
   bench: [14, 7, (P) => { P(0, 0.5, 14, 2, '#6e4a2e'); P(0, 3, 14, 2, '#8f6a42'); P(1, 5, 1, 2, '#1a1c2c'); P(12, 5, 1, 2, '#1a1c2c'); }],
   papers: [8, 4, (P) => { P(0, 1, 3, 2, '#d8dde6'); P(4, 0, 3, 2, '#c9b7a0'); P(5, 2.5, 2, 1.5, '#f4f4f4'); }],
   barrier: [16, 7, (P) => { P(0, 1, 16, 4, '#1a1c2c'); for (let i = 0; i < 4; i++) P(0.5 + i * 4, 1.5, 2, 3, i % 2 ? '#f4f4f4' : '#b13e53'); P(2, 5, 1, 2, '#333c57'); P(13, 5, 1, 2, '#333c57'); }],
+  // 红绿灯（停电了，灯都是暗的，偶尔一个还闪红灯）
+  signal: [8, 24, (P, lit) => {
+    P(3.5, 8, 1.5, 15, '#333c57'); P(3, 22, 2.5, 2, '#1a1c2c');
+    P(1.5, 0, 5, 10, '#1a1c2c'); P(2, 0.5, 4, 9, '#262b3a');
+    P(3, 1.5, 2, 2, lit ? '#ef7d57' : '#4a2a30'); P(3, 4, 2, 2, '#4a4228'); P(3, 6.5, 2, 2, '#1f3a2a');
+  }],
 };
 const DECOR_IMG = {};
 function decorImg(kind, lit) {
@@ -411,27 +440,34 @@ function decorImg(kind, lit) {
   return DECOR_IMG[key];
 }
 
-// ---------- 城市地图生成（参考《僵尸毁灭工程》的布局） ----------
-// 不是整齐的棋盘：
-//   · 主镇：中间一小片不规则的街道网格（营地就在这里），还有一条斜穿的林荫道
-//   · 一条弯曲的高速公路横穿地图，路上堵满废弃汽车，路边有加油站和工厂
-//   · 西边一条蜿蜒的河，路过河的地方是桥
-//   · 弯弯曲曲的乡道连接东边的小村庄、河对岸的郊区住宅区（带尽头回车场）
-//   · 乡道旁的农场（农舍 + 谷仓 + 农田），其余地方是大片森林和草地
-// G.roads 记录每条路的中心线，画地面时用平滑曲线画出来（游戏逻辑仍按格子）
+// ---------- 城市地图生成（按真实城市规划） ----------
+// 道路分级：高速公路 → 主干道（4 车道，有行道树）→ 次干道 → 支路 → 小巷
+//   · 主干道「中央大道」（东西）和「林荫大道」（南北）在环岛交汇
+//   · 高速公路在北边，和林荫大道平面相交（T 字路口，没有高架桥）
+//   · 铁路贴着工业区，过马路的地方是平交道口
+// 功能分区：
+//   · 市中心商务区（东）：小街区、写字楼、公寓、商店、广场
+//   · 老城区（中）：营地所在，警局、消防站、医院等公共设施
+//   · 工业区（西北，靠铁路和高速）：工厂、仓库、加油站
+//   · 住宅区（南）：支路网格（有 T 字路口）、民居、学校、社区公园
+//   · 郊区（河西）：弯曲的道路 + 尽头回车场
+//   · 城北：农田、树林
+// 大型商业建筑旁边有停车场；主干道路口有红绿灯和斑马线
 function cityMapGen(campType) {
   const N = MAP_W * MAP_H;
+  G.citySeed = randInt(1, 1e9); // 建筑内部布局用的随机种子（存档里保存，读档后户型不变）
   G.structs = [];
   G.decor = [];
   G.structAt = new Int16Array(N).fill(-1);
   G.roads = [];
   G.fields = [];
   G.crosswalks = [];
-  const nat = (G.natTer = new Uint8Array(N).fill(TER.GRASS)); // 路面下面原本的地形（画地面用）
+  G.parking = [];
+  const nat = (G.natTer = new Uint8Array(N).fill(TER.GRASS));
   G.terrain.fill(TER.GRASS);
   const roadMask = new Uint8Array(N), sidewalk = new Uint8Array(N), occ = new Uint8Array(N), noTree = new Uint8Array(N);
+  const owner = new Int16Array(N); // 每格马路属于哪条路（找路口用）
   const ccx = G.coreX + 1, ccy = G.coreY + 1;
-  const setT = (x, y, t, n) => { if (!inMap(x, y)) return; const i = idx(x, y); G.terrain[i] = t; if (n !== undefined) nat[i] = n; };
 
   // ---- 曲线工具 ----
   const cr = (p0, p1, p2, p3, t) => {
@@ -457,7 +493,6 @@ function cityMapGen(campType) {
     out.push(ctrl[ctrl.length - 1]);
     return resample(out, 0.5);
   };
-  // 从 a 到 b 的弯曲路线：中间加几个随机偏移的控制点
   const wiggle = (a, b, amp, n) => {
     const ctrl = [a], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1;
     for (let k = 1; k < n; k++) {
@@ -467,122 +502,160 @@ function cityMapGen(campType) {
     ctrl.push(b);
     return smooth(ctrl);
   };
+  const line = (a, b) => resample([a, b], 0.5);
+  const SIDE = { ave: 1, street: 1, local: 1 };
+  const CROSS = { ave: 1, street: 1, local: 1, ring: 1 }; // 这些路相交会画斑马线
   // 把路“刷”到格子上
   const addRoad = (pts, w, kind) => {
+    const id = G.roads.length + 1;
     const road = { pts: pts.map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100]), w, kind };
     G.roads.push(road);
-    const side = kind === 'street' ? 1 : 0, r = w / 2 + side + 1;
+    const side = SIDE[kind] ? 1 : 0, r = w / 2 + side + 1;
     for (const [px, py] of pts) {
       for (let y = Math.floor(py - r); y <= py + r; y++) for (let x = Math.floor(px - r); x <= px + r; x++) {
         if (!inMap(x, y)) continue;
         const i = idx(x, y), d = Math.hypot(x + 0.5 - px, y + 0.5 - py);
         if (d <= w / 2 + 0.15) {
-          if (kind === 'dirt') { if (G.terrain[i] === TER.WATER) continue; if (G.terrain[i] !== TER.ROAD) G.terrain[i] = TER.DIRT; }
+          if (kind === 'dirt' || kind === 'rail') { if (G.terrain[i] !== TER.ROAD && !(kind === 'dirt' && G.terrain[i] === TER.WATER)) G.terrain[i] = TER.DIRT; }
           else { G.terrain[i] = TER.ROAD; sidewalk[i] = 0; }
+          if (CROSS[kind]) owner[i] = owner[i] === 0 || owner[i] === id ? id : -1;
           roadMask[i] = 1;
         } else if (side && d <= w / 2 + 1.1 && G.terrain[i] !== TER.ROAD && G.terrain[i] !== TER.WATER) {
-          G.terrain[i] = TER.PAVE; sidewalk[i] = 1;
+          G.terrain[i] = TER.PAVE; sidewalk[i] = 1; roadMask[i] = 2;
         }
         if (d <= w / 2 + 2.5) noTree[i] = 1;
       }
     }
     return road;
   };
-  const cul = (x, y) => { // 尽头回车场（圆形掉头区）
-    G.roads.push({ pts: [[x, y]], w: 4, kind: 'circle' });
-    for (let yy = Math.floor(y - 3); yy <= y + 3; yy++) for (let xx = Math.floor(x - 3); xx <= x + 3; xx++) {
-      if (!inMap(xx, yy)) continue;
-      const i = idx(xx, yy);
-      if (Math.hypot(xx + 0.5 - x, yy + 0.5 - y) <= 2.15) { G.terrain[i] = TER.ROAD; roadMask[i] = 1; }
+  // 环岛：一圈 3 车道的环形路，中间是绿岛 + 喷泉
+  const ring = (cx, cy, r, w) => {
+    const id = G.roads.length + 1;
+    G.roads.push({ pts: [[cx, cy]], r, w, kind: 'ring' });
+    for (let y = Math.floor(cy - r - 3); y <= cy + r + 3; y++) for (let x = Math.floor(cx - r - 3); x <= cx + r + 3; x++) {
+      if (!inMap(x, y)) continue;
+      const i = idx(x, y), d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+      if (Math.abs(d - r) <= w / 2 + 0.15) { G.terrain[i] = TER.ROAD; sidewalk[i] = 0; roadMask[i] = 1; owner[i] = owner[i] === 0 || owner[i] === id ? id : -1; }
+      else if (d > r && d <= r + w / 2 + 1.1 && G.terrain[i] !== TER.ROAD) { G.terrain[i] = TER.PAVE; sidewalk[i] = 1; roadMask[i] = 2; }
+      else if (d < r - w / 2) { roadMask[i] = 2; }
       noTree[i] = 1;
     }
   };
-  const nearestOn = (road, x, y) => road.pts.reduce((b, p) => (Math.hypot(p[0] - x, p[1] - y) < Math.hypot(b[0] - x, b[1] - y) ? p : b));
+  const cul = (x, y) => {
+    G.roads.push({ pts: [[x, y]], w: 4, kind: 'circle' });
+    for (let yy = Math.floor(y - 3); yy <= y + 3; yy++) for (let xx = Math.floor(x - 3); xx <= x + 3; xx++) {
+      if (!inMap(xx, yy)) continue;
+      const i = idx(xx, yy), d = Math.hypot(xx + 0.5 - x, yy + 0.5 - y);
+      if (d <= 2.15) { G.terrain[i] = TER.ROAD; roadMask[i] = 1; }
+      else if (d <= 3.2 && G.terrain[i] !== TER.ROAD && G.terrain[i] !== TER.WATER) { G.terrain[i] = TER.PAVE; sidewalk[i] = 1; roadMask[i] = 2; }
+      noTree[i] = 1;
+    }
+  };
   const pointAt = (road, f) => road.pts[Math.floor((road.pts.length - 1) * f)];
 
-  // ---- 1) 河流（西边，蜿蜒） ----
-  const rx0 = randInt(22, 26), k1 = rand(0, 6.28), k2 = rand(0, 6.28);
-  const riverX = (y) => rx0 + 4 * Math.sin(y / 12 + k1) + 2 * Math.sin(y / 5 + k2);
+  // ---- 0) 主要坐标 ----
+  const BX = ccx + 9, AY = ccy - 10;           // 林荫大道 x、中央大道 y（环岛在交点）
+  const hwyY = Math.max(5, AY - randInt(25, 27)); // 高速公路
+  const railY = AY - randInt(16, 17);          // 铁路
+  const RIVER = randInt(14, 16);               // 河的大致 x
+  const k1 = rand(0, 6.28), k2 = rand(0, 6.28);
+  const riverX = (y) => RIVER + 2.5 * Math.sin(y / 11 + k1) + 1.2 * Math.sin(y / 4.7 + k2);
+  const zoneAt = (x, y) => {
+    if (y < railY) return x < BX ? 'industry' : 'farm';
+    if (x < riverX(y) + 3) return 'suburb';
+    if (y < AY && x < BX) return 'industry';
+    if (x >= BX && y < AY + 20) return 'cbd';
+    if (y >= AY + 18) return 'resid';
+    return 'old';
+  };
+
+  // ---- 1) 河流 + 河边绿地 ----
   for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
-    if (Math.abs(x + 0.5 - riverX(y + 0.5)) < 1.8) setT(x, y, TER.WATER, TER.WATER);
+    const d = Math.abs(x + 0.5 - riverX(y + 0.5));
+    if (d < 1.8) { G.terrain[idx(x, y)] = TER.WATER; nat[idx(x, y)] = TER.WATER; }
+    else if (d < 3.6) roadMask[idx(x, y)] = roadMask[idx(x, y)] || 3; // 河边不盖楼（滨河绿地）
   }
 
-  // ---- 2) 主镇街道网格（间距不均匀，有的路段缺失，营地街区四周一定有路） ----
-  const vx = [ccx - 21 + randInt(-1, 1), ccx - 9, ccx + 8, ccx + 20 + randInt(-1, 1)];
-  const hy = [ccy - 19 + randInt(-1, 1), ccy - 8, ccy + 7, ccy + 17 + randInt(-1, 1)];
-  const town = { x0: vx[0] - 3, x1: vx[3] + 3, y0: hy[0] - 3, y1: hy[3] + 3 };
-  const vSeg = [], hSeg = [];
-  for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) {
-    const must = (i === 1 || i === 2) && j === 1;
-    vSeg.push(must || Math.random() < 0.82 ? [i, j] : null);
+  // ---- 2) 道路骨架 ----
+  // 高速公路
+  const hwy = addRoad(wiggle([-2, hwyY + rand(-1.5, 1.5)], [MAP_W + 2, hwyY + rand(-1.5, 1.5)], 2, 5), 3, 'hwy');
+  // 铁路
+  const rail = addRoad(wiggle([-2, railY + rand(-1, 1)], [MAP_W + 2, railY + rand(-1, 1)], 1, 4), 1.4, 'rail');
+  // 中央大道（东西向主干道，过河有桥），在环岛处断开
+  const R = 3.6;
+  addRoad(wiggle([-2, AY + rand(-2, 2)], [BX - R - 1.2, AY], 1.5, 4), 4, 'ave');
+  addRoad(wiggle([BX + R + 1.2, AY], [MAP_W + 2, AY + rand(-2, 2)], 1.2, 3), 4, 'ave');
+  // 林荫大道（南北向主干道）：北段穿过铁路，在高速公路处形成平面 T 字路口（没有高架桥）
+  const hwyAtBX = hwy.pts.reduce((b, q) => (Math.abs(q[0] - BX) < Math.abs(b[0] - BX) ? q : b));
+  addRoad(line([BX, AY - R - 1.2], [BX, hwyAtBX[1] + 1.5]), 4, 'ave'); // 停在高速公路南侧边线，人行道不会伸到路对面
+  addRoad(wiggle([BX, AY + R + 1.2], [BX + rand(-6, 6), MAP_H + 2], 2, 4), 4, 'ave');
+  ring(BX, AY, R, 3);
+  // 次干道（老城区 + 商务区 + 工业区）
+  const XW1 = BX - 18, XW2 = BX - 34;          // 老城区两条南北街
+  const YS = AY + 18;                          // 老城区南边的东西街
+  addRoad(line([XW1, AY + 2], [XW1, MAP_H + 2]), 2, 'street');
+  addRoad(line([XW2, railY + 1.5], [XW2, MAP_H + 2]), 2, 'street');
+  addRoad(wiggle([-2, YS + rand(-1, 1)], [XW1, YS], 1, 3), 2, 'street');
+  addRoad(line([XW1, YS], [BX - 2, YS]), 2, 'street');
+  addRoad(line([BX + 2, YS], [MAP_W + 2, YS]), 2, 'street');
+  const YN = AY - 9;                           // 工业区和商务区之间的东西街（过河）
+  addRoad(wiggle([-2, YN + rand(-1, 1)], [BX - 2, YN], 1, 3), 2, 'street');
+  addRoad(line([BX + 2, YN], [MAP_W + 2, YN]), 2, 'street');
+  for (const x of [BX + 11, BX + 22, BX + 33]) if (x < MAP_W - 3) addRoad(line([x, railY + 1.5], [x, YS]), 2, 'street');
+  addRoad(line([BX + 2, AY + 10], [MAP_W + 2, AY + 10]), 2, 'local');
+  addRoad(line([XW2, AY + 9], [XW1, AY + 9]), 1, 'alley');         // 老城区后巷
+  addRoad(line([BX - 30 + randInt(0, 6), railY + 1.5], [BX - 30 + randInt(0, 6), YN]), 2, 'street'); // 工业区
+  // 住宅区支路网格：有的路段缺失，形成 T 字路口
+  const rx = [XW2, XW2 + 8, XW1, XW1 + 9, BX];
+  for (let x = BX + 10; x < MAP_W - 3; x += randInt(9, 11)) rx.push(x);
+  const ry = [YS];
+  for (let y = YS + 9; y < MAP_H - 2; y += randInt(9, 10)) ry.push(y);
+  for (let j = 1; j < ry.length; j++) for (let i = 0; i + 1 < rx.length; i++) {
+    if (Math.random() < 0.85) addRoad(line([rx[i] + (i ? 0 : 0), ry[j]], [rx[i + 1], ry[j]]), 2, 'local');
   }
-  for (let j = 0; j < 4; j++) for (let i = 0; i < 3; i++) {
-    const must = (j === 1 || j === 2) && i === 1;
-    hSeg.push(must || Math.random() < 0.82 ? [i, j] : null);
+  for (let i = 0; i < rx.length; i++) {
+    if (rx[i] === XW1 || rx[i] === XW2 || rx[i] === BX) continue;
+    for (let j = 0; j + 1 < ry.length; j++) if (Math.random() < 0.8) addRoad(line([rx[i], ry[j]], [rx[i], ry[j + 1]]), 2, 'local');
   }
-  for (const s of vSeg) if (s) addRoad(resample([[vx[s[0]], hy[s[1]]], [vx[s[0]], hy[s[1] + 1]]], 0.5), 2, 'street');
-  for (const s of hSeg) if (s) addRoad(resample([[vx[s[0]], hy[s[1]]], [vx[s[0] + 1], hy[s[1]]]], 0.5), 2, 'street');
-  // 路口斑马线
-  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) G.crosswalks.push([vx[i], hy[j]]);
-  // 斜穿城区西北角的林荫道（打破棋盘格）
-  const diag = addRoad(wiggle([vx[0], hy[1] + 1], [vx[1] - 1, hy[0]], 2, 3), 2, 'street');
-
-  // ---- 3) 高速公路（北边，横穿全图，过河有桥） ----
-  const hwyY = Math.max(4, hy[0] - randInt(9, 12));
-  const hwy = addRoad(wiggle([-2, hwyY + rand(-3, 3)], [MAP_W + 2, hwyY + rand(-3, 3)], 5, 6), 3, 'hwy');
-  // 城区北边两条路连到高速
-  for (const x of [vx[1], vx[3]]) {
-    const p = nearestOn(hwy, x, hy[0]);
-    addRoad(wiggle([x, hy[0]], [p[0], p[1]], 1.5, 2), 2, 'rural');
-  }
-
-  // ---- 4) 东边的村庄 + 连接的乡道 ----
-  const vcx = Math.min(MAP_W - 12, vx[3] + randInt(16, 20)), vcy = Math.min(MAP_H - 12, hy[2] + randInt(4, 8));
-  const vill = [];
-  vill.push(addRoad(resample([[vcx - 7, vcy], [vcx + 8, vcy]], 0.5), 2, 'street'));
-  vill.push(addRoad(resample([[vcx, vcy - 8], [vcx, vcy + 9]], 0.5), 2, 'street'));
-  vill.push(addRoad(wiggle([vcx + 8, vcy], [vcx + 6, vcy - 12], 2, 2), 2, 'street'));
-  G.crosswalks.push([vcx, vcy]);
-  const eastRoad = addRoad(wiggle([vx[3], hy[1]], [vcx - 7, vcy], 4, 4), 2, 'rural');
-  addRoad(wiggle([vcx, vcy - 8], nearestOn(hwy, vcx + 4, vcy - 20), 3, 3), 2, 'rural');
-
-  // ---- 5) 河对岸的郊区：一条弯路 + 几条尽头路 ----
-  const subRoad = addRoad(wiggle([vx[0], hy[2]], [6, hy[2] + randInt(6, 14)], 4, 4), 2, 'rural'); // 过河
-  const subMain = addRoad(wiggle([8, hy[0] - 2], [9, Math.min(MAP_H - 4, hy[3] + 8)], 3, 5), 2, 'street');
+  addRoad(line([rx[0] - 0, ry[ry.length - 1]], [MAP_W + 2, ry[ry.length - 1]]), 2, 'local');
+  // 河西郊区：弯路 + 尽头路
+  const sub = addRoad(wiggle([5, railY + 2], [6, MAP_H - 3], 2.5, 5), 2, 'local');
   for (let k = 0; k < 4; k++) {
-    const p = pointAt(subMain, 0.12 + k * 0.24), dir = k % 2 ? -1 : 1;
-    const end = [Math.max(3, Math.min(riverX(p[1]) - 4, p[0] + dir * randInt(5, 8))), p[1] + rand(-3, 3)];
-    if (Math.abs(end[0] - p[0]) < 3) continue;
-    addRoad(wiggle(p, end, 1.2, 2), 2, 'street');
+    const p = pointAt(sub, 0.15 + k * 0.23), toRiver = k % 2 === 0;
+    const end = [toRiver ? Math.min(riverX(p[1]) - 4.5, p[0] + randInt(5, 7)) : Math.max(2.5, p[0] - 3), p[1] + rand(-2, 2)];
+    if (Math.abs(end[0] - p[0]) < 2.5) continue;
+    addRoad(wiggle(p, end, 0.8, 2), 2, 'local');
     cul(end[0], end[1]);
   }
-  // 东北角的郊区（城区和村庄之间）
-  const neStart = pointAt(eastRoad, 0.45);
-  const ne = addRoad(wiggle(neStart, [neStart[0] + rand(-3, 3), neStart[1] - randInt(10, 14)], 3, 3), 2, 'street');
-  cul(ne.pts[ne.pts.length - 1][0], ne.pts[ne.pts.length - 1][1]);
-
-  // ---- 6) 往南的乡道 + 农场的土路 ----
-  const south = addRoad(wiggle([vx[2], hy[3]], [vx[2] + rand(-14, 14), MAP_H + 2], 6, 4), 2, 'rural');
+  // 城北：农田的土路
   const farmRoads = [];
-  for (const f of [0.35, 0.75]) {
-    const p = pointAt(south, f), dir = Math.random() < 0.5 ? -1 : 1;
-    farmRoads.push({ road: addRoad(wiggle(p, [p[0] + dir * randInt(10, 14), p[1] + rand(-3, 3)], 1.5, 2), 1, 'dirt'), dir });
+  for (const fx of [BX + 14, BX + 32]) {
+    if (fx > MAP_W - 8) continue;
+    const p = hwy.pts.reduce((b, q) => (Math.abs(q[0] - fx) < Math.abs(b[0] - fx) ? q : b));
+    farmRoads.push(addRoad(line([fx, p[1] + 1.5], [fx + rand(-1, 1), railY - 1.5]), 1, 'dirt'));
   }
-  const p2 = pointAt(subRoad, 0.6);
-  farmRoads.push({ road: addRoad(wiggle(p2, [p2[0] + rand(-3, 3), Math.min(MAP_H - 4, p2[1] + randInt(9, 12))], 1.5, 2), 1, 'dirt'), dir: 1 });
+
+  // ---- 3) 地面：商务区是硬化广场，工业区是土地，营地街区清空 ----
+  for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
+    const i = idx(x, y);
+    if (roadMask[i] === 1 || sidewalk[i] || G.terrain[i] === TER.WATER) continue;
+    const z = zoneAt(x, y);
+    if (z === 'cbd') { G.terrain[i] = TER.PAVE; nat[i] = TER.PAVE; }
+    else if (z === 'industry') { G.terrain[i] = TER.DIRT; nat[i] = TER.DIRT; }
+  }
 
   // ---- 建筑放置工具 ----
   const fits = (x, y, w, h) => {
     if (x < 1 || y < 1 || x + w >= MAP_W - 1 || y + h >= MAP_H - 1) return false;
     for (let yy = y - 1; yy <= y + h; yy++) for (let xx = x - 1; xx <= x + w; xx++) {
       const i = idx(xx, yy), inside = xx >= x && xx < x + w && yy >= y && yy < y + h;
-      if (occ[i] || roadMask[i]) return false;
-      if (inside && (G.terrain[i] === TER.WATER || sidewalk[i] || G.nodes[i])) return false;
+      if (occ[i] || roadMask[i] === 1) return false;
+      if (inside && (roadMask[i] || G.terrain[i] === TER.WATER || G.nodes[i])) return false;
     }
     return true;
   };
-  const nearRoad = (x, y, w, h, r) => {
-    for (let yy = y - r; yy < y + h + r; yy++) for (let xx = x - r; xx < x + w + r; xx++) if (inMap(xx, yy) && roadMask[idx(xx, yy)]) return true;
+  const frontage = (x, y, w, h) => { // 建筑要临街（2 格内有路或人行道）
+    for (let yy = y - 2; yy < y + h + 2; yy++) for (let xx = x - 2; xx < x + w + 2; xx++) if (inMap(xx, yy) && (roadMask[idx(xx, yy)] === 1 || roadMask[idx(xx, yy)] === 2)) return true;
     return false;
   };
   const place = (type, x, y, extra) => {
@@ -597,138 +670,176 @@ function cityMapGen(campType) {
     for (let yy = y - 1; yy <= y + d.h; yy++) for (let xx = x - 1; xx <= x + d.w; xx++) if (inMap(xx, yy)) noTree[idx(xx, yy)] = 1;
     return s;
   };
-  const inRect = (b, type, tries) => {
+  // 停车场：大建筑南边（或北边）一块画了车位的空地
+  const parking = (s) => {
+    for (const py of [s.y + s.h + 1, s.y - 4]) {
+      const px = s.x, pw = s.w, ph = 3;
+      let ok = py > 0 && py + ph < MAP_H - 1;
+      for (let y = py; ok && y < py + ph; y++) for (let x = px; x < px + pw; x++) {
+        const i = idx(x, y);
+        if (occ[i] || roadMask[i] === 1 || G.terrain[i] === TER.WATER || G.nodes[i]) { ok = false; break; }
+      }
+      if (!ok) continue;
+      for (let y = py; y < py + ph; y++) for (let x = px; x < px + pw; x++) {
+        const i = idx(x, y);
+        G.terrain[i] = TER.ROAD; nat[i] = TER.PAVE; roadMask[i] = 1; occ[i] = 2; noTree[i] = 1; sidewalk[i] = 0;
+      }
+      G.parking.push([px, py, pw, ph]);
+      for (let k = 0; k < pw; k++) if (Math.random() < 0.3) placeNode('car', px + k, py + (Math.random() < 0.5 ? 0 : ph - 1), 6);
+      return;
+    }
+  };
+  const placeIn = (zone, type, tries, big) => {
     const d = STRUCTS[type];
-    for (let t = 0; t < (tries || 30); t++) {
-      const x = randInt(b.x0, b.x1 - d.w + 1), y = randInt(b.y0, b.y1 - d.h + 1);
-      if (fits(x, y, d.w, d.h)) return place(type, x, y);
+    for (let t = 0; t < (tries || 400); t++) {
+      const x = randInt(1, MAP_W - d.w - 1), y = randInt(1, MAP_H - d.h - 1);
+      if (zoneAt(x + d.w / 2, y + d.h / 2) !== zone && zone !== 'any') continue;
+      if (!fits(x, y, d.w, d.h) || !frontage(x, y, d.w, d.h)) continue;
+      const s = place(type, x, y);
+      if (big) parking(s);
+      return s;
     }
     return null;
   };
-  // 沿着路两边盖房子
-  const alongRoad = (road, pool, every, maxDist) => {
-    for (let k = randInt(0, every); k < road.pts.length; k += every) {
-      const [px, py] = road.pts[k];
-      for (let t = 0; t < 10; t++) {
-        const type = pick(pool), d = STRUCTS[type];
-        const x = Math.round(px + rand(-maxDist, maxDist) - d.w / 2), y = Math.round(py + rand(-maxDist, maxDist) - d.h / 2);
-        if (fits(x, y, d.w, d.h) && nearRoad(x, y, d.w, d.h, 2)) { place(type, x, y); break; }
-      }
-    }
-  };
 
-  // ---- 7) 营地街区 ----
-  const camp = { x0: vx[1] + 2, x1: vx[2] - 3, y0: hy[1] + 2, y1: hy[2] - 3 };
-  for (let y = camp.y0 - 1; y <= camp.y1 + 1; y++) for (let x = camp.x0 - 1; x <= camp.x1 + 1; x++) {
+  // ---- 4) 营地街区（老城区中心） ----
+  const camp = { x0: XW1 + 2, x1: BX - 4, y0: AY + 3, y1: YS - 3 };
+  for (let y = camp.y0; y <= camp.y1; y++) for (let x = camp.x0; x <= camp.x1; x++) {
     const i = idx(x, y);
-    if (G.terrain[i] === TER.ROAD || sidewalk[i]) continue;
+    if (roadMask[i]) continue;
     G.terrain[i] = TER.DIRT; nat[i] = TER.DIRT; noTree[i] = 1;
   }
   const hd = STRUCTS[campType];
   place(campType, ccx - Math.floor(hd.w / 2), G.coreY - hd.h, { home: true, left: 0 });
-  for (let y = camp.y0; y <= camp.y1; y++) for (let x = camp.x0; x <= camp.x1; x++) occ[idx(x, y)] = 1; // 营地里不再盖楼
+  for (let y = camp.y0; y <= camp.y1; y++) for (let x = camp.x0; x <= camp.x1; x++) occ[idx(x, y)] = Math.max(occ[idx(x, y)], 2);
 
-  // ---- 8) 主镇的街区：先放重要建筑，再按区域填满 ----
-  const blocks = [];
-  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
-    if (i === 1 && j === 1) continue;
-    const b = { x0: vx[i] + 2, x1: vx[i + 1] - 3, y0: hy[j] + 2, y1: hy[j + 1] - 3, down: i === 1 || j === 1 };
-    blocks.push(b);
-  }
-  blocks.sort(() => Math.random() - 0.5);
-  const park = blocks.find((b) => !b.down);
-  for (const b of blocks) {
-    if (b.down) for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) { const i = idx(x, y); if (!occ[i] && !roadMask[i] && !sidewalk[i]) { G.terrain[i] = TER.PAVE; nat[i] = TER.PAVE; } }
-  }
-  const must = ['hospital', 'police', 'firestation', 'school', 'supermarket'];
-  for (const type of must) for (const b of blocks.filter((q) => q !== park)) if (inRect(b, type, 25)) break;
-  for (const b of blocks) {
-    if (b === park) {
-      const mx = Math.floor((b.x0 + b.x1) / 2), my = Math.floor((b.y0 + b.y1) / 2);
-      if (fits(mx - 1, my - 1, 2, 2)) place('fountain', mx - 1, my - 1);
-      for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) {
-        const i = idx(x, y);
-        if (occ[i] || roadMask[i]) continue;
-        if (Math.random() < 0.2) placeNode('ctree', x, y, 6);
-        else if (Math.random() < 0.06) G.decor.push(['bench', (x + 0.5) * T, (y + 0.7) * T]);
-        noTree[i] = 1;
-      }
-      continue;
-    }
-    const pool = b.down ? ['apartment', 'office', 'office', 'apartment', 'shop', 'shop'] : ['house', 'house', 'house', 'apartment', 'shop'];
-    for (let t = 0; t < 45; t++) inRect(b, pick(pool), 12);
-    for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) {
-      const i = idx(x, y);
-      noTree[i] = 1;
-      if (occ[i] || roadMask[i] || sidewalk[i]) continue;
-      const r = Math.random();
-      if (r < 0.05) placeNode('ctree', x, y, 6);
-      else if (r < 0.08) placeNode('dumpster', x, y, 6);
-    }
-  }
-  for (let y = town.y0; y <= town.y1; y++) for (let x = town.x0; x <= town.x1; x++) if (inMap(x, y)) noTree[idx(x, y)] = 1;
-  alongRoad(diag, ['house', 'shop', 'apartment'], 5, 4);
+  // ---- 5) 环岛中间的喷泉 ----
+  place('fountain', BX - 1, AY - 1);
 
-  // ---- 9) 路边的建筑 ----
-  for (const type of ['gasstation', 'gasstation', 'factory', 'factory']) {
-    for (let t = 0; t < 40; t++) {
-      const [px, py] = pick(hwy.pts), d = STRUCTS[type];
-      const x = Math.round(px + rand(-6, 6) - d.w / 2), y = Math.round(py + rand(-6, 6) - d.h / 2);
-      if (fits(x, y, d.w, d.h) && nearRoad(x, y, d.w, d.h, 2)) { place(type, x, y); break; }
+  // ---- 6) 社区公园（住宅区里留一块绿地） ----
+  for (let t = 0; t < 200; t++) {
+    const x = randInt(XW2 + 2, MAP_W - 12), y = randInt(YS + 3, MAP_H - 9), w = 8, h = 6;
+    let ok = true;
+    for (let yy = y; ok && yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) if (roadMask[idx(xx, yy)] || occ[idx(xx, yy)]) { ok = false; break; }
+    if (!ok) continue;
+    for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) {
+      const i = idx(xx, yy);
+      occ[i] = 2; noTree[i] = 1;
+      if (yy === y + 3 || xx === x + 4) { G.terrain[i] = TER.PAVE; nat[i] = TER.PAVE; }
+      else if (Math.random() < 0.22) placeNode('ctree', xx, yy, 6);
+      else if (Math.random() < 0.08) G.decor.push(['bench', (xx + 0.5) * T, (yy + 0.7) * T]);
     }
-  }
-  alongRoad(hwy, ['gasstation', 'factory', 'shop', 'house'], 26, 5);
-  for (const r of vill) alongRoad(r, ['house', 'house', 'shop', 'apartment', 'gasstation'], 4, 4);
-  const vb = { x0: vcx - 9, x1: vcx + 10, y0: vcy - 10, y1: vcy + 11 };
-  inRect(vb, 'supermarket', 40); inRect(vb, 'firestation', 30);
-  for (const r of G.roads) {
-    if (r.kind === 'street' && r !== diag && !vill.includes(r) && r.pts.length > 4 && (r.pts[0][0] < vx[0] - 4 || r.pts[0][0] > vx[3] + 4 || r.pts[0][1] < hy[0] - 4 || r.pts[0][1] > hy[3] + 4 || r === ne))
-      alongRoad(r, ['house', 'house', 'house', 'shop'], 4, 4); // 郊区住宅
-  }
-  alongRoad(subRoad, ['house', 'house', 'shop'], 9, 4);
-  alongRoad(eastRoad, ['house', 'shop', 'gasstation'], 10, 4);
-  alongRoad(south, ['house', 'barn', 'factory'], 12, 5);
-
-  // ---- 10) 农场：土路尽头的农舍 + 谷仓 + 农田 ----
-  for (const { road, dir } of farmRoads) {
-    const [ex, ey] = road.pts[road.pts.length - 1];
-    const fx = Math.round(ex + (dir > 0 ? 1 : -9)), fy = Math.round(ey - 3);
-    for (let y = fy; y < fy + 6; y++) for (let x = fx; x < fx + 8; x++) {
-      if (!inMap(x, y)) continue;
-      const i = idx(x, y);
-      if (occ[i] || roadMask[i] || G.terrain[i] === TER.WATER) continue;
-      G.terrain[i] = TER.DIRT; nat[i] = TER.DIRT; noTree[i] = 1; occ[i] = 2;
-    }
-    G.fields.push([fx, fy, 8, 6]);
-    const near = { x0: Math.round(ex) - 8, x1: Math.round(ex) + 8, y0: Math.round(ey) - 9, y1: Math.round(ey) + 9 };
-    inRect(near, 'barn', 40); inRect(near, 'house', 40);
-    for (let y = near.y0; y <= near.y1; y++) for (let x = near.x0; x <= near.x1; x++) if (inMap(x, y)) noTree[idx(x, y)] = 1;
+    break;
   }
 
-  // ---- 11) 森林和草地上的树 ----
+  // ---- 7) 重要建筑（按分区） ----
+  placeIn('old', 'police'); placeIn('old', 'firestation'); placeIn('cbd', 'hospital', 600, true) || placeIn('old', 'hospital', 600, true);
+  placeIn('resid', 'school', 600, true); placeIn('cbd', 'supermarket', 600, true); placeIn('resid', 'supermarket', 600, true);
+  for (let k = 0; k < 3; k++) placeIn('industry', 'factory', 400); for (let k = 0; k < 3; k++) placeIn('industry', 'warehouse', 400);
+  // 加油站：高速路口、主干道边
+  for (let k = 0; k < 2; k++) {
+    for (let t = 0; t < 300; t++) {
+      const p = pick(G.roads.filter((r) => r.kind === 'ave' || r.kind === 'hwy')).pts;
+      const [px, py] = pick(p), d = STRUCTS.gasstation;
+      const x = Math.round(px + rand(-5, 5) - 2), y = Math.round(py + rand(-5, 5) - 1);
+      if (fits(x, y, d.w, d.h) && frontage(x, y, d.w, d.h)) { place('gasstation', x, y); break; }
+    }
+  }
+  for (let k = 0; k < 2; k++) placeIn('cbd', 'office', 300, k === 0);
+
+  // ---- 8) 其余建筑：每个分区按自己的类型填满（都要临街） ----
+  const POOLS = {
+    cbd: ['office', 'office', 'apartment', 'apartment', 'shop', 'shop'],
+    old: ['shop', 'shop', 'apartment', 'house', 'house'],
+    resid: ['house', 'house', 'house', 'house', 'house', 'apartment', 'shop'],
+    suburb: ['house'],
+    industry: ['factory', 'warehouse', 'warehouse', 'shop'],
+    farm: ['barn', 'house'],
+  };
+  for (let t = 0; t < 9000; t++) {
+    const x = randInt(1, MAP_W - 3), y = randInt(1, MAP_H - 3), z = zoneAt(x, y), pool = POOLS[z];
+    if (z === 'farm' && Math.random() < 0.85) continue;
+    const type = pick(pool), d = STRUCTS[type];
+    if (zoneAt(x + d.w / 2, y + d.h / 2) !== z) continue;
+    if (fits(x, y, d.w, d.h) && frontage(x, y, d.w, d.h)) place(type, x, y);
+  }
+
+  // ---- 9) 城北农田 ----
+  for (const r of farmRoads) {
+    const [ex, ey] = r.pts[Math.floor(r.pts.length / 2)];
+    for (const dir of [-1, 1]) {
+      const fx = Math.round(ex + (dir > 0 ? 1.5 : -9.5)), fy = Math.round(ey - 2), fw = 8, fh = 4;
+      let ok = true;
+      for (let y = fy; ok && y < fy + fh; y++) for (let x = fx; x < fx + fw; x++) if (!inMap(x, y) || roadMask[idx(x, y)] === 1 || occ[idx(x, y)] || G.terrain[idx(x, y)] === TER.WATER) { ok = false; break; }
+      if (!ok) continue;
+      for (let y = fy; y < fy + fh; y++) for (let x = fx; x < fx + fw; x++) { const i = idx(x, y); G.terrain[i] = TER.DIRT; nat[i] = TER.DIRT; occ[i] = 2; noTree[i] = 1; }
+      G.fields.push([fx, fy, fw, fh]);
+    }
+  }
+
+  // ---- 10) 树：城北和河西多树林，住宅区院子里零星几棵，商务区没有 ----
   const fn = makeNoise(), fn2 = makeNoise();
   for (let y = 1; y < MAP_H - 1; y++) for (let x = 1; x < MAP_W - 1; x++) {
     const i = idx(x, y);
-    if (noTree[i] || occ[i] || G.terrain[i] !== TER.GRASS || distToCore(x, y) < 10) continue;
-    const f = fn(x * 0.09, y * 0.09) * 0.75 + fn2(x * 0.3, y * 0.3) * 0.25;
-    const p = f > 0.52 ? 0.55 : f > 0.45 ? 0.16 : 0.03;
+    if (noTree[i] || occ[i] || roadMask[i] === 1 || G.terrain[i] === TER.WATER || distToCore(x, y) < 10) continue;
+    const z = zoneAt(x, y);
+    if (z === 'cbd' || z === 'industry') { if (Math.random() < 0.01) placeNode('ctree', x, y, 6); continue; }
+    if (z === 'resid' || z === 'old') { if (Math.random() < 0.05) placeNode('ctree', x, y, 6); continue; }
+    const f = fn(x * 0.1, y * 0.1) * 0.75 + fn2(x * 0.3, y * 0.3) * 0.25;
+    const p = roadMask[i] === 3 ? 0.18 : f > 0.5 ? 0.55 : f > 0.42 ? 0.15 : 0.03;
     if (Math.random() < p) placeNode(Math.random() < 0.45 ? 'fpine' : 'ftree', x, y, 6);
   }
 
-  // ---- 12) 街景：路灯、消防栓、垃圾、路障、汽车 ----
+  // ---- 11) 路口：斑马线 + 主干道上的红绿灯 ----
+  G.roads.forEach((r, ri) => {
+    if (!SIDE[r.kind] || r.pts.length < 8) return;
+    const id = ri + 1, pts = r.pts;
+    const own = (k) => { const [x, y] = pts[k]; return inMap(Math.floor(x), Math.floor(y)) ? owner[idx(Math.floor(x), Math.floor(y))] : 0; };
+    let last = -99;
+    const add = (k, k0, k1) => {
+      if (k < 1 || k >= pts.length - 1 || Math.abs(k - last) < 4) return;
+      last = k;
+      const [x, y] = pts[k], a = Math.atan2(pts[k1][1] - pts[k0][1], pts[k1][0] - pts[k0][0]);
+      G.crosswalks.push([x, y, Math.round(a * 1000) / 1000, r.w]);
+      if (r.kind === 'ave') {
+        const nx = -Math.sin(a), ny = Math.cos(a), o = r.w / 2 + 1.3;
+        G.decor.push(['signal', (x + nx * o) * T, (y + ny * o) * T]);
+      }
+    };
+    for (let k = 1; k < pts.length; k++) {
+      const a = own(k - 1), b = own(k);
+      if (a === id && b === -1) add(k - 3, Math.max(0, k - 5), k - 1);
+      if (a === -1 && b === id) add(k + 2, k, Math.min(pts.length - 1, k + 4));
+    }
+  });
+
+  // ---- 12) 街景 ----
+  for (const r of G.roads) {
+    if (r.kind !== 'ave') continue;
+    // 主干道两边的行道树
+    for (let k = 3; k < r.pts.length - 1; k += 6) {
+      const [x, y] = r.pts[k], [px, py] = r.pts[k - 1], len = Math.hypot(x - px, y - py) || 1;
+      const nx = -(y - py) / len, ny = (x - px) / len;
+      for (const s of [-1, 1]) {
+        const tx = x + nx * s * (r.w / 2 + 0.6), ty = y + ny * s * (r.w / 2 + 0.6);
+        const i = inMap(Math.floor(tx), Math.floor(ty)) ? idx(Math.floor(tx), Math.floor(ty)) : -1;
+        if (i >= 0 && sidewalk[i] && !occ[i]) G.decor.push(['stree', tx * T, (ty + 0.4) * T]);
+      }
+    }
+  }
   for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
     const i = idx(x, y);
     if (sidewalk[i] && !occ[i] && !G.nodes[i]) {
-      if ((x * 7 + y * 13) % 9 === 0) G.decor.push(['lamp', (x + 0.5) * T, (y + 0.8) * T, Math.random() < 0.35]);
-      else if (Math.random() < 0.04) G.decor.push([pick(['hydrant', 'trash', 'trash', 'papers', 'cone']), (x + rand(0.2, 0.8)) * T, (y + rand(0.3, 0.9)) * T]);
-    } else if (G.terrain[i] === TER.ROAD && Math.random() < 0.01 && distToCore(x, y) > 6) {
+      if ((x * 7 + y * 13) % 10 === 0) G.decor.push(['lamp', (x + 0.5) * T, (y + 0.8) * T, Math.random() < 0.35]);
+      else if (Math.random() < 0.035) G.decor.push([pick(['hydrant', 'trash', 'trash', 'papers', 'cone']), (x + rand(0.2, 0.8)) * T, (y + rand(0.3, 0.9)) * T]);
+    } else if (G.terrain[i] === TER.ROAD && Math.random() < 0.008 && distToCore(x, y) > 6) {
       G.decor.push([pick(['barrier', 'cone', 'papers']), (x + 0.5) * T, (y + 0.6) * T]);
     }
   }
   // 高速公路上堵满了车，其他路上零星几辆
   for (const r of G.roads) {
-    if (r.kind === 'circle' || r.kind === 'dirt') continue;
-    const dens = r.kind === 'hwy' ? 0.3 : 0.06;
+    if (r.pts.length < 2 || r.kind === 'dirt' || r.kind === 'rail' || r.kind === 'alley') continue;
+    const dens = r.kind === 'hwy' ? 0.35 : r.kind === 'ave' ? 0.12 : 0.05;
     for (let k = 0; k < r.pts.length; k += 2) {
       if (Math.random() > dens) continue;
       const [px, py] = r.pts[k];
@@ -762,7 +873,12 @@ function drawCity(ctx, x0, y0, x1, y1) {
   // 地上的小物件
   for (const d of G.decor) {
     if (d[1] < (x0 - 1) * T || d[1] > (x1 + 2) * T || d[2] < (y0 - 1) * T || d[2] > (y1 + 3) * T) continue;
-    const im = decorImg(d[0], d[3] && !day);
+    if (d[0] === 'stree') { // 行道树
+      drawShadow(ctx, d[1], d[2] - 1, 13, 0.7);
+      ctx.drawImage(SPR.ctree.img, d[1] - 8, d[2] - 15, 16, 16);
+      continue;
+    }
+    const im = decorImg(d[0], d[0] === 'signal' ? Math.sin(G.time * 3 + d[1]) > 0.6 : d[3] && !day);
     ctx.drawImage(im.img, d[1] - im.w / 2, d[2] - im.h, im.w, im.h);
   }
   // 建筑（从上往下画，前面的楼挡住后面的楼）
@@ -771,10 +887,22 @@ function drawCity(ctx, x0, y0, x1, y1) {
     const d = STRUCTS[s.type];
     if (s.x > x1 + 1 || s.x + s.w < x0 - 1 || s.y > y1 + 3 || s.y + s.h < y0 - 1) continue;
     const im = structImg(s.type, s.v), sx = s.x * T, sy = s.y * T - d.ex, bottom = (s.y + s.h) * T;
-    ctx.fillStyle = 'rgba(10,10,30,0.28)';
-    ctx.fillRect(sx + s.w * T, sy + 8, 4, bottom - sy - 6);
-    ctx.fillRect(sx + 5, bottom, s.w * T - 1, 3);
+    if (d.ex > 0) { // 楼房的影子（喷泉这种平的东西没有）
+      ctx.fillStyle = 'rgba(10,10,30,0.28)';
+      ctx.fillRect(sx + s.w * T, sy + 8, 4, bottom - sy - 6);
+      ctx.fillRect(sx + 5, bottom, s.w * T - 1, 3);
+    }
     ctx.drawImage(im.img, sx, sy, im.w, im.h);
+    if (structEnterable(s)) {
+      // 大门口的门垫 + 靠近时显示「进入」
+      const en = structEntrance(s); // 实际能进的门口（正门被挡住时换一个）
+      if (en) {
+        const ex = en.x * T, ey = en.y * T, p = G.player;
+        ctx.fillStyle = '#1a1c2c'; ctx.fillRect(ex + 2.5, ey + 0.5, 11, 3.5);
+        ctx.fillStyle = s.home ? '#38b764' : '#8f2f2a'; ctx.fillRect(ex + 3, ey + 1, 10, 2.5);
+        if (p && Math.hypot(p.x - ex - 8, p.y - ey - 8) < 3 * T) drawWorldLabel(ctx, '▲进入', ex + 8, ey + 13, s.home ? '#a7f070' : '#ffcd75');
+      }
+    }
     if (s.home) {
       // 营地旗帜
       const fx = sx + 3, fy = sy - 2;

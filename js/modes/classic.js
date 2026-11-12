@@ -38,14 +38,16 @@ MODES.classic = {
     rock: { name: '石头', res: 'stone', amount: 40, clusters: 7, perCluster: 5, spread: 1.6, regrow: 4 },
   },
 
-  buildList: ['wall', 'stonewall', 'tower', 'cannon', 'frost', 'tesla', 'spikes', 'lumber', 'quarry', 'market'],
+  buildList: ['wall', 'door', 'stonewall', 'stonedoor', 'tower', 'cannon', 'frost', 'tesla', 'spikes', 'lumber', 'quarry', 'market'],
   buildings: {
     core: {
       name: '营地', size: 2, hp: 600, attack: 'arrow', range: 4, dmg: 8, rate: 1, light: 5,
       upgrade: { wood: 80, stone: 50, gold: 15 }, desc: '被摧毁就输了！',
     },
-    wall: { name: '木墙', hp: 200, cost: { wood: 8 }, wall: true, desc: '阻挡怪物前进' },
-    stonewall: { name: '石墙', hp: 600, cost: { stone: 12 }, wall: true, locked: true, desc: '非常结实的墙' },
+    wall: { name: '木墙', hp: 200, cost: { wood: 8 }, wall: true, wallStyle: 'wood', sprite: 'wall_wood', desc: '阻挡怪物前进，相邻的墙和门会自动连成一片' },
+    door: { name: '木门', hp: 170, cost: { wood: 12 }, door: true, wallStyle: 'wood', sprite: 'door_wood', desc: '自己人可以进出，怪物过不去（比木墙略脆）' },
+    stonewall: { name: '石墙', hp: 600, cost: { stone: 12 }, wall: true, wallStyle: 'stone', sprite: 'wall_stone', locked: true, desc: '非常结实的墙' },
+    stonedoor: { name: '石门', hp: 500, cost: { stone: 14, wood: 4 }, door: true, wallStyle: 'stone', sprite: 'door_stone', locked: true, desc: '自己人可以进出，怪物过不去（比石墙略脆）' },
     tower: { name: '箭塔', hp: 150, cost: { wood: 30, stone: 10 }, attack: 'arrow', range: 5, dmg: 10, rate: 1.5, light: 2.5, desc: '快速射击单个敌人' },
     cannon: { name: '投石塔', hp: 220, cost: { wood: 40, stone: 40, gold: 10 }, attack: 'rock', range: 4.5, dmg: 22, rate: 0.5, splash: 1.3, light: 2, desc: '范围伤害，割草利器' },
     frost: {
@@ -63,7 +65,7 @@ MODES.classic = {
   },
 
   techs: [
-    { id: 'mason', name: '石工', desc: '解锁 石墙（生命是木墙的 3 倍）', cost: { wood: 40, stone: 30 }, unlock: ['stonewall'] },
+    { id: 'mason', name: '石工', desc: '解锁 石墙、石门（生命是木墙的 3 倍）', cost: { wood: 40, stone: 30 }, unlock: ['stonewall', 'stonedoor'] },
     { id: 'traps', name: '陷阱学', desc: '解锁 尖刺陷阱（不挡路，怪物踩上去持续受伤）', cost: { wood: 60 }, unlock: ['spikes'] },
     { id: 'trade', name: '贸易', desc: '解锁 市场（持续产出金币）', cost: { wood: 80, stone: 20 }, unlock: ['market'] },
     { id: 'tools', name: '精良工具', desc: '自动采集速度 +25%，点击采集 +1', cost: { wood: 60, stone: 40 }, apply: (m) => { m.gather *= 1.25; m.tap += 1; } },

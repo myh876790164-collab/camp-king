@@ -125,7 +125,10 @@ function drawPills(ctx, items, y, maxW) {
   return rows.length * 24;
 }
 
-function unlockedBuildList() { return G.def.buildList.filter((t) => G.unlocked.has(t)); }
+function unlockedBuildList() {
+  const custom = G.def.hooks.buildList && G.def.hooks.buildList(); // 丧尸模式：在建筑里面时建造栏不一样
+  return custom || G.def.buildList.filter((t) => G.unlocked.has(t));
+}
 
 function drawUI(ctx) {
   uiButtons = [];
