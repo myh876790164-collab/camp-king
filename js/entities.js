@@ -44,7 +44,8 @@ function createBuilding(type, x, y) {
 // 等级或强化变化后重新计算生命上限（保持血量百分比）
 function refreshBuilding(b) {
   const ratio = b.maxHp ? b.hp / b.maxHp : 1;
-  b.maxHp = Math.round(b.def.hp * levelMult(b.level) * G.mods.hp);
+  b.maxHp = Math.round(b.def.hp * levelMult(b.level) * G.mods.hp *
+    (b.def.wall ? G.mods.wallHp : 1) * (b.type === 'core' ? G.mods.coreHp : 1));
   b.hp = Math.max(1, ratio * b.maxHp);
 }
 function refreshAllBuildings() { for (const b of G.buildings) refreshBuilding(b); }
@@ -85,6 +86,7 @@ function placeProblem(type, tx, ty) {
   const i = idx(tx, ty);
   if (G.nodes[i] || G.bld[i]) return '这里不能建造';
   if (G.terrain[i] === TER.WATER) return '不能建在水上';
+  if (solidTer(G.terrain[i])) return '这里不能建造';
   if (bdef(type).nearWater && !adjacentWater(tx, ty)) return '必须建在水边';
   if (G.player && Math.floor(G.player.x / T) === tx && Math.floor(G.player.y / T) === ty) return '你站在这里';
   return null;
@@ -424,6 +426,10 @@ function applyHitFx(m, p) {
 }
 
 // ---------- 弹道 ----------
+// 子弹由谁打出（丧尸模式记录幸存者的击杀和伤害）
+function creditOwner(p, m, wasAlive) {
+  if (p.owner && G.def.hooks.credit) G.def.hooks.credit(p.owner, p.dmg, wasAlive && !m.alive);
+}
 function updateProjectile(p, dt) {
   if (p.target && p.target.alive) { p.tx = p.target.x; p.ty = p.target.y - 4; }
   const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy);
@@ -434,12 +440,14 @@ function updateProjectile(p, dt) {
       const r2 = p.splash * p.splash;
       for (const m of G.monsters) {
         const ex = m.x - p.tx, ey = m.y - p.ty;
-        if (ex * ex + ey * ey < r2) { applyHitFx(m, p); hurtMonster(m, p.dmg); }
+        if (ex * ex + ey * ey < r2) { const was = m.alive; applyHitFx(m, p); hurtMonster(m, p.dmg); creditOwner(p, m, was); }
       }
       G.effects.push({ type: 'boom', x: p.tx, y: p.ty, t: 0, life: 0.3, size: p.splash });
     } else if (p.target && p.target.alive) {
+      const was = p.target.alive;
       applyHitFx(p.target, p);
       hurtMonster(p.target, p.dmg);
+      creditOwner(p, p.target, was);
     }
     return;
   }

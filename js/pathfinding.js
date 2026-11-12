@@ -47,7 +47,7 @@ class MinHeap {
 function isBlocked(x, y) {
   if (!inMap(x, y)) return true;
   const i = idx(x, y);
-  if (G.terrain[i] === TER.WATER || G.nodes[i]) return true;
+  if (solidTer(G.terrain[i]) || G.nodes[i]) return true;
   const b = G.bld[i];
   return !!(b && !b.def.passable);
 }
@@ -97,7 +97,7 @@ function recomputeFlow() {
       const nx = x + dx, ny = y + dy;
       if (!inMap(nx, ny)) continue;
       const j = idx(nx, ny);
-      if (G.nodes[j] || G.terrain[j] === TER.WATER) continue;
+      if (G.nodes[j] || solidTer(G.terrain[j])) continue;
       const diag = dx !== 0 && dy !== 0;
       if (diag && !canStepDiag(nx, ny, -dx, -dy)) continue;
       const nd = d + (diag ? 1.4142 : 1) + stepIn;

@@ -20,7 +20,7 @@ function placeNode(type, x, y, minCoreDist) {
   if (G.nodes[i] || G.bld[i]) return false;
   const def = G.def.nodes[type];
   const ter = G.terrain[i];
-  if (ter === TER.WATER) return false;
+  if (solidTer(ter)) return false;
   if (def.onRoad ? ter !== TER.ROAD : ter === TER.ROAD) return false;
   if (distToCore(x, y) < (minCoreDist || 4)) return false; // 营地周围留出空地
   G.nodes[i] = { type, x, y, amount: def.amount || 1, max: def.amount || 1, shakeUntil: 0, searchedUntil: 0 };
@@ -30,6 +30,7 @@ function placeNode(type, x, y, minCoreDist) {
 // 成片撒资源：clusters 个中心，每个中心周围 perCluster 个
 function scatterNodes(type, clusters, perCluster, spread) {
   const ccx = G.coreX + 1, ccy = G.coreY + 1;
+  clusters = Math.round(clusters * MAP_SCALE); // 地图越大，资源越多
   for (let c = 0; c < clusters; c++) {
     let cx, cy, tries = 0;
     do {
@@ -78,7 +79,7 @@ function generateMap() {
 // 每天早上：在已有资源旁边长出新的，没有就随机长
 function regrowNodes() {
   for (const type in G.def.nodes) {
-    const want = G.def.nodes[type].regrow || 0;
+    const want = Math.round((G.def.nodes[type].regrow || 0) * MAP_SCALE);
     if (!want) continue;
     const list = G.nodes.filter((n) => n && n.type === type);
     let grown = 0, tries = 0;
@@ -104,56 +105,3 @@ function removeNode(n) {
   markFlowDirty();
 }
 
-// 地面配色：[底色, 斑点1, 斑点2]
-const GROUND_COLORS = {
-  [TER.GRASS]: ['#4a8c3f', '#427e38', '#56994a'],
-  [TER.WATER]: ['#3b5dc9', '#3554b5', '#41a6f6'],
-  [TER.SAND]: ['#e4c9a0', '#d4b98a', '#f0dcb4'],
-  [TER.ROAD]: ['#4b4f5e', '#3d404d', '#565b6b'],
-  [TER.SNOW]: ['#e8eef5', '#cfd9e6', '#ffffff'],
-  [TER.DIRT]: ['#7d6a45', '#6e5c3a', '#8c7850'],
-};
-
-// 背景只画一次，存成一张大图
-function buildGround() {
-  const c = createCanvas(MAP_W * T, MAP_H * T);
-  const g = c.getContext('2d');
-  const colors = Object.assign({}, GROUND_COLORS, G.def.groundColors || {});
-  for (let y = 0; y < MAP_H; y++) {
-    for (let x = 0; x < MAP_W; x++) {
-      const ter = G.terrain[idx(x, y)];
-      const col = colors[ter];
-      g.fillStyle = col[0];
-      g.fillRect(x * T, y * T, T, T);
-      for (let i = 0; i < 6; i++) {
-        g.fillStyle = Math.random() < 0.5 ? col[1] : col[2];
-        g.fillRect(x * T + randInt(0, T - 1), y * T + randInt(0, T - 1), ter === TER.WATER ? 3 : 1, 1);
-      }
-      if (ter === TER.GRASS && Math.random() < 0.5) {
-        g.fillStyle = col[1];
-        const gx = x * T + randInt(0, T - 3), gy = y * T + randInt(0, T - 3);
-        g.fillRect(gx, gy, 1, 2);
-        g.fillRect(gx + 2, gy + 1, 1, 1);
-      }
-      if (ter === TER.GRASS && Math.random() < 0.06 && !G.def.noFlowers) {
-        g.fillStyle = pick(['#ffcd75', '#f4f4f4', '#ef7d57', '#73eff7']);
-        g.fillRect(x * T + randInt(0, T - 1), y * T + randInt(0, T - 1), 1, 1);
-      }
-      // 道路中线
-      if (ter === TER.ROAD && x % 3 === 0) {
-        const vert = terrainAt(x, y - 1) === TER.ROAD && terrainAt(x, y + 1) === TER.ROAD &&
-          terrainAt(x - 1, y) !== TER.ROAD;
-        if (!vert) { g.fillStyle = '#8a7f4a'; g.fillRect(x * T + 4, y * T + (y % 2 ? 15 : 0), 8, 1); }
-      }
-      // 海浪：水边画一道白边
-      if (ter === TER.WATER) {
-        g.fillStyle = 'rgba(244,244,244,0.55)';
-        if (terrainAt(x, y - 1) !== TER.WATER) g.fillRect(x * T, y * T, T, 1);
-        if (terrainAt(x, y + 1) !== TER.WATER) g.fillRect(x * T, y * T + T - 1, T, 1);
-        if (terrainAt(x - 1, y) !== TER.WATER) g.fillRect(x * T, y * T, 1, T);
-        if (terrainAt(x + 1, y) !== TER.WATER) g.fillRect(x * T + T - 1, y * T, 1, T);
-      }
-    }
-  }
-  G.ground = c;
-}

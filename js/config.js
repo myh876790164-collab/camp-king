@@ -4,8 +4,8 @@
 // =============================================
 const CONFIG = {
   TILE: 16,               // 每格像素（像素画原始尺寸）
-  MAP_W: 48,              // 地图宽（格）
-  MAP_H: 36,              // 地图高（格）
+  MAP_W: 72,              // 地图宽（格）
+  MAP_H: 54,              // 地图高（格）
   DUSK_TIME: 10,          // 白天最后几秒开始天黑
   DAWN_REPAIR: 0.3,       // 天亮时建筑恢复 30% 生命
   PATH_BUILDING_COST: 12, // 寻路时“拆墙”的代价，越大怪物越愿意绕路
@@ -15,11 +15,20 @@ const CONFIG = {
   DEMOLISH_REFUND: 0.5,   // 拆除返还 50%
 };
 const T = CONFIG.TILE;
-const MAP_W = CONFIG.MAP_W;
-const MAP_H = CONFIG.MAP_H;
+// 地图尺寸：每个模式可以不同（丧尸模式是城市大地图），开局时由 setMapSize 设置
+let MAP_W = CONFIG.MAP_W;
+let MAP_H = CONFIG.MAP_H;
+// 地图面积相对最初 48×36 的倍数：资源数量按它放大
+let MAP_SCALE = (MAP_W * MAP_H) / (48 * 36);
+function setMapSize(w, h) {
+  MAP_W = w; MAP_H = h;
+  MAP_SCALE = (w * h) / (48 * 36);
+}
 
 // 地形
-const TER = { GRASS: 0, WATER: 1, SAND: 2, ROAD: 3, SNOW: 4, DIRT: 5 };
+const TER = { GRASS: 0, WATER: 1, SAND: 2, ROAD: 3, SNOW: 4, DIRT: 5, PAVE: 6, LOT: 7 }; // PAVE 人行道，LOT 城市建筑占地
+// 走不过去的地形：水、城市建筑
+function solidTer(t) { return t === TER.WATER || t === TER.LOT; }
 
 // 资源名称和颜色（图标在 sprites.js 里，名字为 icon_资源名）
 const RES_INFO = {
@@ -43,7 +52,7 @@ function defaultMods() {
     arrowDmg: 1, cannonDmg: 1, splash: 1, multishot: 0, burn: 0, chain: 0, slowPow: 1,
     thorns: 0, trapDmg: 1, lumberTower: 0, goldPower: 0,
     warm: 0, heatMul: 1, fuelMul: 1, coldResist: 0, furnaceMax: 3,
-    happy: 0, foodSave: 0, survDmg: 1, craftTier: 2,
+    happy: 0, foodSave: 0, survDmg: 1, craftTier: 2, wallHp: 1, coreHp: 1,
   };
 }
 

@@ -2,7 +2,7 @@
 //  存档：每个模式一个存档位，保存在浏览器本地
 //  只在白天存档（夜里怪物太多，不保存战斗中的状态）
 // =============================================
-const SAVE_VERSION = 1;
+const SAVE_VERSION = 2; // v2：地图变大，旧存档无法读取
 function saveKey(mode) { return 'campking_save_' + mode; }
 function hasSave(mode) { return !!Store.get(saveKey(mode)); }
 function deleteSave(mode) { Store.del(saveKey(mode)); }
@@ -38,7 +38,10 @@ function saveGame() {
 function loadGame(mode) {
   let d;
   try { d = JSON.parse(Store.get(saveKey(mode))); } catch (e) { d = null; }
-  if (!d || d.v !== SAVE_VERSION) { showBanner('存档损坏或版本不兼容', '', 3, '#ef7d57'); return; }
+  if (!d || d.v !== SAVE_VERSION || (MODES[mode].saveCheck && !MODES[mode].saveCheck(d))) {
+    showBanner('存档损坏或版本不兼容', '旧版本的存档无法读取，请开始新游戏', 3, '#ef7d57');
+    return;
+  }
   setupMode(mode);
   Object.assign(G, { day: d.day, timer: d.timer, res: d.res, kills: d.kills, goldAcc: d.goldAcc || 0 });
   G.mods = Object.assign(defaultMods(), d.mods);

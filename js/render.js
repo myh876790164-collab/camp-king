@@ -48,13 +48,16 @@ function render() {
   const oy = Math.round((G.sh / 2 - G.cam.y * z) * dpr);
   ctx.setTransform(z * dpr, 0, 0, z * dpr, ox, oy);
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(G.ground, 0, 0);
+  ctx.drawImage(G.ground, 0, 0, MAP_W * T, MAP_H * T);
 
   const tl = screenToWorld(0, 0), br = screenToWorld(G.sw, G.sh);
   const x0 = Math.max(0, Math.floor(tl.x / T) - 1), y0 = Math.max(0, Math.floor(tl.y / T) - 1);
   const x1 = Math.min(MAP_W - 1, Math.floor(br.x / T) + 1), y1 = Math.min(MAP_H - 1, Math.floor(br.y / T) + 1);
 
-  // 资源点
+  drawWaterShimmer(ctx, x0, y0, x1, y1);
+
+  // 资源点（树会随风轻轻摆动）
+  const zd = z * dpr;
   for (let y = y0; y <= y1; y++) {
     for (let x = x0; x <= x1; x++) {
       const n = G.nodes[idx(x, y)];
@@ -63,8 +66,16 @@ function render() {
       let sx = x * T;
       if (G.time < n.shakeUntil) sx += Math.sin(G.time * 80) * 1.2;
       const searched = n.searchedUntil > G.day;
+      const key = def.sprite || n.type, tall = SWAY[key];
+      drawShadow(ctx, x * T + 8, y * T + 14.5, tall ? 15 : 13, 0.8);
       if (searched) ctx.globalAlpha = 0.5;
-      ctx.drawImage(SPR[def.sprite || n.type].img, sx, y * T);
+      if (tall) {
+        const k = Math.sin(G.time * 1.7 + x * 0.7 + y * 0.45) * 0.035 * tall;
+        const baseY = y * T + 15;
+        ctx.setTransform(zd, 0, -k * zd, zd, ox + k * baseY * zd, oy);
+        ctx.drawImage(SPR[key].img, sx, y * T, 16, 16);
+        ctx.setTransform(zd, 0, 0, zd, ox, oy);
+      } else ctx.drawImage(SPR[key].img, sx, y * T, 16, 16);
       ctx.globalAlpha = 1;
       if (def.res && n.amount < n.max) hpBar(ctx, x * T + 3, y * T + 15, 10, n.amount / n.max, '#ffcd75');
       if (def.search && !searched && G.phase === 'day') {
@@ -74,7 +85,11 @@ function render() {
     }
   }
 
-  // 建筑
+  // 模式自己的地面物体（丧尸模式：城市建筑、路灯、垃圾等）
+  if (hooks.drawUnder) hooks.drawUnder(ctx, x0, y0, x1, y1);
+
+  // 建筑（先画所有阴影，再画建筑本体）
+  for (const b of G.buildings) drawShadow(ctx, (b.x + b.size / 2) * T + 1, (b.y + b.size) * T - 1.5, b.size * T * 0.95, 0.75);
   for (const b of G.buildings) {
     const spr = buildingSprite(b), s = b.size * T;
     ctx.drawImage(b.hit > 0 ? spr.white : spr.img, b.x * T, b.y * T, s, s);
@@ -99,6 +114,7 @@ function render() {
     ctx.fillStyle = '#b13e53'; ctx.fillRect(fx - 2, fy - h, 5, h);
     ctx.fillStyle = '#ef7d57'; ctx.fillRect(fx - 1, fy - h + 1, 3, h - 1);
     ctx.fillStyle = '#ffcd75'; ctx.fillRect(fx, fy - h * 0.6, 1, h * 0.6);
+    drawEmbers(ctx, fx + 0.5, fy - 3);
   }
 
   const sel = G.selected;
@@ -112,7 +128,7 @@ function render() {
   if (G.buildMode && G.hover && inMap(G.hover.x, G.hover.y) && G.state === 'play') {
     const hx = G.hover.x, hy = G.hover.y, ok = !placeProblem(G.buildMode, hx, hy);
     ctx.globalAlpha = 0.6;
-    ctx.drawImage(SPR[bdef(G.buildMode).sprite || G.buildMode].img, hx * T, hy * T);
+    ctx.drawImage(SPR[bdef(G.buildMode).sprite || G.buildMode].img, hx * T, hy * T, 16, 16);
     ctx.globalAlpha = 1;
     ctx.fillStyle = ok ? 'rgba(56,183,100,0.35)' : 'rgba(177,62,83,0.45)';
     ctx.fillRect(hx * T, hy * T, T, T);
@@ -126,10 +142,7 @@ function render() {
   for (const m of G.monsters) {
     const spr = SPR[m.def.sprite || m.type], s = m.def.scale || 1, w = spr.w * s, h = spr.h * s;
     const bob = m.def.fly ? Math.sin(G.time * 10 + m.bob) * 2 : -Math.abs(Math.sin(G.time * 8 + m.bob)) * 1.5 * s;
-    if (!m.def.fly) {
-      ctx.fillStyle = 'rgba(0,0,0,0.25)';
-      ctx.fillRect(m.x - 5 * s, m.y + 2 * s, 10 * s, 2 * s);
-    }
+    drawShadow(ctx, m.x, m.y + (m.def.fly ? 4 : 2.5) * s, (m.def.fly ? 8 : 12) * s, m.def.fly ? 0.5 : 0.9);
     const img = m.hit > 0 ? spr.white : (m.face < 0 ? spr.flip : spr.img);
     const top = m.def.fly ? m.y - h / 2 - 6 : m.y - h + 4 * s;
     if (m.slowUntil > G.clock) ctx.globalAlpha = 0.75;
@@ -143,6 +156,7 @@ function render() {
   drawDarkness(ctx, ox, oy);
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawVignette(ctx);
   if (hooks.drawScreen) hooks.drawScreen(ctx);
   for (const f of G.floats) {
     const p = worldToScreen(f.x, f.y - f.t * 18);
@@ -189,9 +203,13 @@ function drawProjectilesAndEffects(ctx) {
       ctx.fillStyle = e.color;
       ctx.fillRect(e.x - 1, e.y - 1, 2, 2);
     } else if (e.type === 'puff') {
-      const r = e.size * (0.4 + k * 0.6);
-      ctx.strokeStyle = e.color;
-      ctx.strokeRect(e.x - r, e.y - r, r * 2, r * 2);
+      // 一圈向外散开的小烟团
+      const r = e.size * (0.35 + k * 0.65), q = (1 - k) * 2.2 + 0.6;
+      ctx.fillStyle = e.color;
+      for (let j = 0; j < 8; j++) {
+        const a = j * 0.785 + e.size;
+        ctx.fillRect(e.x + Math.cos(a) * r - q / 2, e.y + Math.sin(a) * r * 0.8 - q / 2 - k * 3, q, q);
+      }
     } else if (e.type === 'boom') {
       ctx.fillStyle = '#ef7d57';
       ctx.beginPath();
@@ -262,7 +280,9 @@ function drawDarkness(ctx, ox, oy) {
   l.setTransform(1, 0, 0, 1, 0, 0);
   l.globalCompositeOperation = 'source-over';
   l.clearRect(0, 0, lc.width, lc.height);
-  l.fillStyle = 'rgba(12,10,40,' + dark.toFixed(3) + ')';
+  // 黄昏偏暖紫，深夜偏冷蓝
+  const tw = Math.min(1, dark / 0.55);
+  l.fillStyle = 'rgba(' + Math.round(70 - 58 * tw) + ',' + Math.round(28 - 18 * tw) + ',' + Math.round(55 - 15 * tw) + ',' + dark.toFixed(3) + ')';
   l.fillRect(0, 0, lc.width, lc.height);
   l.globalCompositeOperation = 'destination-out';
   const lights = [];
@@ -281,4 +301,103 @@ function drawDarkness(ctx, ox, oy) {
   l.globalCompositeOperation = 'source-over';
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(lc, 0, 0);
+
+  // 暖色火光：在光源附近叠加一层橙色
+  for (const [mode, c0, c1] of [['multiply', '255,165,90', 0.7], ['lighter', '255,120,40', 0.14]]) {
+    ctx.globalCompositeOperation = mode;
+    for (const lt of lights) {
+      const sx = lt.x * z + ox, sy = lt.y * z + oy, r = lt.r * T * z * 0.8;
+      if (sx < -r || sy < -r || sx > lc.width + r || sy > lc.height + r) continue;
+      const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, r);
+      g.addColorStop(0, 'rgba(' + c0 + ',' + (c1 * dark).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(' + c0 + ',0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(sx - r, sy - r, r * 2, r * 2);
+    }
+  }
+  ctx.globalCompositeOperation = 'lighter';
+  // 萤火虫（草地模式的夜晚）
+  if (dark > 0.25 && (G.mode === 'classic' || G.mode === 'island')) {
+    const cell = 6 * T;
+    const cx0 = Math.floor(-ox / z / cell), cy0 = Math.floor(-oy / z / cell);
+    const cx1 = Math.ceil((lc.width - ox) / z / cell), cy1 = Math.ceil((lc.height - oy) / z / cell);
+    const a = Math.min(1, (dark - 0.25) * 3);
+    for (let cy = cy0; cy <= cy1; cy++) {
+      for (let cx = cx0; cx <= cx1; cx++) {
+        const h = ((cx * 73856093) ^ (cy * 19349663)) >>> 0;
+        if (h % 3 !== 0) continue;
+        const ph = (h % 1000) / 159;
+        const wx = (cx + 0.5) * cell + Math.sin(G.time * 0.4 + ph) * cell * 0.4;
+        const wy = (cy + 0.5) * cell + Math.cos(G.time * 0.33 + ph * 1.3) * cell * 0.35;
+        const tx = Math.floor(wx / T), ty = Math.floor(wy / T);
+        if (!inMap(tx, ty) || G.terrain[idx(tx, ty)] === TER.WATER) continue;
+        const blink = 0.5 + 0.5 * Math.sin(G.time * 2.3 + ph * 4);
+        const sx = wx * z + ox, sy = wy * z + oy, rr = 3 * z;
+        const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, rr);
+        g.addColorStop(0, 'rgba(210,255,140,' + (0.9 * a * blink).toFixed(3) + ')');
+        g.addColorStop(1, 'rgba(160,240,100,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(sx - rr, sy - rr, rr * 2, rr * 2);
+      }
+    }
+  }
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+// 会随风摆动的资源（数字 = 摆动幅度）
+const SWAY = { tree: 1, pine: 0.8, palm: 1.4, deadtree: 0.5, berry: 0.4, zpine: 0.8, ctree: 0.8 };
+
+// 水面波光：每个水格偶尔闪一下
+function drawWaterShimmer(ctx, x0, y0, x1, y1) {
+  const gt = G.groundTer, W = MAP_W * T;
+  ctx.fillStyle = '#dff6ff';
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      if (G.terrain[idx(x, y)] !== TER.WATER) continue;
+      const h = ((x * 73856093) ^ (y * 19349663)) >>> 0;
+      const ph = (G.time * 0.45 + (h % 997) / 997) % 1;
+      if (ph > 0.3) continue;
+      const px = x * T + 2 + (h % 11), py = y * T + 2 + ((h >> 5) % 11);
+      if (gt && gt[(py | 0) * W + (px | 0)] !== TER.WATER) continue;
+      ctx.globalAlpha = Math.sin(ph / 0.3 * Math.PI) * 0.85;
+      const len = 1.5 + (h % 3);
+      ctx.fillRect(px - len / 2, py, len, 0.5);
+      ctx.fillRect(px - len / 4 + 1, py + 1.5, len / 2, 0.5);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// 篝火的火星和烟
+function drawEmbers(ctx, x, y) {
+  for (let i = 0; i < 4; i++) {
+    const ph = (G.time * 0.22 + i / 4) % 1;
+    ctx.globalAlpha = (1 - ph) * 0.22;
+    ctx.fillStyle = '#c8ccd8';
+    const r = 1.5 + ph * 4;
+    ctx.beginPath();
+    ctx.arc(x + Math.sin(ph * 4 + i) * 2 + ph * 5, y - 7 - ph * 26, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  for (let i = 0; i < 8; i++) {
+    const ph = (G.time * 0.6 + i / 8) % 1;
+    ctx.globalAlpha = 1 - ph;
+    ctx.fillStyle = ph < 0.4 ? '#ffcd75' : '#ef7d57';
+    ctx.fillRect(x + Math.sin(ph * 7 + i * 2.3) * (1.5 + ph * 4), y - ph * 24, 0.8, 0.8);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// 屏幕四角微微压暗，画面更聚焦
+let VIGNETTE = null;
+function drawVignette(ctx) {
+  if (!VIGNETTE || VIGNETTE.w !== G.sw || VIGNETTE.h !== G.sh) {
+    const r = Math.hypot(G.sw, G.sh) / 2;
+    const g = ctx.createRadialGradient(G.sw / 2, G.sh / 2, r * 0.55, G.sw / 2, G.sh / 2, r);
+    g.addColorStop(0, 'rgba(10,8,25,0)');
+    g.addColorStop(1, 'rgba(10,8,25,0.38)');
+    VIGNETTE = { w: G.sw, h: G.sh, g };
+  }
+  ctx.fillStyle = VIGNETTE.g;
+  ctx.fillRect(0, 0, G.sw, G.sh);
 }

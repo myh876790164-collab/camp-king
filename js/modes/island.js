@@ -1005,7 +1005,8 @@ MODES.island = {
     extraButtons() { return [{ label: '成员', onClick: () => openMembers() }]; },
     drawWorld(ctx) {
       for (const a of G.animals) {
-        ctx.drawImage(a.face < 0 ? SPR.boar.flip : SPR.boar.img, Math.round(a.x - 8), Math.round(a.y - 12));
+        drawShadow(ctx, a.x, a.y + 2, 14);
+        ctx.drawImage(a.face < 0 ? SPR.boar.flip : SPR.boar.img, a.x - 8, a.y - 12, 16, 16);
         if (a.hp < 30) hpBar(ctx, a.x - 5, a.y - 8, 10, a.hp / 30, '#b13e53');
       }
       const s = G.ship;
@@ -1022,7 +1023,8 @@ MODES.island = {
           ctx.lineWidth = 1;
           ctx.strokeRect(m.x - 7.5, m.y + 1.5, 15, 2);
         }
-        ctx.drawImage(m.hit > 0 ? spr.white : (m.face < 0 ? spr.flip : spr.img), Math.round(m.x - 8), Math.round(m.y - 14 + bob));
+        drawShadow(ctx, m.x, m.y + 1, 11);
+        ctx.drawImage(m.hit > 0 ? spr.white : (m.face < 0 ? spr.flip : spr.img), m.x - 8, m.y - 14 + bob, 16, 16);
         if (m.working && m.workT) hpBar(ctx, m.x - 5, m.y - 17, 10, m.workT / (ISLAND_TASKS[m.task].time || 1), '#ffcd75');
         if (m.hp < memberMaxHp(m)) hpBar(ctx, m.x - 5, m.y - 20, 10, m.hp / memberMaxHp(m), '#a7f070');
         const icon = m.state === 'rest' ? 'Zz' : m.hunger < 25 ? '饿' : m.note.indexOf('需要') === 0 ? '?' : null;

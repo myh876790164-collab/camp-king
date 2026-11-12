@@ -221,28 +221,120 @@ const ICONS = {
   person: ['...kk...', '..kSSk..', '..kSSk..', '...kk...', '.kCCCCk.', '.kCCCCk.', '..kPPk..', '..k..k..'],
   iron: ['........', '........', '..kkkkk.', '.kswssk.', 'kswsssdk', 'kddddddk', '.kkkkkk.'],
   fire: ['...k....', '..kok...', '..koyk..', '.koyyok.', '.kyyyyk.', 'koyyyyok', '.kbbbbk.', '..kkkk..'],
+  // 丧尸模式的武器 / 护甲 / 消耗品
+  fists: ['........', '..kkkk..', '.kSSSSk.', 'kSkSkSSk', 'kSSSSSSk', '.kSSSSk.', '..kkkk..', '........'],
+  knife: ['.......k', '......kw', '.....kwk', '....kwk.', '...kwk..', '..kbk...', '.kbk....', '.kk.....'],
+  bat: ['......kk', '.....khk', '....khk.', '...khk..', '..khk...', '.kbk....', 'kbk.....', 'kk......'],
+  axe: ['..kkk...', '.krrrk..', 'krrwrk..', '.krrkbk.', '..k.kbk.', '.....kbk', '......kb', '.......k'],
+  pistol: ['........', 'kkkkkkk.', 'kddddddk', 'kDDkkkk.', '.kDk....', '.kDk....', '.kkk....', '........'],
+  shotgun: ['........', '........', 'kkkkkkkk', 'kddddhhk', 'kkkkkhhk', '.....khk', '.....kk.', '........'],
+  rifle: ['........', 'k.......', 'kkkkkkkk', 'kDDDDDDk', 'kkkDkhhk', '...kkhhk', '.....khk', '.....kk.'],
+  none: ['........', '..k..k..', '.kDkkDk.', '.kDDDDk.', '.kDDDDk.', '.kDDDDk.', '..kkkk..', '........'],
+  jacket: ['.kk..kk.', 'kbbkkbbk', 'kbbbbbbk', 'kbkbbkbk', 'kbkbbkbk', '.kbbbbk.', '.kbbbbk.', '.kkkkkk.'],
+  vest: ['.kk..kk.', 'kDDkkDDk', 'kDdDDdDk', 'kDdDDdDk', 'kDDDDDDk', '.kDDDDk.', '.kDDDDk.', '.kkkkkk.'],
+  riot: ['..kkkk..', '.kssssk.', 'kkaaaakk', 'kssssssk', 'ksdssdsk', 'ksdssdsk', '.ksssk..', '.kkkkk..'],
+  bandage: ['........', '.kkkkkk.', 'kwwwwwwk', 'kwTwwTwk', 'kwwwwwwk', '.kkkkkk.', '........', '........'],
+  medkit: ['..kkkk..', '.kwwwwk.', 'kwwrrwwk', 'kwrrrrwk', 'kwwrrwwk', 'kwwwwwwk', '.kkkkkk.', '........'],
 };
+
+const SPR_DUMPSTER = [
+  '................', '................', '................', '..kkkkkkkkkkkk..',
+  '.kGGGGGGGGGGGGk.', '.kkkkkkkkkkkkkk.', '.keGGGGGGGGGGek.', '.keGGGkkkkGGGek.',
+  '.keGGGGGGGGGGek.', '.keGrGGGGGGGGek.', '.keeeeeeeeeeeek.', '.kkkkkkkkkkkkkk.',
+  '..kDk......kDk..', '..kkk......kkk..',
+];
+
+// ---------- 高清化 ----------
+// 原始字符画先用 Scale2x 算法放大 2 倍（斜线变圆滑），
+// 再自动加光影：上边缘受光变亮、下边缘背光变暗，看起来更立体。
+// 图片实际是 2 倍分辨率，但 w/h 仍是原尺寸，绘制时按原尺寸画。
+const SPRITE_HD = 2;
+function hexRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [n >> 16, (n >> 8) & 255, n & 255];
+}
+const PAL_RGB = {};
+for (const k in PALETTE) PAL_RGB[k] = hexRgb(PALETTE[k]);
+
+function scale2x(grid, w, h) {
+  const W = w * 2, out = new Array(W * h * 2).fill('.');
+  const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? '.' : grid[y * w + x]);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const P = at(x, y), A = at(x, y - 1), B = at(x + 1, y), C = at(x - 1, y), D = at(x, y + 1);
+      let e0 = P, e1 = P, e2 = P, e3 = P;
+      if (C === A && C !== D && A !== B) e0 = A;
+      if (A === B && A !== C && B !== D) e1 = B;
+      if (D === C && D !== B && C !== A) e2 = C;
+      if (B === D && B !== A && D !== C) e3 = D;
+      const o = y * 2 * W + x * 2;
+      out[o] = e0; out[o + 1] = e1; out[o + W] = e2; out[o + W + 1] = e3;
+    }
+  }
+  return out;
+}
 
 // 把字符画变成图片：普通版、左右翻转版、受击闪白版
 function makeSprite(rows, subst) {
   const h = rows.length;
   let w = 0;
   for (const r of rows) w = Math.max(w, r.length);
-  const img = createCanvas(w, h), flip = createCanvas(w, h), white = createCanvas(w, h);
-  const a = img.getContext('2d'), b = flip.getContext('2d'), c = white.getContext('2d');
-  c.fillStyle = '#ffffff';
+  const grid = new Array(w * h).fill('.');
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < rows[y].length; x++) {
       let ch = rows[y][x];
       if (subst && subst[ch]) ch = subst[ch];
-      const col = PALETTE[ch];
-      if (!col) continue;
-      a.fillStyle = col; a.fillRect(x, y, 1, 1);
-      b.fillStyle = col; b.fillRect(w - 1 - x, y, 1, 1);
-      c.fillRect(x, y, 1, 1);
+      if (PALETTE[ch]) grid[y * w + x] = ch;
     }
   }
+  const S = SPRITE_HD, W = w * S, H = h * S;
+  const big = scale2x(grid, w, h);
+  const solid = (x, y) => x >= 0 && y >= 0 && x < W && y < H && big[y * W + x] !== '.' && big[y * W + x] !== 'k';
+  const img = createCanvas(W, H), flip = createCanvas(W, H), white = createCanvas(W, H);
+  const a = img.getContext('2d'), c = white.getContext('2d');
+  const id = a.createImageData(W, H), wd = c.createImageData(W, H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const ch = big[y * W + x];
+      if (ch === '.') continue;
+      let [r, g, b] = PAL_RGB[ch];
+      if (ch !== 'k') {
+        if (!solid(x, y - 1)) { r += (255 - r) * 0.24; g += (255 - g) * 0.22; b += (255 - b) * 0.16; }      // 顶部受光
+        else if (!solid(x, y + 1)) { r *= 0.74; g *= 0.76; b *= 0.86; }                                    // 底部背光（偏冷）
+        else if (!solid(x + 1, y)) { r *= 0.86; g *= 0.87; b *= 0.92; }                                    // 右侧阴影
+        else if (!solid(x - 1, y)) { r += (255 - r) * 0.1; g += (255 - g) * 0.09; b += (255 - b) * 0.06; } // 左侧微亮
+      }
+      const o = (y * W + x) * 4;
+      id.data[o] = r; id.data[o + 1] = g; id.data[o + 2] = b; id.data[o + 3] = 255;
+      wd.data[o] = wd.data[o + 1] = wd.data[o + 2] = wd.data[o + 3] = 255;
+    }
+  }
+  a.putImageData(id, 0, 0);
+  c.putImageData(wd, 0, 0);
+  const f = flip.getContext('2d');
+  f.translate(W, 0);
+  f.scale(-1, 1);
+  f.drawImage(img, 0, 0);
   return { w, h, img, flip, white };
+}
+
+// 柔和的椭圆阴影（画在角色、建筑、树木脚下）
+let SHADOW_IMG = null;
+function drawShadow(ctx, x, y, w, alpha) {
+  if (!SHADOW_IMG) {
+    SHADOW_IMG = createCanvas(32, 16);
+    const g = SHADOW_IMG.getContext('2d');
+    g.setTransform(1, 0, 0, 0.5, 0, 0);
+    const gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    gr.addColorStop(0, 'rgba(10,10,30,0.55)');
+    gr.addColorStop(0.65, 'rgba(10,10,30,0.35)');
+    gr.addColorStop(1, 'rgba(10,10,30,0)');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 32, 32);
+  }
+  if (alpha !== undefined) ctx.globalAlpha = alpha;
+  ctx.drawImage(SHADOW_IMG, x - w / 2, y - w / 4, w, w / 2);
+  if (alpha !== undefined) ctx.globalAlpha = 1;
 }
 
 // ---------- 2×2 营地（用代码画） ----------
@@ -412,4 +504,11 @@ function initSprites() {
   villagerLooks.forEach((s, i) => { SPR['villager' + i] = makeSprite(SPR_PERSON, Object.assign({ P: 'b' }, s)); });
 
   for (const k in ICONS) SPR['icon_' + k] = makeSprite(ICONS[k]);
+  // 丧尸模式：幸存者不同外貌、城市行道树、垃圾箱
+  const zLooks = [{ C: 'G', P: 'b', H: 'k' }, { C: 'u', P: 'D', H: 'H' }, { C: 'o', P: 'n', H: 'h' }, { C: 'w', P: 'D', H: 'y' },
+    { C: 'm', P: 'b', H: 'k' }, { C: 'd', P: 'k', H: 'r' }];
+  zLooks.forEach((s, i) => { SPR['zs' + i] = makeSprite(SPR_PERSON, s); });
+  SPR.ctree = makeSprite(SPR_TREE, { G: 'g', l: 'Z', e: 'e' });
+  SPR.zpine = makeSprite(SPR_PINE, { w: 'G' });
+  SPR.dumpster = makeSprite(SPR_DUMPSTER);
 }

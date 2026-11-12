@@ -164,7 +164,7 @@ function drawUI(ctx) {
   const by = sh - UI.bottomH;
   drawPanel(ctx, 0, by, sw, UI.bottomH);
   const fixed = [{ label: '科技', onClick: () => { G.state = 'tech'; G.buildMode = null; }, badge: availableTechCount() > 0 }];
-  if (G.mode === 'zombie') fixed.push({ label: '装备', onClick: () => { G.state = 'equip'; G.buildMode = null; }, badge: false });
+  if (G.mode === 'zombie') fixed.push({ label: '幸存者', onClick: () => { G.state = 'equip'; G.buildMode = null; }, badge: false });
   if (G.def.hooks.extraButtons) fixed.push(...G.def.hooks.extraButtons());
   const fw = 50, gap = 6;
   fixed.forEach((f, i) => {

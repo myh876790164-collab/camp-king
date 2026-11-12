@@ -8,6 +8,7 @@ function setupMode(mode) {
   G.mode = mode;
   G.def = MODES[mode];
   const def = G.def;
+  setMapSize(def.mapW || CONFIG.MAP_W, def.mapH || CONFIG.MAP_H);
   Object.assign(G, {
     res: Object.assign({}, def.startRes), day: 1, phase: 'day', timer: def.dayTime, state: 'play',
     buildings: [], monsters: [], projectiles: [], effects: [], floats: [],
@@ -20,11 +21,13 @@ function setupMode(mode) {
     player: null, survivors: [], npcs: [], inventory: {}, villagers: [], furnace: null, keys: {},
     dawnMsg: null, nightNote: null, buildPage: 0, techPage: 0, equipSel: 0, equipTab: 'equip',
     camFollow: false, moveMarker: null,
+    roads: null, natTer: null, fields: null, crosswalks: null, structOrder: null, // 城市地图专用
   });
 }
 
-function startGame(mode) {
+function startGame(mode, opt) {
   setupMode(mode);
+  G.opt = opt || {}; // 开局选项（丧尸模式：初始营地）
   generateMap();
   createBuilding('core', G.coreX, G.coreY);
   if (G.def.hooks.init) G.def.hooks.init();
@@ -78,15 +81,24 @@ function startNight() {
 
   // 随着天数增加，敌人从更多方向来袭
   const sides = [0, 1, 2, 3].sort(() => Math.random() - 0.5).slice(0, Math.min(4, 1 + Math.floor((n - 1) / 3)));
+  // 地图变大后，怪物不从地图边缘走过来（太远），而是从营地外一圈出现；
+  // 某个方向全是海时，就从那个方向离营地最远的岸边出现
   G.spawnTiles = [];
+  const R = def.spawnRadius || Math.min(MAP_W, MAP_H) / 2 - 3;
+  const ccx = G.coreX + 1, ccy = G.coreY + 1, best = [0, 0, 0, 0], cand = [];
   for (let y = 0; y < MAP_H; y++) {
     for (let x = 0; x < MAP_W; x++) {
-      if (x !== 0 && y !== 0 && x !== MAP_W - 1 && y !== MAP_H - 1) continue;
-      const side = y === 0 ? 0 : x === MAP_W - 1 ? 1 : y === MAP_H - 1 ? 2 : 3;
       const i = idx(x, y);
-      if (sides.includes(side) && !G.nodes[i] && !G.bld[i] && isFinite(G.dist[i])) G.spawnTiles.push(i);
+      if (G.nodes[i] || G.bld[i] || !isFinite(G.dist[i]) || solidTer(G.terrain[i])) continue;
+      const dx = x + 0.5 - ccx, dy = y + 0.5 - ccy;
+      const side = Math.abs(dy) > Math.abs(dx) ? (dy < 0 ? 0 : 2) : (dx > 0 ? 1 : 3);
+      if (!sides.includes(side)) continue;
+      const d = Math.min(R, Math.hypot(dx, dy));
+      if (d > best[side]) best[side] = d;
+      cand.push([i, side, d]);
     }
   }
+  for (const [i, side, d] of cand) if (d >= best[side] - 1.2 && best[side] > 6) G.spawnTiles.push(i);
   if (!G.spawnTiles.length) for (let x = 0; x < MAP_W; x++) G.spawnTiles.push(idx(x, 0));
   if (def.hooks.night) def.hooks.night();
   const dirText = sides.map((s) => SIDE_NAMES[s]).join('、');

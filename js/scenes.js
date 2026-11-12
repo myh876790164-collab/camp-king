@@ -14,6 +14,7 @@ function drawScene(ctx) {
   else if (G.scene === 'modes') drawModeSelect(ctx);
   else if (G.scene === 'load') drawLoadScreen(ctx);
   else if (G.scene === 'settings') drawSettings(ctx);
+  else if (G.scene === 'zcamp') drawCampSelect(ctx);
   drawConfirm(ctx);
 }
 
@@ -87,7 +88,7 @@ function drawTitle(ctx) {
   drawButton(ctx, x, y, bw, bh, '读取存档', () => gotoScene('load'), { size: 18, dim: !anySave });
   y += bh + 14;
   drawButton(ctx, x, y, bw, bh, '设置', () => { G.settingsFrom = 'title'; gotoScene('settings'); }, { size: 18 });
-  drawText(ctx, 'v0.2 原型', sw - 10, sh - 12, 11, '#566c86', 'right', false);
+  drawText(ctx, 'v0.3 原型', sw - 10, sh - 12, 11, '#566c86', 'right', false);
 }
 
 function drawModeSelect(ctx) {
@@ -103,9 +104,11 @@ function drawModeSelect(ctx) {
   MODE_ORDER.forEach((id, i) => {
     const m = MODES[id];
     const x = x0 + (i % cols) * (cw + gap), y = y0 + Math.floor(i / cols) * (ch + gap);
+    // 丧尸模式先选初始营地
+    const go = () => (id === 'zombie' ? gotoScene('zcamp') : startGame(id));
     drawButton(ctx, x, y, cw, ch, '', () => {
-      if (hasSave(id)) askConfirm('「' + m.name + '」已有存档，开始新游戏会覆盖它（存档会在下次天亮时被替换）。继续吗？', () => startGame(id));
-      else startGame(id);
+      if (hasSave(id)) askConfirm('「' + m.name + '」已有存档，开始新游戏会覆盖它（存档会在下次天亮时被替换）。继续吗？', go);
+      else go();
     }, { color: 'rgba(26,28,44,0.92)' });
     const isz = Math.min(48, ch - 40);
     ctx.drawImage(SPR[m.icon].img, x + 12, y + 14, isz, isz);
