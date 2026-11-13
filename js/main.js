@@ -28,13 +28,15 @@ function setupMode(mode) {
 }
 
 function startGame(mode, opt) {
+  if (MODES[mode].applyOpt) MODES[mode].applyOpt(opt); // 难度等开局选项
   setupMode(mode);
   G.opt = opt || {}; // 开局选项（丧尸模式：初始营地）
+  G.introNote = null;
   generateMap();
   createBuilding('core', G.coreX, G.coreY);
   if (G.def.hooks.init) G.def.hooks.init();
   finishGameSetup();
-  showBanner('第 1 天 · ' + G.def.name, G.def.intro, 7);
+  showBanner('第 1 天 · ' + G.def.name, (G.introNote ? G.introNote + '　' : '') + G.def.intro, 7);
 }
 
 function finishGameSetup() {

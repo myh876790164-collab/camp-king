@@ -32,7 +32,7 @@ function drawWorldLabel(ctx, text, x, y, color) {
 }
 
 function buildingSprite(b) {
-  return SPR[b.type === 'core' ? G.def.coreSprite : (b.def.sprite || b.type)];
+  return SPR[b.type === 'core' ? G.def.coreSprite : (b.spr || b.def.sprite || b.type)]; // b.spr：会变样子的建筑（地雷薯亮灯）
 }
 
 function render() {
@@ -203,6 +203,11 @@ function drawProjectilesAndEffects(ctx) {
       ctx.strokeStyle = '#dff6ff'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(p.x - p.vx * 6, p.y - p.vy * 6); ctx.lineTo(p.x, p.y); ctx.stroke();
       ctx.lineWidth = 1;
+    } else if (p.kind === 'seed' || p.kind === 'frostseed') { // 籽弹
+      const ice = p.kind === 'frostseed';
+      ctx.fillStyle = '#1a1c2c'; ctx.beginPath(); ctx.arc(p.x, p.y, 2.6, 0, 7); ctx.fill();
+      ctx.fillStyle = ice ? '#73eff7' : '#5aa04c'; ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, 7); ctx.fill();
+      ctx.fillStyle = ice ? '#ffffff' : '#a7f070'; ctx.fillRect(p.x - 1, p.y - 1.2, 1, 1);
     } else if (p.kind === 'rock') {
       ctx.fillStyle = '#1a1c2c'; ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
       ctx.fillStyle = '#94b0c2'; ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3);

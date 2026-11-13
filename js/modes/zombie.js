@@ -108,6 +108,21 @@ const ZCAMPS = {
   },
 };
 
+// ---------- 难度 ----------
+// day = 白天秒数；wave = 尸潮（首夜数量、每夜增加、增长倍率、每夜血量/伤害成长、几夜一个巨尸）
+// special = 变异丧尸比例倍数；wander = 白天游荡丧尸数量倍数；zin = 建筑里的丧尸倍数
+const ZDIFF = {
+  easy: { name: '简单', color: '#a7f070', desc: '白天 140 秒，尸潮少、成长慢，变异丧尸少', day: 140,
+    wave: { baseCount: 4, perNight: 4, growth: 1.05, hpPerNight: 0.14, dmgPerNight: 0.05, bossEvery: 7 }, special: 0.6, wander: 0.7, zin: 0.7 },
+  normal: { name: '普通', color: '#ffcd75', desc: '白天 110 秒，标准难度', day: 110,
+    wave: { baseCount: 6, perNight: 5, growth: 1.07, hpPerNight: 0.18, dmgPerNight: 0.06, bossEvery: 5 }, special: 1, wander: 1, zin: 1 },
+  hard: { name: '困难', color: '#ef7d57', desc: '白天 90 秒，尸潮更大、成长更快，变异丧尸多 30%', day: 90,
+    wave: { baseCount: 7, perNight: 6, growth: 1.09, hpPerNight: 0.25, dmgPerNight: 0.08, bossEvery: 5 }, special: 1.3, wander: 1.25, zin: 1.25 },
+  nightmare: { name: '噩梦', color: '#b13e53', desc: '白天 75 秒，每 4 夜一只巨尸，丧尸成长极快，变异丧尸多 60%', day: 75,
+    wave: { baseCount: 10, perNight: 9, growth: 1.13, hpPerNight: 0.4, dmgPerNight: 0.12, bossEvery: 4 }, special: 1.6, wander: 1.5, zin: 1.5 },
+};
+function zdiff() { return ZDIFF[(G.opt && G.opt.diff) || 'normal'] || ZDIFF.normal; }
+
 // ---------- 物品 ----------
 function itemTable(key) { return key[0] === 'w' ? WEAPONS : key[0] === 'a' ? ARMORS : key[0] === 'k' ? CORES : key[0] === 'x' ? MISC : CONSUMABLES; }
 function itemDef(key) { return itemTable(key)[key.slice(2)]; }
@@ -417,19 +432,34 @@ function reachGoal(g) {
 }
 
 // 按物资表掷骰子
+// 有没有搜到东西：搜刮技能每级 +7% 出货几率，拾荒者再 +15%（最高 95%）
+function lootChance(p, base) { return Math.min(0.95, base * (1 + 0.07 * p.skills.scav) * (hasT(p, 'scavenger') ? 1.15 : 1)); }
+// 一个容器什么都没出：技能越高，越可能翻到点零碎（35% + 每级 6%）
+function lootFallback(L, p) {
+  if (Math.random() > 0.35 + 0.06 * p.skills.scav) return null;
+  const r = ['food', 'water', 'parts', 'ammo'].find((k) => L[k]);
+  if (r) return { res: r, n: Math.max(1, Math.ceil(L[r][1] * 0.5 * Math.random())) };
+  if (L.c) return { item: 'c:bandage' };
+  return { res: 'parts', n: 1 };
+}
 function rollLoot(L, p) {
   const got = [];
   const mult = (1 + 0.05 * p.skills.scav) * (hasT(p, 'scavenger') ? 1.3 : 1) * (AB(p) ? AB(p).lootMul : 1), luck = hasT(p, 'lucky') ? 1.6 : 1;
   for (const r of ['food', 'water', 'parts', 'ammo']) {
-    if (!L[r] || Math.random() > L[r][2]) continue;
-    const k = Math.round(randInt(L[r][0], L[r][1]) * mult);
+    if (!L[r] || Math.random() > lootChance(p, L[r][2])) continue;
+    const k = Math.max(1, Math.round(randInt(L[r][0], L[r][1]) * mult));
     G.res[r] = (G.res[r] || 0) + k;
     got.push(RES_INFO[r].name + ' +' + k);
   }
   const found = (k) => { addItem(k); got.push('找到 ' + itemName(k)); showBanner('找到：' + itemName(k), '打开「幸存者」面板给大家装备上', 3, '#ffcd75'); };
-  if (L.w && Math.random() < L.w * luck) found(randomItem('w', L.wPool));
-  else if (L.a && Math.random() < L.a * luck) found(randomItem('a', L.aPool));
-  if (L.c && Math.random() < L.c) found(Math.random() < 0.75 ? 'c:bandage' : 'c:medkit');
+  if (L.w && Math.random() < lootChance(p, L.w * luck)) found(randomItem('w', L.wPool));
+  else if (L.a && Math.random() < lootChance(p, L.a * luck)) found(randomItem('a', L.aPool));
+  if (L.c && Math.random() < lootChance(p, L.c)) found(Math.random() < 0.75 ? 'c:bandage' : 'c:medkit');
+  if (!got.length) { // 保底：翻到点零碎
+    const fb = lootFallback(L, p);
+    if (fb && fb.res) { G.res[fb.res] = (G.res[fb.res] || 0) + fb.n; got.push('翻到一点' + RES_INFO[fb.res].name + ' +' + fb.n); }
+    else if (fb) { addItem(fb.item); got.push('翻到 ' + itemName(fb.item)); }
+  }
   return got;
 }
 
@@ -484,6 +514,7 @@ function spawnBandits(x, y, count) {
 function traitText(p) { return p.traits.map((t) => ZTRAITS[t].name).join('、') || '无'; }
 
 function openNpcDialog(npc) {
+  if (npc.kind === 'merchant') { openMerchant(npc); return; } // 精明的冬瓜
   if (npc.kind === 'friendly') {
     const full = campSurvivors().length >= zombieHousing(), cost = { food: 8, water: 8 }, pp = npc.person;
     const best = Object.keys(ZSKILLS).sort((a, b) => pp.skills[b] - pp.skills[a])[0];
@@ -538,7 +569,7 @@ function openNpcDialog(npc) {
 }
 
 // ---------- 白天游荡的丧尸 ----------
-function wanderCap() { return Math.round(Math.min(80, 18 + G.day * 3) * (G.camp ? G.camp.dangerMul : 1)); }
+function wanderCap() { return Math.round(Math.min(80, 18 + G.day * 3) * (G.camp ? G.camp.dangerMul : 1) * zdiff().wander); }
 function spawnZombieAt(x, y) {
   const type = G.day >= 2 && Math.random() < 0.3 ? 'runner' : 'walker';
   spawnMonster(type, (x + rand(0.3, 0.7)) * T, (y + rand(0.3, 0.7)) * T, { wander: true });
@@ -566,7 +597,7 @@ function seedCityZombies() {
     if (s.home || !d.danger || structDist(s, G.core.cx, G.core.cy) < 12 * T) continue;
     // 自己营地类型以外，越危险的地方丧尸越多
     spawnNearStruct(s, Math.floor(d.danger * 0.3 * mul * rand(0.5, 1.3) + Math.random())); // 随机取整：期望值和倍率成正比
-    s.zIn = Math.floor(d.danger * 0.5 * mul * rand(0.4, 1.2) + Math.random()); // 建筑里面的丧尸
+    s.zIn = Math.floor(d.danger * 0.5 * mul * zdiff().zin * rand(0.4, 1.2) + Math.random()); // 建筑里面的丧尸
   }
   // 公路、树林、田野里也零散游荡着丧尸
   for (let k = 0; k < 20 * mul; k++) {
@@ -890,11 +921,20 @@ function drawCampSelect(ctx) {
   drawText(ctx, '选择初始营地', sw / 2, 34, 22, '#ffcd75', 'center');
   drawButton(ctx, 10, 12, 70, 34, '返回', () => gotoScene('modes'), { size: 13 });
   if (!ZCAMPS[G.campSel]) G.campSel = ids[0];
+  // 难度
+  G.diffSel = ZDIFF[G.diffSel] ? G.diffSel : 'normal';
+  const dk = Object.keys(ZDIFF), dbw = Math.min(90, (sw - 24 - 60) / dk.length);
+  drawText(ctx, '难度', sw / 2 - (dk.length * (dbw + 6)) / 2 - 20, 70, 13, '#c8d6e5', 'center');
+  dk.forEach((k, i) => {
+    const bx = sw / 2 - (dk.length * (dbw + 6)) / 2 + i * (dbw + 6);
+    drawButton(ctx, bx, 56, dbw, 28, ZDIFF[k].name, () => { G.diffSel = k; }, { active: G.diffSel === k, size: 13, color: G.diffSel === k ? '#29366f' : '#333c57' });
+  });
+  drawText(ctx, ZDIFF[G.diffSel].desc, sw / 2, 96, 12, ZDIFF[G.diffSel].color, 'center', false);
   const wide = sw >= 820;
   const listW = wide ? Math.min(480, sw * 0.52) : sw - 24;
   const cols = wide ? 2 : sw >= 560 ? 4 : 2;
-  const gap = 8, tw = (listW - (cols - 1) * gap) / cols, th = wide ? 96 : sw >= 560 ? 84 : 68;
-  const gx = wide ? Math.max(12, (sw - listW - 16 - Math.min(440, sw - listW - 40)) / 2) : 12, gy = 62;
+  const gap = 8, tw = (listW - (cols - 1) * gap) / cols, th = wide ? 96 : sw >= 560 ? 84 : 64;
+  const gx = wide ? Math.max(12, (sw - listW - 16 - Math.min(440, sw - listW - 40)) / 2) : 12, gy = 110;
   ids.forEach((id, i) => {
     const c = ZCAMPS[id], x = gx + (i % cols) * (tw + gap), y = gy + Math.floor(i / cols) * (th + gap), sel = id === G.campSel;
     drawButton(ctx, x, y, tw, th, '', () => { G.campSel = id; }, { active: sel, color: sel ? '#29366f' : 'rgba(26,28,44,0.92)' });
@@ -929,7 +969,7 @@ function drawCampSelect(ctx) {
   list('劣势', c.cons, '#ef7d57', '✖');
   list('营地每天产出（独特）', [outputText(c.struct, 1) + '。把别的同类建筑清理后派人驻守，也能获得这种产出'], '#73eff7', '◆');
   const by = Math.max(y + 4, dy + dh - 56);
-  drawButton(ctx, dx + 14, Math.min(by, dy + dh - 50), dw - 28, 40, '在「' + c.name + '」建立营地', () => startGame('zombie', { camp: G.campSel }), { color: '#1f5e3a', size: 15 });
+  drawButton(ctx, dx + 14, Math.min(by, dy + dh - 50), dw - 28, 40, '在「' + c.name + '」建立营地', () => startGame('zombie', { camp: G.campSel, diff: G.diffSel }), { color: '#1f5e3a', size: 15 });
 }
 
 // ---------- 模式定义 ----------
@@ -955,6 +995,12 @@ MODES.zombie = {
   groundColors: { [TER.GRASS]: ['#5f6b45', '#4f5a39', '#6e7a52'] },
   noFlowers: true,
   saveCheck: (d) => !!(d.extra && d.extra.city === 4),
+  // 开局 / 读档前：按难度设置白天时长和尸潮成长
+  applyOpt(opt) {
+    const d = ZDIFF[(opt && opt.diff) || 'normal'] || ZDIFF.normal;
+    MODES.zombie.dayTime = d.day;
+    MODES.zombie.wave = Object.assign({}, d.wave);
+  },
 
   nodes: {
     car: { name: '废弃汽车', search: true, onRoad: true, amount: 1, regrow: 2 },
@@ -966,7 +1012,9 @@ MODES.zombie = {
 
   mapGen() { cityMapGen(ZCAMPS[(G.opt && G.opt.camp) || 'police'].struct); },
 
-  buildList: ['barricade', 'gate', 'collector', 'workbench', 'vegfarm', 'spikes', 'turret', 'floodlight'],
+  buildList: ['barricade', 'gate', 'collector', 'workbench', 'vegfarm', 'spikes', 'turret', 'floodlight',
+    // 商人「精明的冬瓜」卖的图纸（js/merchant.js）
+    'seedgun', 'frostgun', 'twingun', 'nutwall', 'mine', 'melon', 'chili', 'bomb'],
   buildings: {
     core: {
       name: '避难所', size: 2, hp: 800, attack: 'bullet', range: 4.5, dmg: 9, rate: 1.2, light: 5,
@@ -981,6 +1029,15 @@ MODES.zombie = {
     spikes: { name: '钉板', hp: 80, cost: { parts: 6 }, trap: 12, passable: true, locked: true, desc: '不挡路，丧尸踩上去持续受伤' },
     turret: { name: '机枪塔', hp: 200, cost: { parts: 30 }, attack: 'bullet', range: 5, dmg: 6, rate: 3, light: 2, locked: true, desc: '高射速自动炮塔' },
     floodlight: { name: '探照灯', hp: 120, cost: { parts: 20 }, light: 5, aura: { radius: 4, slow: 0.6 }, locked: true, desc: '照亮周围并减速丧尸' },
+    // ---- 图纸建筑（向商人购买图纸后解锁）----
+    seedgun: { name: '籽弹炮台', hp: 120, cost: { parts: 12, food: 3 }, attack: 'seed', range: 4.5, dmg: 10, rate: 1.4, locked: true, sprite: 'b_seedgun', desc: '自动瞄准范围内的丧尸，连续射出硬籽弹' },
+    frostgun: { name: '霜籽炮台', hp: 120, cost: { parts: 16, water: 5 }, attack: 'frostseed', range: 4.5, dmg: 7, rate: 1.2, slow: { factor: 0.5, dur: 2 }, locked: true, sprite: 'b_frostgun', desc: '射出冰冷的籽弹，打中的丧尸减速一半' },
+    twingun: { name: '双发籽弹炮台', hp: 140, cost: { parts: 22, food: 5 }, attack: 'seed', range: 4.5, dmg: 10, rate: 1.4, bp: 'twingun', locked: true, sprite: 'b_twingun', desc: '一次射出两发籽弹' },
+    nutwall: { name: '硬壳果墙', hp: 1200, cost: { parts: 10, food: 3 }, locked: true, sprite: 'b_nutwall', desc: '超厚的果壳，生命是路障的 5 倍，丧尸要啃很久' },
+    mine: { name: '地雷薯', hp: 40, cost: { parts: 10 }, passable: true, bp: 'mine', locked: true, sprite: 'b_mine', desc: '埋好后 6 秒才能用，丧尸踩上去爆炸，伤害 600（一次性）' },
+    melon: { name: '铁皮重瓜', hp: 300, cost: { parts: 25, food: 8 }, bp: 'melon', locked: true, sprite: 'b_melon', desc: '丧尸靠近就跳起来砸血最多的那只，伤害 2000，专治巨尸（一次性）' },
+    chili: { name: '爆燃辣椒', hp: 60, cost: { parts: 18, food: 6 }, bp: 'chili', locked: true, sprite: 'b_chili', desc: '丧尸进入 2 格就引爆，横竖各 7 格烈焰，伤害 800 并点燃（一次性）' },
+    bomb: { name: '双生爆果', hp: 60, cost: { parts: 22 }, bp: 'bomb', locked: true, sprite: 'b_bomb', desc: '放下 1.5 秒后爆炸，半径 2.5 格内伤害 1000（一次性）' },
   },
 
   techs: [
@@ -1009,6 +1066,7 @@ MODES.zombie = {
   hooks: {
     init() {
       const c = G.core, campId = (G.opt && G.opt.camp) || 'police', camp = ZCAMPS[campId];
+      G.introNote = '难度：' + zdiff().name;
       G.camp = { id: campId, craftMul: 1, fullHeal: false, dangerMul: 1 };
       G.player = Object.assign(newPerson('你'), { baseHp: 100, weapon: 'bat', path: [], goal: null, search: null, down: 0 });
       G.player.hp = personMaxHp(G.player);
@@ -1037,7 +1095,8 @@ MODES.zombie = {
         home: G.home, citySeed: G.citySeed,
         survivors: G.survivors.map(personSave),
         inventory: G.inventory,
-        npcs: G.npcs.map((n) => ({ x: n.x, y: n.y, kind: n.kind, name: n.name, person: n.person ? personSave(n.person) : null })),
+        npcs: G.npcs.map((n) => ({ x: n.x, y: n.y, kind: n.kind, name: n.name, person: n.person ? personSave(n.person) : null, stock: n.stock, sold: n.sold })),
+        merchantAt: G.merchantAt,
         structs: G.structs.map((s) => [s.type, s.x, s.y, s.v, s.left, s.restock, s.home ? 1 : 0, s.opened || {}, s.zIn || 0, s.nc || 0, s.zs || null, s.op || null]),
         decor: G.decor,
       };
@@ -1049,6 +1108,8 @@ MODES.zombie = {
       placeSurvivors();
       G.inventory = d.inventory || {};
       G.npcs = (d.npcs || []).map((n) => Object.assign({ face: 1 }, n, { person: n.person ? personLoad(n.person) : null }));
+      for (const n of G.npcs) if (n.kind === 'merchant') { n.stock = n.stock || []; n.sold = n.sold || []; }
+      G.merchantAt = d.merchantAt || null;
       G.structs = [];
       G.structAt = new Int16Array(MAP_W * MAP_H).fill(-1);
       G.home = d.home || { beds: [] }; G.citySeed = d.citySeed || 1; G.inside = null;
@@ -1082,9 +1143,17 @@ MODES.zombie = {
       for (const s of campSurvivors()) {
         s.hit = Math.max(0, s.hit - dt);
         updateSurvivorTrip(s, dt); // 白天自己出门搜刮（js/scavenge.js）
+        updateGuard(s, dt); // 丧尸进营地：主动迎战 / 支援被攻击的建筑（js/defense.js）
         if (!s.down && s.state !== 'in') personAttack(s, dt, G.mods.survDmg);
         abilityTick(s, dt, allPeople());
       }
+      for (const s of G.survivors) { // 驻守分基地的人：在门口迎战
+        if (s.state !== 'post') continue;
+        s.hit = Math.max(0, s.hit - dt);
+        if (!s.down) personAttack(s, dt, G.mods.survDmg);
+        abilityTick(s, dt, [s]);
+      }
+      updateMerchant(); // 商人什么时候来、什么时候走
       if (G.phase === 'day') {
         G.wanderTimer -= dt;
         if (G.wanderTimer <= 0) {
@@ -1106,6 +1175,7 @@ MODES.zombie = {
       const p = G.player;
       if (confusedAI(m, dt)) return true;
       if (m.special && specialAI(m, dt, G.inside ? null : p)) return true;
+      if (m.raid && raidAI(m, dt)) return true;
       const pd = p.down > 0 || G.inside ? 1e9 : Math.hypot(p.x - m.x, p.y - m.y);
       if (m.def.ranged && pd < m.def.ranged * T) {
         m.face = p.x < m.x ? -1 : 1;
@@ -1120,7 +1190,7 @@ MODES.zombie = {
         if (m.cd <= 0) { m.cd = 1 / m.def.rate; hurtPlayer(m.dmg, m); }
         return true;
       }
-      for (const s of campSurvivors()) {
+      for (const s of G.survivors) {
         if (s.down || s.state === 'in' || Math.hypot(s.x - m.x, s.y - m.y) > T * 0.7) continue;
         if (m.cd <= 0) { m.cd = 1 / m.def.rate; hurtSurvivor(s, m.dmg, m); }
         return true;
@@ -1146,8 +1216,9 @@ MODES.zombie = {
       // 营地附近游荡的丧尸也被吸引过来（远处的继续游荡）
       for (const m of G.monsters) if (m.wander && m.type !== 'bandit' && Math.hypot(m.x - G.core.cx, m.y - G.core.cy) < 18 * T) m.wander = false;
       const p = G.player, px = G.inside ? p.cityX : p.x, py = G.inside ? p.cityY : p.y;
-      const rep = scavReport();
-      if (rep) G.nightNote = rep;
+      const rep = scavReport(), raids = outpostNight();
+      const note = [rep].concat(raids).filter(Boolean).join('；');
+      if (note) G.nightNote = note;
       if (G.inside && !G.inside.home) showBanner('天黑了！', '尸潮正在围攻营地，快离开建筑回去', 3, '#ef7d57');
       else if (!G.inside && Math.hypot(px - G.core.cx, py - G.core.cy) > 8 * T) {
         G.dawnMsg = null;
@@ -1177,6 +1248,7 @@ MODES.zombie = {
         msgs.push('食物或水不够了！大家士气大跌');
         G.player.hp = Math.max(1, G.player.hp - 15);
       }
+      for (const m of G.monsters) if (m.raid) m.raid = null; // 袭击分基地的丧尸散去
       // 分基地：昨晚的袭击 + 今天的产出；营地建筑自己的产出
       outpostsDawn(msgs);
       // 士气太低的人会离开
@@ -1212,6 +1284,7 @@ MODES.zombie = {
       }
       const add = randInt(1, 3);
       for (let i = 0; i < add && G.npcs.length < 10; i++) spawnNpc();
+      planMerchant(); // 今天商人来不来
       msgs.push('今天消耗 食物 ' + needFood + '、水 ' + needWater);
       G.dawnMsg = msgs.join('　');
     },
@@ -1266,14 +1339,15 @@ MODES.zombie = {
     drawWorld(ctx) {
       // 陌生人
       for (const n of G.npcs) {
-        const spr = n.kind === 'bandit' ? SPR.bandit : n.person ? SPR['zs' + n.person.look] : SPR.stranger;
+        const spr = n.kind === 'merchant' ? SPR.merchant : n.kind === 'bandit' ? SPR.bandit : n.person ? SPR['zs' + n.person.look] : SPR.stranger;
         drawShadow(ctx, n.x, n.y + 1, 11);
         ctx.drawImage(spr.img, n.x - 8, n.y - 14, 16, 16);
+        if (n.kind === 'merchant') { drawMoneyBag(ctx, n.x, n.y - 21); drawWorldLabel(ctx, '精明的冬瓜', n.x, n.y + 6, '#ffcd75'); continue; }
         const bob = Math.sin(G.time * 4) * 1.5;
         drawWorldLabel(ctx, n.kind === 'bandit' ? '!' : '?', n.x, n.y - 18 + bob, n.kind === 'bandit' ? '#ef7d57' : '#ffcd75');
       }
       // 幸存者
-      for (const s of campSurvivors()) {
+      for (const s of G.survivors) {
         if (s.state === 'in') continue; // 在楼里搜刮
         const spr = personSprite(s);
         ctx.globalAlpha = s.down ? 0.4 : 1;

@@ -515,4 +515,5 @@ function initSprites() {
   initWallSprites(); // 墙和门的建造按钮图标（js/walls.js）
   initInteriorSprites(); // 床的图标（js/interior.js）
   initAbilitySprites(); // 晶核图标（js/abilities.js）
+  initMerchantSprites(); // 商人和图纸建筑（js/merchant.js）
 }

@@ -139,6 +139,7 @@ function removeBuilding(b) {
 
 function damageBuilding(b, dmg, attacker) {
   if (!b.alive) return;
+  if (attacker) attacker.atkT = G.clock; // 记下：这只怪正在攻击建筑（丧尸模式的同伴会优先去支援）
   b.hp -= dmg;
   b.hit = 0.12;
   if (attacker && (b.def.wall || b.def.door) && G.mods.thorns) hurtMonster(attacker, dmg * G.mods.thorns);
@@ -158,6 +159,7 @@ function updateBuilding(b, dt) {
   if (def.produce) updateProducer(b, dt);
   if (def.trap) updateTrap(b, dt);
   if (def.aura) updateAura(b);
+  if (def.bp && typeof BP_UPDATE !== 'undefined' && BP_UPDATE[def.bp]) BP_UPDATE[def.bp](b, dt); // 丧尸模式：商人图纸建筑
 }
 
 function nearestMonsters(x, y, r) {
@@ -186,7 +188,7 @@ function updateTower(b, dt) {
   b.cd = 1 / towerRate(b);
 }
 
-const SHOT_SPEED = { arrow: 16, rock: 9, ice: 12, fire: 12, bullet: 26 };
+const SHOT_SPEED = { arrow: 16, rock: 9, ice: 12, fire: 12, bullet: 26, seed: 14, frostseed: 13 };
 function towerShoot(b, target) {
   const atk = b.def.attack;
   const o = { kind: atk, speed: (SHOT_SPEED[atk] || 16) * T, dmg: towerDmg(b) };

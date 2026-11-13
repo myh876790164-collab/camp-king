@@ -14,16 +14,16 @@ const CONT = {
   counter: { name: '橱柜', loot: { food: [1, 4, 0.7], parts: [0, 1, 0.2] } },
   freezer: { name: '冰柜', loot: { food: [3, 7, 0.85] } },
   shelf: { name: '货架', loot: { food: [2, 5, 0.7], water: [1, 4, 0.5] } },
-  wardrobe: { name: '衣柜', loot: { a: 0.15, aPool: ['jacket'], parts: [0, 1, 0.2] } },
+  wardrobe: { name: '衣柜', loot: { a: 0.15, aPool: ['jacket'], parts: [1, 2, 0.35] } },
   drawer: { name: '床头柜', loot: { parts: [1, 2, 0.4], ammo: [1, 4, 0.15], c: 0.12, w: 0.05, wPool: ['knife', 'pistol'] } },
-  bookshelf: { name: '书架', loot: { parts: [1, 2, 0.3] } },
+  bookshelf: { name: '书架', loot: { parts: [1, 2, 0.45] } },
   medcab: { name: '药柜', loot: { c: 0.6 } },
   medshelf: { name: '药品架', loot: { c: 0.8, water: [1, 3, 0.3] } },
   desk: { name: '办公桌', loot: { ammo: [1, 3, 0.08], parts: [1, 3, 0.5], food: [0, 2, 0.2], c: 0.05 } },
-  filing: { name: '文件柜', loot: { parts: [1, 3, 0.45] } },
+  filing: { name: '文件柜', loot: { parts: [1, 3, 0.55] } },
   cooler: { name: '饮水机', loot: { water: [2, 5, 0.9] } },
   vending: { name: '自动售货机', loot: { food: [2, 4, 0.7], water: [2, 4, 0.7] } },
-  register: { name: '收银台', loot: { parts: [1, 3, 0.5] } },
+  register: { name: '收银台', loot: { parts: [1, 3, 0.6], ammo: [1, 3, 0.1] } },
   crate: { name: '木箱', loot: { parts: [2, 5, 0.6], food: [1, 3, 0.3], ammo: [2, 5, 0.15] } },
   rack: { name: '仓储货架', loot: { parts: [2, 6, 0.7], food: [1, 3, 0.3], water: [1, 3, 0.3] } },
   plocker: { name: '警用储物柜', loot: { ammo: [3, 8, 0.7], a: 0.35, aPool: ['vest', 'riot'], w: 0.15, wPool: ['pistol', 'knife'] } },
@@ -184,8 +184,9 @@ function genInterior(s, opts) {
   fl[I(door.x, door.y)] = fl[I(door.x, door.y - 1)];
   resv[I(door.x, door.y - 1)] = 1; resv[I(door.x, door.y - 2)] = 1;
   if (door.x > 1) resv[I(door.x - 1, door.y - 1)] = 1;
+  if (door.x < W - 2) resv[I(door.x + 1, door.y - 1)] = 1; // 门口两边都留空，柜子不会贴着出口
 
-  const it = { s, W, H, t, fl, occ, resv, door, rooms, furn: [], cont: [], zombies: [], fx: [], proj: [], floats: [], wall: plan.wall, home: !!opts.home };
+  const it = { s, W, H, t, fl, occ, resv, door, rooms, gaps, furn: [], cont: [], zombies: [], fx: [], proj: [], floats: [], wall: plan.wall, home: !!opts.home };
   // 放家具：放完检查是否还能走到每一处，不能就撤销
   const put = (k, x, y, w, h) => {
     if (k !== 'rug') {
@@ -375,31 +376,91 @@ function buildInteriorImage(it) {
   const { W, H, t, fl } = it, R = mulberry(interiorSeed(it.s) + 7);
   const c = createCanvas(W * T * 2, H * T * 2), g = c.getContext('2d');
   g.scale(2, 2);
+  const isWall = (x, y) => x < 0 || y < 0 || x >= W || y >= H || t[y * W + x] === IT.WALL;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const i = y * W + x;
     if (t[i] === IT.FLOOR || t[i] === IT.DOOR) paintFloorTile(g, x, y, FLOORS[fl[i]], R);
   }
-  // 墙：顶部深色，朝南那面是墙纸（3/4 视角）
+  // 房间的天花板灯光：每个房间中间一片暖色光晕（没有灯的废弃楼就暗一些）
+  for (const r of it.rooms) {
+    if (R() < 0.3) continue;
+    const cx = (r.x0 + r.x1 + 1) / 2 * T, cy = (r.y0 + r.y1 + 1) / 2 * T, rr = Math.max(r.x1 - r.x0, r.y1 - r.y0) * T * 0.6 + T;
+    const gr = g.createRadialGradient(cx, cy, 0, cx, cy, rr);
+    gr.addColorStop(0, 'rgba(255,220,160,0.16)'); gr.addColorStop(1, 'rgba(255,220,160,0)');
+    g.fillStyle = gr; g.fillRect(cx - rr, cy - rr, rr * 2, rr * 2);
+  }
+  // 墙脚阴影（贴着墙的地板暗一点，看起来有立体感）
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (t[y * W + x] !== IT.FLOOR) continue;
+    const X = x * T, Y = y * T;
+    if (isWall(x, y - 1)) { g.fillStyle = 'rgba(10,10,25,0.32)'; g.fillRect(X, Y, T, 2); g.fillStyle = 'rgba(10,10,25,0.15)'; g.fillRect(X, Y + 2, T, 2); }
+    if (isWall(x - 1, y)) { g.fillStyle = 'rgba(10,10,25,0.22)'; g.fillRect(X, Y, 2, T); }
+    if (isWall(x + 1, y)) { g.fillStyle = 'rgba(10,10,25,0.12)'; g.fillRect(X + T - 2, Y, 2, T); }
+  }
+  // 地上的杂物：纸张、易拉罐、碎玻璃、弹壳（不挡路）
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+    const i = y * W + x;
+    if (t[i] !== IT.FLOOR || it.occ[i] || R() > 0.1) continue;
+    const X = x * T + 3 + R() * 9, Y = y * T + 3 + R() * 9, k = R();
+    if (k < 0.35) { g.fillStyle = '#d8dde6'; g.fillRect(X, Y, 4, 3); g.fillStyle = '#94a0b0'; g.fillRect(X + 0.5, Y + 1, 3, 0.5); }
+    else if (k < 0.55) { g.fillStyle = pick(['#b13e53', '#38b764', '#3b5dc9']); g.fillRect(X, Y, 3, 1.5); g.fillStyle = '#c8ccd8'; g.fillRect(X + 3, Y, 0.8, 1.5); }
+    else if (k < 0.75) { g.fillStyle = 'rgba(200,230,255,0.7)'; for (let q = 0; q < 4; q++) g.fillRect(X + R() * 5, Y + R() * 4, 1, 1); }
+    else if (k < 0.85) { g.fillStyle = '#ffcd75'; g.fillRect(X, Y, 1.5, 0.8); g.fillRect(X + 2, Y + 2, 1.5, 0.8); }
+    else { g.fillStyle = 'rgba(40,30,25,0.35)'; g.beginPath(); g.ellipse(X + 2, Y + 2, 3 + R() * 2, 2, 0, 0, 7); g.fill(); }
+  }
+  // 墙：顶部深色，朝南那面是墙纸（3/4 视角）；外墙开窗，内墙挂画、开关、踢脚线
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (t[y * W + x] !== IT.WALL) continue;
     const X = x * T, Y = y * T, below = y + 1 < H ? t[(y + 1) * W + x] : IT.VOID;
     g.fillStyle = '#2b2e3a'; g.fillRect(X, Y, T, T);
     g.fillStyle = '#3a3f4d'; g.fillRect(X, Y, T, 1);
+    if ((x + y) % 2 === 0) { g.fillStyle = 'rgba(255,255,255,0.03)'; g.fillRect(X, Y + 1, T, 6); }
     if (below === IT.FLOOR) {
       g.fillStyle = it.wall; g.fillRect(X, Y + 7, T, 9);
       g.fillStyle = 'rgba(255,255,255,0.12)'; g.fillRect(X, Y + 7, T, 1);
-      g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(X, Y + 14, T, 2);
-      if ((x * 5 + y) % 9 === 0) { g.fillStyle = '#1a1c2c'; g.fillRect(X + 4, Y + 8.5, 8, 4.5); g.fillStyle = ['#b13e53', '#3b5dc9', '#38704a'][x % 3]; g.fillRect(X + 4.5, Y + 9, 7, 3.5); } // 墙上的画
+      g.fillStyle = 'rgba(0,0,0,0.08)'; for (let q = 0; q < 3; q++) g.fillRect(X + q * 5 + 2, Y + 8, 0.5, 6); // 墙纸竖纹
+      g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(X, Y + 14, T, 2); // 踢脚线
+      const dec = (x * 5 + y * 3) % 11;
+      if (y === 0 && dec % 3 === 0) {
+        // 外墙的窗户（有的破了，有的钉了木板）
+        const kind = R();
+        g.fillStyle = '#1a1c2c'; g.fillRect(X + 2, Y + 7.5, 12, 6);
+        if (kind < 0.2) { g.fillStyle = '#6e4a2e'; g.fillRect(X + 2.5, Y + 8, 11, 5); g.fillStyle = '#8f6a42'; g.fillRect(X + 2.5, Y + 8.5, 11, 1.2); g.fillRect(X + 2.5, Y + 11, 11, 1.2); }
+        else {
+          g.fillStyle = kind < 0.35 ? '#11131f' : '#41579a'; g.fillRect(X + 2.5, Y + 8, 11, 5);
+          g.fillStyle = 'rgba(169,196,240,0.7)'; g.fillRect(X + 3, Y + 8.5, 4, 0.8);
+          g.fillStyle = '#1a1c2c'; g.fillRect(X + 7.75, Y + 8, 0.5, 5);
+          if (kind > 0.7) { g.fillStyle = '#b13e53'; g.fillRect(X + 2.5, Y + 8, 2, 5); g.fillRect(X + 11.5, Y + 8, 2, 5); } // 窗帘
+        }
+      } else if (dec === 1) { g.fillStyle = '#1a1c2c'; g.fillRect(X + 4, Y + 8.5, 8, 4.5); g.fillStyle = ['#b13e53', '#3b5dc9', '#38704a', '#c49a64'][x % 4]; g.fillRect(X + 4.5, Y + 9, 7, 3.5); } // 挂画
+      else if (dec === 5) { g.fillStyle = '#f4f4f4'; g.fillRect(X + 7, Y + 10, 2, 2.5); g.fillStyle = '#94a0b0'; g.fillRect(X + 7.5, Y + 10.5, 1, 1.5); } // 开关
+      else if (dec === 8) { g.fillStyle = 'rgba(20,20,30,0.25)'; g.fillRect(X + 3, Y + 9, 1, 5); g.fillRect(X + 4, Y + 11, 2, 0.5); } // 裂缝
     }
   }
-  // 大门（出口）
+  // 房间之间的门框
+  for (const [x, y] of it.gaps || []) {
+    const X = x * T, Y = y * T, vertWall = isWall(x - 1, y) && isWall(x + 1, y);
+    g.fillStyle = '#6e4a2e';
+    if (vertWall) { g.fillRect(X, Y, 1.5, T); g.fillRect(X + T - 1.5, Y, 1.5, T); }
+    else { g.fillRect(X, Y, T, 1.5); g.fillRect(X, Y + T - 1.5, T, 1.5); }
+  }
+  // 大门（出口）：门框 + 绿色“出口”灯 + 门垫
   const D = it.door;
   g.fillStyle = '#1a1c2c'; g.fillRect(D.x * T, D.y * T, T, T);
-  g.fillStyle = '#6e4a2e'; g.fillRect(D.x * T + 2, D.y * T + 2, T - 4, T - 2);
-  g.fillStyle = '#8f2f2a'; g.fillRect(D.x * T + 3, (D.y - 1) * T + 10, T - 6, 5); // 门垫
-  g.fillStyle = '#38b764'; g.fillRect(D.x * T + 4, D.y * T + 3, T - 8, 3);
-  // 家具（地毯先画）
+  g.fillStyle = '#6e4a2e'; g.fillRect(D.x * T + 1, D.y * T + 1, T - 2, T - 1);
+  g.fillStyle = '#4a2f1d'; g.fillRect(D.x * T + 3, D.y * T + 4, T - 6, T - 4);
+  g.fillStyle = '#ffcd75'; g.fillRect(D.x * T + T - 5, D.y * T + 9, 1.5, 1.5);
+  g.fillStyle = '#38b764'; g.fillRect(D.x * T + 4, D.y * T + 1.5, T - 8, 2.5);
+  g.fillStyle = '#a7f070'; g.fillRect(D.x * T + 5, D.y * T + 2, T - 10, 1);
+  g.fillStyle = '#8f2f2a'; g.fillRect(D.x * T + 2, (D.y - 1) * T + 10, T - 4, 5); // 门垫
+  g.fillStyle = '#b13e53'; g.fillRect(D.x * T + 3, (D.y - 1) * T + 11, T - 6, 0.6);
+  // 家具（地毯先画），每件家具底下一圈柔和阴影
   for (const f of it.furn) if (f.k === 'rug') paintFurniture(g, f);
+  for (const f of it.furn) {
+    if (f.k === 'rug' || f.k === 'bars') continue;
+    g.fillStyle = 'rgba(10,10,25,0.28)';
+    g.beginPath(); g.ellipse((f.x + f.w / 2) * T + 1, (f.y + f.h) * T - 1, f.w * T * 0.5, 2.5, 0, 0, 7); g.fill();
+  }
   for (const f of it.furn.slice().sort((a, b) => a.y + a.h - b.y - b.h)) if (f.k !== 'rug') paintFurniture(g, f);
   it.img = c;
 }
@@ -552,8 +613,9 @@ function insideTap(tx, ty, wx, wy) {
   const ptx = Math.floor(p.x / T), pty = Math.floor(p.y / T);
   let goal = null, goalFn = (x, y) => x === tx && y === ty;
   if (tx >= 0 && ty >= 0 && tx < it.W && ty < it.H) {
-    const atDoor = Math.abs(tx - it.door.x) <= 1 && ty >= it.door.y - 1;
+    // 先看点到的是不是家具（家具优先），只有门本身那一格（或正上方的空地）才算出口
     const f = furnAt(it, tx, ty);
+    const atDoor = !f && tx === it.door.x && ty >= it.door.y - 1;
     if (atDoor) { goal = { exit: true }; goalFn = (x, y) => Math.abs(x - it.door.x) <= 0 && y >= it.door.y - 1; }
     else if (f && f.k === 'cbed') {
       askConfirm('拆掉这张床？返还 3 个零件。', () => removeBed(it, f));

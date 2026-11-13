@@ -57,7 +57,7 @@ function drawMiniContent(ctx, x, y, w, h, big) {
   // 敌人
   for (const m of G.monsters) if (m.alive) P(m.x, m.y, m.special && typeof ABIL !== 'undefined' ? ABIL[m.special].color : m.def.boss ? '#ff4060' : '#d13a3a', m.def.boss ? dot * 1.8 : dot);
   // 陌生人 / 船只 / 动物
-  for (const n of G.npcs || []) P(n.x, n.y, n.kind === 'bandit' ? '#ef7d57' : '#ffcd75', dot);
+  for (const n of G.npcs || []) P(n.x, n.y, n.kind === 'bandit' ? '#ef7d57' : n.kind === 'merchant' ? '#ff5fa0' : '#ffcd75', n.kind === 'merchant' ? dot * 1.6 : dot);
   if (G.ship) P(G.ship.x, G.ship.y, '#f4f4f4', dot * 1.6);
   // 同伴 / 岛民
   for (const s of G.survivors || []) { if (s.state === 'in' && Math.sin(G.time * 6) < 0) continue; P(s.x, s.y, s.down ? '#566c86' : '#41a6f6', dot * 1.2); }
@@ -112,7 +112,7 @@ function drawBigMap(ctx) {
     G.mapOpen = false;
   });
   // 图例
-  const legend = [['#ffe066', '你'], ['#a7f070', '营地'], ['#d13a3a', '丧尸/怪物'], ['#ffcd75', '陌生人'], ['#ef7d57', '强盗'], ['#41a6f6', '同伴/分基地'], ['#c8ccd8', '可搜建筑'], ['#6b6e78', '已搜空']];
+  const legend = [['#ffe066', '你'], ['#a7f070', '营地'], ['#d13a3a', '丧尸/怪物'], ['#ff5fa0', '商人'], ['#ffcd75', '陌生人'], ['#ef7d57', '强盗'], ['#41a6f6', '同伴/分基地'], ['#c8ccd8', '可搜建筑'], ['#6b6e78', '已搜空']];
   let lx = Math.max(12, sw / 2 - legend.length * 42);
   const ly = y + h + 22;
   for (const [col, name] of legend) {

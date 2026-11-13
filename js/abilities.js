@@ -144,7 +144,7 @@ const SPECIALS = {
   space: { name: '空间尸', hp: 1.6, dmg: 1.1, speed: 1, blink: true },
   spirit: { name: '魅尸', hp: 1.8, dmg: 0.8, speed: 1, ranged: 4, shot: '#ff9ad5', on: 'weak' },
 };
-function specialChance() { return Math.min(0.25, 0.05 + G.day * 0.01); }
+function specialChance() { return Math.min(0.25, 0.05 + G.day * 0.01) * (typeof zdiff === 'function' ? zdiff().special : 1); }
 function makeSpecial(m, t) {
   const s = SPECIALS[t];
   m.special = t;

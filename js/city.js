@@ -421,6 +421,16 @@ const DECOR_PAINT = {
   bench: [14, 7, (P) => { P(0, 0.5, 14, 2, '#6e4a2e'); P(0, 3, 14, 2, '#8f6a42'); P(1, 5, 1, 2, '#1a1c2c'); P(12, 5, 1, 2, '#1a1c2c'); }],
   papers: [8, 4, (P) => { P(0, 1, 3, 2, '#d8dde6'); P(4, 0, 3, 2, '#c9b7a0'); P(5, 2.5, 2, 1.5, '#f4f4f4'); }],
   barrier: [16, 7, (P) => { P(0, 1, 16, 4, '#1a1c2c'); for (let i = 0; i < 4; i++) P(0.5 + i * 4, 1.5, 2, 3, i % 2 ? '#f4f4f4' : '#b13e53'); P(2, 5, 1, 2, '#333c57'); P(13, 5, 1, 2, '#333c57'); }],
+  busstop: [20, 16, (P) => {
+    P(1, 2, 18, 2.5, '#1a1c2c'); P(1.5, 2.3, 17, 1.8, '#41a6f6'); // 顶棚
+    P(2, 4.5, 1, 11, '#566c86'); P(17, 4.5, 1, 11, '#566c86');
+    P(3, 4.5, 14, 7, 'rgba(169,196,240,0.35)'); P(3, 4.5, 14, 0.6, 'rgba(255,255,255,0.4)'); // 玻璃
+    P(4, 11, 12, 2, '#8f6a42'); P(5, 13, 1, 2.5, '#1a1c2c'); P(14, 13, 1, 2.5, '#1a1c2c'); // 长椅
+    P(8, 5.5, 4, 3, '#ffcd75'); // 站牌
+  }],
+  mailbox: [6, 9, (P) => { P(0.5, 0.5, 5, 5, '#1a1c2c'); P(1, 1, 4, 4, '#3b8f4a'); P(1.5, 2, 3, 0.6, '#1a1c2c'); P(2.5, 5.5, 1, 3.5, '#333c57'); }],
+  newsbox: [6, 8, (P) => { P(0.5, 1, 5, 7, '#1a1c2c'); P(1, 1.5, 4, 6, '#b13e53'); P(1.5, 2, 3, 2.5, '#d8dde6'); P(2, 2.5, 2, 0.5, '#566c86'); }],
+  planter: [10, 10, (P) => { P(1, 6, 8, 4, '#1a1c2c'); P(1.5, 6.5, 7, 3, '#8b93a3'); P(2, 2, 6, 5, '#38704a'); P(3, 1, 4, 3, '#5aa04c'); P(4, 1.5, 1, 1, '#a7f070'); }],
   // 红绿灯（停电了，灯都是暗的，偶尔一个还闪红灯）
   signal: [8, 24, (P, lit) => {
     P(3.5, 8, 1.5, 15, '#333c57'); P(3, 22, 2.5, 2, '#1a1c2c');
@@ -823,7 +833,7 @@ function cityMapGen(campType) {
       for (const s of [-1, 1]) {
         const tx = x + nx * s * (r.w / 2 + 0.6), ty = y + ny * s * (r.w / 2 + 0.6);
         const i = inMap(Math.floor(tx), Math.floor(ty)) ? idx(Math.floor(tx), Math.floor(ty)) : -1;
-        if (i >= 0 && sidewalk[i] && !occ[i]) G.decor.push(['stree', tx * T, (ty + 0.4) * T]);
+        if (i >= 0 && sidewalk[i] && !occ[i]) G.decor.push([k % 42 === 39 && s > 0 ? 'busstop' : 'stree', tx * T, (ty + 0.4) * T]);
       }
     }
   }
@@ -831,7 +841,7 @@ function cityMapGen(campType) {
     const i = idx(x, y);
     if (sidewalk[i] && !occ[i] && !G.nodes[i]) {
       if ((x * 7 + y * 13) % 10 === 0) G.decor.push(['lamp', (x + 0.5) * T, (y + 0.8) * T, Math.random() < 0.35]);
-      else if (Math.random() < 0.035) G.decor.push([pick(['hydrant', 'trash', 'trash', 'papers', 'cone']), (x + rand(0.2, 0.8)) * T, (y + rand(0.3, 0.9)) * T]);
+      else if (Math.random() < 0.04) G.decor.push([pick(['hydrant', 'trash', 'trash', 'papers', 'cone', 'mailbox', 'newsbox', 'planter']), (x + rand(0.2, 0.8)) * T, (y + rand(0.3, 0.9)) * T]);
     } else if (G.terrain[i] === TER.ROAD && Math.random() < 0.008 && distToCore(x, y) > 6) {
       G.decor.push([pick(['barrier', 'cone', 'papers']), (x + 0.5) * T, (y + 0.6) * T]);
     }
@@ -892,7 +902,10 @@ function drawCity(ctx, x0, y0, x1, y1) {
       ctx.fillRect(sx + s.w * T, sy + 8, 4, bottom - sy - 6);
       ctx.fillRect(sx + 5, bottom, s.w * T - 1, 3);
     }
+    const fence = FENCE[s.type];
+    if (fence) drawFence(ctx, s, fence, false);
     ctx.drawImage(im.img, sx, sy, im.w, im.h);
+    if (fence) drawFence(ctx, s, fence, true);
     if (structEnterable(s)) {
       // 大门口的门垫 + 靠近时显示「进入」
       const en = structEntrance(s); // 实际能进的门口（正门被挡住时换一个）
@@ -932,6 +945,46 @@ function drawCity(ctx, x0, y0, x1, y1) {
       drawWorldLabel(ctx, name, (s.x + s.w / 2) * T, (s.y + s.h) * T - 4, s.home ? '#a7f070' : s.op ? '#73eff7' : s.left > 0 ? '#f4f4f4' : '#94b0c2');
     }
   }
+}
+
+// ---------- 院子的栅栏（只画在草地 / 泥地上，路和人行道上不画） ----------
+const FENCE = {
+  house: { post: '#e8eef5', rail: '#c8ccd8', gap: 3.2 },
+  barn: { post: '#8f6a42', rail: '#6e4a2e', gap: 4 },
+  factory: { post: '#8b93a3', rail: 'rgba(200,205,215,0.55)', gap: 5, mesh: 1 },
+  warehouse: { post: '#8b93a3', rail: 'rgba(200,205,215,0.55)', gap: 5, mesh: 1 },
+};
+function yardTile(px, py) {
+  const tx = Math.floor(px / T), ty = Math.floor(py / T);
+  if (!inMap(tx, ty)) return false;
+  const t = G.terrain[idx(tx, ty)];
+  return (t === TER.GRASS || t === TER.DIRT) && !G.bld[idx(tx, ty)];
+}
+// front = false：画后面和两边（被楼挡住的部分）；true：画前面那条（挡在楼前）
+function drawFence(ctx, s, f, front) {
+  const x0 = (s.x - 0.7) * T, x1 = (s.x + s.w + 0.7) * T, y0 = (s.y - 0.4) * T, y1 = (s.y + s.h + 0.75) * T;
+  const gx = (s.x + Math.floor(s.w / 2) + 0.5) * T; // 正门对着的地方留个缺口
+  const seg = (ax, ay, bx, by) => {
+    const len = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.round(len / f.gap));
+    let prev = null;
+    for (let k = 0; k <= n; k++) {
+      const px = ax + (bx - ax) * k / n, py = ay + (by - ay) * k / n;
+      const ok = yardTile(px, py) && !(front && Math.abs(px - gx) < T * 0.75);
+      if (ok && prev) {
+        ctx.fillStyle = f.rail;
+        if (ay === by) { ctx.fillRect(prev[0], py - 3, px - prev[0], 0.8); ctx.fillRect(prev[0], py - 1.5, px - prev[0], 0.8); }
+        else { ctx.fillRect(px - 0.4, prev[1] - 3, 0.8, py - prev[1]); }
+        if (f.mesh && ay === by) { ctx.fillStyle = 'rgba(200,205,215,0.25)'; ctx.fillRect(prev[0], py - 4, px - prev[0], 3.5); }
+      }
+      if (ok) {
+        ctx.fillStyle = '#1a1c2c'; ctx.fillRect(px - 0.8, py - 4.8, 1.6, 5.3);
+        ctx.fillStyle = f.post; ctx.fillRect(px - 0.5, py - 4.5, 1, 4.8);
+      }
+      prev = ok ? [px, py] : null;
+    }
+  };
+  if (!front) { seg(x0, y0, x1, y0); seg(x0, y0, x0, y1); seg(x1, y0, x1, y1); }
+  else seg(x0, y1, x1, y1);
 }
 
 // 夜里还亮着的路灯（只算屏幕附近的）

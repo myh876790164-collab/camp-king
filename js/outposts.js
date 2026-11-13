@@ -111,16 +111,15 @@ function outpostsDawn(msgs) {
   for (const st of outposts()) {
     const s = outpostWorker(st), name = STRUCTS[st.type].name;
     if (!s) { st.op = null; continue; }
-    if (Math.random() < outpostRaidChance(st)) {
-      const w = WEAPONS[s.weapon];
-      if (w.ammo && (G.res.ammo || 0) >= 5) G.res.ammo -= 5;
-      if (Math.random() < outpostWinChance(st)) {
-        s.hp = Math.max(1, s.hp - personMaxHp(s) * rand(0.1, 0.3));
-        s.stats.kills += 2; G.kills += 2;
+    // 昨晚真的有丧尸来袭（js/defense.js）：驻守的人倒下 = 分基地失守
+    if (st.raided) {
+      st.raided = false;
+      if (!s.down) {
         msgs.push(s.name + ' 守住了' + name + '分基地');
         if (Math.random() < 0.3) { const t = pick(ABIL_KEYS); addItem('k:' + t); msgs.push('缴获' + CORES[t].name); }
       } else {
         recallOutpost(st, true);
+        s.down = false;
         s.hp = Math.max(1, personMaxHp(s) * 0.2);
         changeMorale(s, -15);
         st.zIn = Math.ceil(STRUCTS[st.type].danger * 0.8) + 1; st.zs = null;
@@ -155,7 +154,7 @@ function openStationDialog(st) {
   options.push({ label: '取消', action: () => {} });
   G.dialog = {
     title: '在' + name + '建立分基地',
-    text: '派一名同伴驻守，每天天亮产出：' + outputText(st.type, 1) + '（驻守的人搜刮技能、异能越高越多）。\n费用：零件 15、食物 5。驻守的人不再守营地、不占营地床位，但照常吃饭。\n第 3 天起夜里可能被丧尸袭击，守不住分基地就会丢。' +
+    text: '派一名同伴驻守，每天天亮产出：' + outputText(st.type, 1) + '（驻守的人搜刮技能、异能越高越多）。\n费用：零件 15、食物 5。驻守的人不再守营地、不占营地床位，但照常吃饭。\n第 3 天起夜里可能有少量丧尸来袭，驻守的人会迎战，被打倒的话分基地就丢了。' +
       (free.length ? '' : '\n\n现在营地里没有空闲的同伴（外出搜刮的要等他们回来）。'),
     options,
   };
@@ -172,8 +171,8 @@ function openOutpostDialog(st) {
   G.dialog = {
     title: name + '分基地 · ' + lv + ' 级',
     text: '驻守：' + (s ? s.name + '（' + WEAPONS[s.weapon].name + '）' : '无') + '\n每天产出：' + outputText(st.type, outpostMul(st)) +
-      '\n夜里被袭击的几率：' + (G.day < 3 ? '第 3 天起才会有' : pct(outpostRaidChance(st))) + '，守住的把握：' + pct(outpostWinChance(st)) +
-      '\n（给驻守的人换更好的武器、提升异能，守住的把握更大；用枪的话每次袭击消耗 5 发子弹）',
+      '\n夜里被袭击的几率：' + (G.day < 3 ? '第 3 天起才会有' : pct(Math.min(0.8, outpostRaidChance(st) * 2)) + '，每次约 ' + outpostRaidCount(st) + ' 只丧尸') +
+      '\n驻守的人会在门口迎战，被打倒的话分基地就丢了。给 TA 换好武器和护甲、提升异能，或者升级分基地（来的丧尸更少）',
     options,
   };
   G.state = 'dialog';

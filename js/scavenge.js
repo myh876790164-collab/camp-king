@@ -73,13 +73,15 @@ function followTripPath(s, dt) {
 // 按物资表掷骰子，放进同伴的背包（回营地才交）
 function rollInto(bag, L, s) {
   const mult = scavPower(s), luck = hasT(s, 'lucky') ? 1.6 : 1;
+  let any = false;
   for (const r of ['food', 'water', 'parts', 'ammo']) {
-    if (!L[r] || Math.random() > L[r][2]) continue;
-    bag[r] += Math.round(randInt(L[r][0], L[r][1]) * mult);
+    if (!L[r] || Math.random() > lootChance(s, L[r][2])) continue;
+    bag[r] += Math.max(1, Math.round(randInt(L[r][0], L[r][1]) * mult)); any = true;
   }
-  if (L.w && Math.random() < L.w * luck) bag.items.push(randomItem('w', L.wPool));
-  else if (L.a && Math.random() < L.a * luck) bag.items.push(randomItem('a', L.aPool));
-  if (L.c && Math.random() < L.c) bag.items.push(Math.random() < 0.75 ? 'c:bandage' : 'c:medkit');
+  if (L.w && Math.random() < lootChance(s, L.w * luck)) { bag.items.push(randomItem('w', L.wPool)); any = true; }
+  else if (L.a && Math.random() < lootChance(s, L.a * luck)) { bag.items.push(randomItem('a', L.aPool)); any = true; }
+  if (L.c && Math.random() < lootChance(s, L.c)) { bag.items.push(Math.random() < 0.75 ? 'c:bandage' : 'c:medkit'); any = true; }
+  if (!any) { const fb = lootFallback(L, s); if (fb && fb.res) bag[fb.res] += fb.n; else if (fb) bag.items.push(fb.item); }
 }
 
 // 在楼里：先和里面的丧尸打，再搜几个柜子

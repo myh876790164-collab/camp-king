@@ -382,6 +382,12 @@ function drawRoadsHD(g, S) {
 // 曲线路上的颗粒、裂缝、油渍、血迹
 function cityRoadDecor(g, x, y, TS, t) {
   const bx = x * TS, by = y * TS;
+  // 末日之后没人打理：裂缝里长出杂草
+  if (Math.random() < (t === TER.ROAD ? 0.07 : 0.12)) {
+    const wx = bx + randInt(3, TS - 6), wy = by + randInt(4, TS - 4);
+    g.fillStyle = '#2f5a3c'; g.fillRect(wx, wy, 1, 3); g.fillRect(wx + 2, wy - 1, 1, 4); g.fillRect(wx + 4, wy + 1, 1, 2);
+    g.fillStyle = '#5aa04c'; g.fillRect(wx + 2, wy - 1, 1, 1); g.fillRect(wx, wy, 1, 1);
+  }
   if (t === TER.ROAD) {
     for (let k = 0; k < 8; k++) {
       g.fillStyle = Math.random() < 0.5 ? 'rgba(20,20,30,0.25)' : 'rgba(200,205,215,0.12)';

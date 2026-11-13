@@ -42,6 +42,7 @@ function loadGame(mode) {
     showBanner('存档损坏或版本不兼容', '旧版本的存档无法读取，请开始新游戏', 3, '#ef7d57');
     return;
   }
+  if (MODES[mode].applyOpt) MODES[mode].applyOpt(d.extra && d.extra.opt); // 读档：恢复难度
   setupMode(mode);
   Object.assign(G, { day: d.day, timer: d.timer, res: d.res, kills: d.kills, goldAcc: d.goldAcc || 0 });
   G.mods = Object.assign(defaultMods(), d.mods);
