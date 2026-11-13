@@ -140,7 +140,7 @@ function setupInput(canvas) {
       else if (G.mapOpen) G.mapOpen = false;
       else if (G.buildMode || G.selected) { G.buildMode = null; G.selected = null; }
       else if (G.state === 'play') G.state = 'paused';
-      else if (G.state === 'paused' || G.state === 'tech' || G.state === 'equip' || G.state === 'members') G.state = 'play';
+      else if (G.state === 'paused' || G.state === 'tech' || G.state === 'equip' || G.state === 'members' || G.state === 'sect') G.state = 'play';
       return;
     }
     if (G.state !== 'play') return;
@@ -151,7 +151,7 @@ function setupInput(canvas) {
       G.buildMode = G.buildMode === type ? null : type;
       G.selected = null;
     } else if (key === ' ') {
-      G.speed = G.speed >= 3 ? 1 : G.speed + 1;
+      G.speed = G.speed >= (G.def.maxSpeed || 3) ? 1 : G.speed + 1;
       e.preventDefault();
     } else if (key === 'n') {
       startNightEarly();

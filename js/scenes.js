@@ -97,9 +97,9 @@ function drawModeSelect(ctx) {
   drawButton(ctx, 10, 12, 70, 34, '返回', () => gotoScene('title'), { size: 13 });
   const cols = sw >= 760 ? 2 : 1;
   const gap = 12, cw = Math.min(cols === 2 ? 340 : 420, (sw - 24 - (cols - 1) * gap) / cols);
-  const ch = cols === 2 ? 150 : Math.min(140, (sh - 80 - 3 * gap) / 4);
+  const ch = cols === 2 ? Math.min(150, (sh - 80 - 2 * gap) / 3) : Math.min(140, (sh - 80 - (MODE_ORDER.length - 1) * gap) / MODE_ORDER.length);
   const totalW = cols * cw + (cols - 1) * gap, x0 = (sw - totalW) / 2;
-  const totalH = Math.ceil(4 / cols) * (ch + gap) - gap;
+  const totalH = Math.ceil(MODE_ORDER.length / cols) * (ch + gap) - gap;
   const y0 = Math.max(64, (sh - totalH) / 2 + 20);
   MODE_ORDER.forEach((id, i) => {
     const m = MODES[id];
@@ -127,7 +127,7 @@ function drawLoadScreen(ctx) {
   drawText(ctx, '读取存档', sw / 2, 34, 22, '#ffcd75', 'center');
   drawButton(ctx, 10, 12, 70, 34, '返回', () => gotoScene('title'), { size: 13 });
   const pw = Math.min(460, sw - 24), px = (sw - pw) / 2, rh = 64, gap = 10;
-  let y = Math.max(70, sh / 2 - (4 * (rh + gap)) / 2);
+  let y = Math.max(70, sh / 2 - (MODE_ORDER.length * (rh + gap)) / 2);
   drawText(ctx, '每天天亮时会自动存档，也可以在暂停菜单里手动保存', sw / 2, y - 16, 12, '#94b0c2', 'center', false);
   for (const id of MODE_ORDER) {
     const info = saveInfo(id);
@@ -168,7 +168,7 @@ function drawSettings(ctx) {
   const darkNames = { 0.6: '偏亮', 1: '标准', 1.3: '偏暗' };
   row('夜晚亮度', darkNames[s.dark] || '标准', () => { s.dark = s.dark === 0.6 ? 1 : s.dark === 1 ? 1.3 : 0.6; saveSettings(); });
   y += 10;
-  drawButton(ctx, px, y, pw, 44, '清除所有存档', () => askConfirm('确定清除全部 4 个模式的存档吗？无法恢复。', () => MODE_ORDER.forEach(deleteSave)), { color: '#5d275d', size: 14 });
+  drawButton(ctx, px, y, pw, 44, '清除所有存档', () => askConfirm('确定清除全部 ' + MODE_ORDER.length + ' 个模式的存档吗？无法恢复。', () => MODE_ORDER.forEach(deleteSave)), { color: '#5d275d', size: 14 });
   y += 64;
   const tips = [
     '操作说明：点击 = 采集/建造/选中，拖动 = 移动视角，滚轮/双指 = 缩放',

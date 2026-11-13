@@ -234,8 +234,8 @@ function buildGround() {
         if (terrainAt(x, y - 1) === TER.ROAD) px2(bx, by, TS, 2, curb);
         if (terrainAt(x + 1, y) === TER.ROAD) { px2(bx + TS - 3, by, 2, TS, curb); px2(bx + TS - 1, by, 1, TS, curbDk); }
         if (terrainAt(x - 1, y) === TER.ROAD) px2(bx, by, 2, TS, curb);
-        if (Math.random() < 0.05) cityStain(g, cx, cy);
-        if (Math.random() < 0.06) px2(cx, cy, 3, 2, pick(['#d8dde6', '#c9b7a0', '#8f6a42'])); // 纸屑落叶
+        if (!G.def.cleanPave && Math.random() < 0.05) cityStain(g, cx, cy);
+        if (!G.def.cleanPave && Math.random() < 0.06) px2(cx, cy, 3, 2, pick(['#d8dde6', '#c9b7a0', '#8f6a42'])); // 纸屑落叶
       } else if (tt === TER.LOT) {
         px2(bx, by, TS, 1, 'rgba(30,30,40,0.25)');
       }

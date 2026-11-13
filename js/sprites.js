@@ -516,4 +516,5 @@ function initSprites() {
   initInteriorSprites(); // 床的图标（js/interior.js）
   initAbilitySprites(); // 晶核图标（js/abilities.js）
   initMerchantSprites(); // 商人和图纸建筑（js/merchant.js）
+  initSectSprites(); // 修仙门派（js/sectmap.js）
 }

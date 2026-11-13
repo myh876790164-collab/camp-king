@@ -44,7 +44,7 @@ function drawTechPanel(ctx) {
   addButton(0, 0, sw, sh, null);
   const pw = Math.min(580, sw - 16), px = (sw - pw) / 2, top = 8, bottom = sh - 8;
   drawPanel(ctx, px, top, pw, bottom - top);
-  drawText(ctx, '科技研究', px + 14, top + 22, 18, '#ffcd75');
+  drawText(ctx, G.def.techTitle || '科技研究', px + 14, top + 22, 18, '#ffcd75');
   drawButton(ctx, px + pw - 44, top + 8, 36, 30, '✕', () => { G.state = 'play'; }, { size: 14 });
 
   const techs = G.def.techs;

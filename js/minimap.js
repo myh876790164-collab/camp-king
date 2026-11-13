@@ -17,7 +17,8 @@ function buildMiniBase() {
   const rgb = (h) => rgbCache[h] || (rgbCache[h] = hexRgb(h));
   for (let i = 0; i < MAP_W * MAP_H; i++) {
     const t = G.terrain[i];
-    let col = rgb(t === TER.GRASS && over[t] ? over[t][1] : MINI_COL[t] || '#4a7a3f');
+    const mc = G.def.miniColors && G.def.miniColors[t];
+    let col = rgb(mc || (t === TER.GRASS && over[t] ? over[t][1] : MINI_COL[t] || '#4a7a3f'));
     const n = G.nodes[i];
     if (n) col = n.type === 'car' ? [74, 78, 92] : n.type === 'dumpster' ? [56, 112, 74] : n.type.match(/rock|ore|coal/) ? [148, 176, 194] : [31, 94, 58];
     const o = i * 4;

@@ -41,10 +41,13 @@ const RES_INFO = {
   ammo: { name: '子弹', color: '#ffcd75' },
   coal: { name: '煤炭', color: '#94b0c2' },
   iron: { name: '铁', color: '#c8d6e5' },
+  lingshi: { name: '灵石', color: '#73eff7' },
+  herb: { name: '灵草', color: '#a7f070' },
+  ore: { name: '玄铁', color: '#c8d6e5' },
 };
 
 const MODES = {};
-const MODE_ORDER = ['classic', 'island', 'zombie', 'frost'];
+const MODE_ORDER = ['classic', 'island', 'zombie', 'frost', 'sect'];
 
 // 所有加成的初始值（科技和肉鸽强化会修改这些数）
 function defaultMods() {

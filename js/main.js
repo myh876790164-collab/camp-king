@@ -24,6 +24,7 @@ function setupMode(mode) {
     roads: null, natTer: null, fields: null, crosswalks: null, parking: null, structOrder: null, // 城市地图专用
     inside: null, home: null, citySeed: 0, cityCam: null, // 丧尸模式：建筑内部
     mapOpen: false, miniBase: null, scavLog: [], // 小地图、同伴搜刮记录
+    members: [], sect: null, sectFx: null, sectLayer: null, sui: null, // 修仙门派
   });
 }
 
@@ -43,7 +44,7 @@ function finishGameSetup() {
   buildGround();
   recomputeFlow();
   const focus = G.player || G.core;
-  G.cam = { x: focus.cx || focus.x, y: focus.cy || focus.y, zoom: defaultZoom() };
+  G.cam = { x: focus.cx || focus.x, y: focus.cy || focus.y, zoom: G.def.startZoom ? Math.max(minZoom(), Math.min(defaultZoom(), G.def.startZoom)) : defaultZoom() };
   clampCamera();
   G.state = 'play';
   gotoScene('game');

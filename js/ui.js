@@ -191,13 +191,14 @@ function drawUI(ctx) {
     x += step;
   }
   drawButton(ctx, sw - 48, 6, 40, 32, '‖', () => { G.state = 'paused'; }, { size: 16 });
-  drawButton(ctx, sw - 96, 6, 44, 32, '×' + G.speed, () => { G.speed = G.speed >= 3 ? 1 : G.speed + 1; });
+  drawButton(ctx, sw - 96, 6, 44, 32, '×' + G.speed, () => { G.speed = G.speed >= (G.def.maxSpeed || 3) ? 1 : G.speed + 1; });
 
   // ---- 昼夜 + 模式状态 ----
   let label;
   if (G.phase === 'day') label = '第 ' + G.day + ' 天  ☀ 白天 ' + Math.ceil(G.timer) + ' 秒';
   else if (G.def.hasNights) label = '第 ' + G.day + ' 夜  ☾ 剩余敌人 ' + (nightEnemies() + G.spawnLeft + G.bossLeft);
   else label = '第 ' + G.day + ' 夜  ☾ 休息中 ' + Math.ceil(G.timer) + ' 秒';
+  if (G.def.hooks.dayLabel) label = G.def.hooks.dayLabel(); // 修仙门派：宗门历法
   ctx.font = 'bold 14px ' + FONT;
   const showNightBtn = G.phase === 'day' && G.def.hasNights && playing;
   const lw = ctx.measureText(label).width + 24, bw = showNightBtn ? 62 : 0;
@@ -215,7 +216,7 @@ function drawUI(ctx) {
   // ---- 底部栏：科技/装备 + 建造（可翻页） ----
   const by = sh - UI.bottomH;
   drawPanel(ctx, 0, by, sw, UI.bottomH);
-  const fixed = [{ label: '科技', onClick: () => { G.state = 'tech'; G.buildMode = null; }, badge: availableTechCount() > 0 }];
+  const fixed = [{ label: G.def.techLabel || '科技', onClick: () => { G.state = 'tech'; G.buildMode = null; }, badge: availableTechCount() > 0 }];
   if (G.mode === 'zombie') fixed.push({ label: '幸存者', onClick: () => { G.state = 'equip'; G.buildMode = null; }, badge: false });
   if (G.def.hooks.extraButtons) fixed.push(...G.def.hooks.extraButtons());
   const fw = 50, gap = 6;
@@ -288,6 +289,7 @@ function drawUI(ctx) {
   if (G.state === 'perk') drawPerkOverlay(ctx);
   if (G.state === 'dialog') drawDialog(ctx);
   if (G.state === 'over') drawEndOverlay(ctx, false);
+  if (G.def.hooks.drawOverlay) G.def.hooks.drawOverlay(ctx); // 修仙门派：弟子 / 典籍 / 天下 / 纪事面板
   if (G.state === 'victory') drawEndOverlay(ctx, true);
   drawBigMap(ctx);
   if (G.state === 'paused') drawPauseMenu(ctx);
