@@ -431,7 +431,7 @@ function applyHitFx(m, p) {
 // ---------- 弹道 ----------
 // 子弹由谁打出（丧尸模式记录幸存者的击杀和伤害）
 function creditOwner(p, m, wasAlive) {
-  if (p.owner && G.def.hooks.credit) G.def.hooks.credit(p.owner, p.dmg, wasAlive && !m.alive, m);
+  if (p.owner && G.def.hooks.credit) G.def.hooks.credit(p.owner, p.dmg, wasAlive && !m.alive, m, p);
 }
 function updateProjectile(p, dt) {
   if (p.target && p.target.alive) { p.tx = p.target.x; p.ty = p.target.y - 4; }

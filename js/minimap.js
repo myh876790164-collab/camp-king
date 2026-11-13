@@ -43,7 +43,7 @@ function drawMiniContent(ctx, x, y, w, h, big) {
   // 城市建筑（丧尸模式）
   if (G.structs) {
     for (const s of G.structs) {
-      ctx.fillStyle = s.home ? '#38b764' : s.left > 0 ? '#c8ccd8' : '#6b6e78';
+      ctx.fillStyle = s.home ? '#38b764' : s.op ? '#41a6f6' : s.left > 0 ? '#c8ccd8' : '#6b6e78';
       ctx.fillRect(x + s.x * T * sx, y + s.y * T * sy, Math.max(1, s.w * T * sx), Math.max(1, s.h * T * sy));
     }
   }
@@ -112,7 +112,7 @@ function drawBigMap(ctx) {
     G.mapOpen = false;
   });
   // 图例
-  const legend = [['#ffe066', '你'], ['#a7f070', '营地'], ['#41a6f6', '同伴'], ['#d13a3a', '丧尸/怪物'], ['#ffcd75', '陌生人'], ['#ef7d57', '强盗'], ['#c8ccd8', '可搜建筑'], ['#6b6e78', '已搜空']];
+  const legend = [['#ffe066', '你'], ['#a7f070', '营地'], ['#d13a3a', '丧尸/怪物'], ['#ffcd75', '陌生人'], ['#ef7d57', '强盗'], ['#41a6f6', '同伴/分基地'], ['#c8ccd8', '可搜建筑'], ['#6b6e78', '已搜空']];
   let lx = Math.max(12, sw / 2 - legend.length * 42);
   const ly = y + h + 22;
   for (const [col, name] of legend) {

@@ -192,12 +192,13 @@ function drawProjectilesAndEffects(ctx) {
   ctx.strokeStyle = '#ffcd75';
   ctx.beginPath();
   for (const p of G.projectiles) {
-    if (p.kind !== 'bullet') continue;
+    if (p.kind !== 'bullet' || p.ab) continue; // 带异能的子弹单独画（彩色拖尾）
     ctx.moveTo(p.x - p.vx * 4, p.y - p.vy * 4);
     ctx.lineTo(p.x, p.y);
   }
   ctx.stroke();
   for (const p of G.projectiles) {
+    if (p.ab && typeof drawAbTrail === 'function' && drawAbTrail(ctx, p)) continue; // 异能子弹
     if (p.kind === 'blade') { // 御剑：银色飞刃
       ctx.strokeStyle = '#dff6ff'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(p.x - p.vx * 6, p.y - p.vy * 6); ctx.lineTo(p.x, p.y); ctx.stroke();
@@ -215,7 +216,9 @@ function drawProjectilesAndEffects(ctx) {
   for (const e of G.effects) {
     const k = e.t / e.life;
     ctx.globalAlpha = 1 - k;
-    if (e.type === 'p') {
+    if (e.type === 'custom') { // 自带画法的特效（异能挥砍、粒子）
+      e.draw(ctx, e, k);
+    } else if (e.type === 'p') {
       ctx.fillStyle = e.color;
       ctx.fillRect(e.x - 1, e.y - 1, 2, 2);
     } else if (e.type === 'puff') {

@@ -15,21 +15,21 @@ const CONT = {
   freezer: { name: '冰柜', loot: { food: [3, 7, 0.85] } },
   shelf: { name: '货架', loot: { food: [2, 5, 0.7], water: [1, 4, 0.5] } },
   wardrobe: { name: '衣柜', loot: { a: 0.15, aPool: ['jacket'], parts: [0, 1, 0.2] } },
-  drawer: { name: '床头柜', loot: { parts: [1, 2, 0.4], c: 0.12, w: 0.05, wPool: ['knife', 'pistol'] } },
+  drawer: { name: '床头柜', loot: { parts: [1, 2, 0.4], ammo: [1, 4, 0.15], c: 0.12, w: 0.05, wPool: ['knife', 'pistol'] } },
   bookshelf: { name: '书架', loot: { parts: [1, 2, 0.3] } },
   medcab: { name: '药柜', loot: { c: 0.6 } },
   medshelf: { name: '药品架', loot: { c: 0.8, water: [1, 3, 0.3] } },
-  desk: { name: '办公桌', loot: { parts: [1, 3, 0.5], food: [0, 2, 0.2], c: 0.05 } },
+  desk: { name: '办公桌', loot: { ammo: [1, 3, 0.08], parts: [1, 3, 0.5], food: [0, 2, 0.2], c: 0.05 } },
   filing: { name: '文件柜', loot: { parts: [1, 3, 0.45] } },
   cooler: { name: '饮水机', loot: { water: [2, 5, 0.9] } },
   vending: { name: '自动售货机', loot: { food: [2, 4, 0.7], water: [2, 4, 0.7] } },
   register: { name: '收银台', loot: { parts: [1, 3, 0.5] } },
-  crate: { name: '木箱', loot: { parts: [2, 5, 0.6], food: [1, 3, 0.3] } },
+  crate: { name: '木箱', loot: { parts: [2, 5, 0.6], food: [1, 3, 0.3], ammo: [2, 5, 0.15] } },
   rack: { name: '仓储货架', loot: { parts: [2, 6, 0.7], food: [1, 3, 0.3], water: [1, 3, 0.3] } },
-  plocker: { name: '警用储物柜', loot: { a: 0.35, aPool: ['vest', 'riot'], w: 0.15, wPool: ['pistol', 'knife'] } },
+  plocker: { name: '警用储物柜', loot: { ammo: [3, 8, 0.7], a: 0.35, aPool: ['vest', 'riot'], w: 0.15, wPool: ['pistol', 'knife'] } },
   flocker: { name: '消防储物柜', loot: { a: 0.3, aPool: ['jacket'], w: 0.2, wPool: ['axe'] } },
-  locker: { name: '储物柜', loot: { parts: [1, 2, 0.4], a: 0.08, aPool: ['jacket'], food: [0, 2, 0.2] } },
-  gunlocker: { name: '枪柜', loot: { w: 0.75, wPool: ['pistol', 'shotgun', 'rifle'] } },
+  locker: { name: '储物柜', loot: { ammo: [1, 4, 0.15], parts: [1, 2, 0.4], a: 0.08, aPool: ['jacket'], food: [0, 2, 0.2] } },
+  gunlocker: { name: '枪柜', loot: { ammo: [8, 16, 0.95], w: 0.75, wPool: ['pistol', 'shotgun', 'rifle'] } },
   toolbox: { name: '工具箱', loot: { parts: [2, 5, 0.8], w: 0.1, wPool: ['knife', 'bat', 'axe'] } },
   sack: { name: '饲料袋', loot: { food: [2, 5, 0.8] } },
   schooldesk: { name: '课桌', loot: { parts: [0, 2, 0.35], food: [0, 2, 0.3] } },
@@ -731,7 +731,7 @@ function tryPlaceBed(it, x, y) {
   sfx('build');
 }
 function removeBed(it, f) {
-  if (G.survivors.length > G.home.beds.length - 1) { showBanner('不能拆', '床位不够，有人会没地方睡', 2, '#ef7d57'); return; }
+  if (campSurvivors().length > G.home.beds.length - 1) { showBanner('不能拆', '床位不够，有人会没地方睡', 2, '#ef7d57'); return; }
   G.home.beds = G.home.beds.filter(([x, y]) => !(x === f.x && y === f.y));
   const i = it.furn.indexOf(f);
   it.furn.splice(i, 1);
@@ -762,11 +762,21 @@ function renderInterior(ctx) {
     }
   }
   // 营地：同伴睡在床上
+  if (it.s.op) {
+    // 分基地：驻守的同伴站在门口附近
+    const wk = outpostWorker(it.s), wx = (it.door.x - 1) * T, wy = (it.door.y - 1.6) * T;
+    if (wk) {
+      drawShadow(ctx, wx, wy + 1, 11);
+      ctx.drawImage(personSprite(wk).img, wx - 8, wy - 14, 16, 16);
+      drawWorldLabel(ctx, wk.name + '·驻守', wx, wy - 18, '#73eff7');
+    }
+  }
   if (it.home) {
+    const sleepers = campSurvivors().filter((s) => (s.state || 'base') === 'base');
     let k = 0;
     for (const f of it.furn) {
-      if (f.k !== 'cbed' || k >= G.survivors.length) continue;
-      const s = G.survivors[k++];
+      if (f.k !== 'cbed' || k >= sleepers.length) continue;
+      const s = sleepers[k++];
       ctx.save();
       ctx.translate((f.x + 0.5) * T, (f.y + 1) * T);
       ctx.rotate(-Math.PI / 2);

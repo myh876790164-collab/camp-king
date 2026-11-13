@@ -909,6 +909,14 @@ function drawCity(ctx, x0, y0, x1, y1) {
       ctx.fillStyle = '#1a1c2c'; ctx.fillRect(fx, fy - 12, 1, 14);
       ctx.fillStyle = '#38b764'; ctx.fillRect(fx + 1, fy - 12 + Math.sin(G.time * 4) * 0.5, 7, 4);
       ctx.fillStyle = '#a7f070'; ctx.fillRect(fx + 1, fy - 12, 7, 1);
+    } else if (s.op) {
+      // 分基地：蓝旗（等级越高旗越多）
+      for (let k = 0; k < s.op.lv; k++) {
+        const fx = sx + 3 + k * 9, fy = sy - 2;
+        ctx.fillStyle = '#1a1c2c'; ctx.fillRect(fx, fy - 12, 1, 14);
+        ctx.fillStyle = '#41a6f6'; ctx.fillRect(fx + 1, fy - 12 + Math.sin(G.time * 4 + k) * 0.5, 7, 4);
+        ctx.fillStyle = '#c8e8ff'; ctx.fillRect(fx + 1, fy - 12, 7, 1);
+      }
     } else if (day && s.left > 0) {
       const bob = Math.sin(G.time * 3 + s.x) * 1.2;
       ctx.fillStyle = '#1a1c2c'; ctx.fillRect(sx + s.w * T / 2 - 1.5, sy - 4.5 + bob, 3, 3);
@@ -918,10 +926,10 @@ function drawCity(ctx, x0, y0, x1, y1) {
   // 大建筑的名字（放大时显示，方便找路）
   if (G.cam.zoom >= 1.5) {
     for (const s of G.structs) {
-      if (s.type === 'house' || s.type === 'shop' || s.type === 'fountain') continue;
+      if (!s.op && (s.type === 'house' || s.type === 'shop' || s.type === 'fountain')) continue;
       if (s.x > x1 + 1 || s.x + s.w < x0 - 1 || s.y > y1 + 2 || s.y + s.h < y0 - 1) continue;
-      const name = (s.home ? '营地·' : '') + STRUCTS[s.type].name + (s.home || s.left > 0 ? '' : '（已搜空）');
-      drawWorldLabel(ctx, name, (s.x + s.w / 2) * T, (s.y + s.h) * T - 4, s.home ? '#a7f070' : s.left > 0 ? '#f4f4f4' : '#94b0c2');
+      const name = (s.home ? '营地·' : s.op ? '分基地·' : '') + STRUCTS[s.type].name + (s.home || s.op || s.left > 0 ? '' : '（已搜空）');
+      drawWorldLabel(ctx, name, (s.x + s.w / 2) * T, (s.y + s.h) * T - 4, s.home ? '#a7f070' : s.op ? '#73eff7' : s.left > 0 ? '#f4f4f4' : '#94b0c2');
     }
   }
 }

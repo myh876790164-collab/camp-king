@@ -215,6 +215,7 @@ const ICONS = {
   food: ['....kk..', '...kook.', '..kooook', '.kooook.', '.kyook..', 'kwkk....', 'kwk.....', '.k......'],
   water: ['...kk...', '...kck..', '..kcck..', '.kccack.', '.kccack.', '.kcccck.', '..kcck..', '...kk...'],
   parts: ['..k..k..', '.kdkkdk.', 'kdssssdk', '.ksDDsk.', '.ksDDsk.', 'kdssssdk', '.kdkkdk.', '..k..k..'],
+  ammo: ['.k...k..', 'kyk.kyk.', 'kyk.kyk.', 'kok.kok.', 'kok.kok.', 'kok.kok.', 'kkk.kkk.', '........'],
   coal: ['........', '..kkkk..', '.kDdDDk.', 'kDsDDdDk', 'kDDDdDDk', '.kDDDDk.', '..kkkk..'],
   heart: ['........', '.kk.kk..', 'krrkrrk.', 'kroorrk.', 'krrrrrk.', '.krrrk..', '..krk...', '...k....'],
   temp: ['...kk...', '..kwwk..', '..kwrk..', '..kwrk..', '..kwrk..', '.krrrrk.', '.krrrrk.', '..kkkk..'],

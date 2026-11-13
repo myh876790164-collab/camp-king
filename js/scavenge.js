@@ -9,6 +9,7 @@ const TRIP_STATE = { base: '在营地', go: '前往', in: '正在搜刮', home: 
 
 function survivorTripText(s) {
   if (s.down) return '倒下了';
+  if (s.post !== undefined && s.post !== null) return '派驻在分基地';
   if (s.stay) return '留守营地';
   const st = s.state || 'base';
   if ((st === 'go' || st === 'in') && s.target) return TRIP_STATE[st] + ' ' + STRUCTS[s.target.type].name;
@@ -42,7 +43,7 @@ function pickTarget(s) {
   const taken = G.survivors.filter((o) => o !== s && o.target).map((o) => o.target);
   const cands = [];
   for (const st of G.structs) {
-    if (st.home || !structEnterable(st) || taken.includes(st) || structLeftCount(st) <= 0) continue;
+    if (st.home || st.op || !structEnterable(st) || taken.includes(st) || structLeftCount(st) <= 0) continue;
     const d = structDist(st, s.x, s.y) / T;
     if (d < 4 || d > 34) continue;
     cands.push([st, d + Math.random() * 6]);
@@ -72,7 +73,7 @@ function followTripPath(s, dt) {
 // 按物资表掷骰子，放进同伴的背包（回营地才交）
 function rollInto(bag, L, s) {
   const mult = scavPower(s), luck = hasT(s, 'lucky') ? 1.6 : 1;
-  for (const r of ['food', 'water', 'parts']) {
+  for (const r of ['food', 'water', 'parts', 'ammo']) {
     if (!L[r] || Math.random() > L[r][2]) continue;
     bag[r] += Math.round(randInt(L[r][0], L[r][1]) * mult);
   }
@@ -127,7 +128,7 @@ function arriveHome(s) {
   s.bag = null;
   if (!b) return;
   const got = [];
-  for (const r of ['food', 'water', 'parts']) if (b[r] > 0) { G.res[r] += b[r]; got.push(RES_INFO[r].name + '+' + b[r]); }
+  for (const r of ['food', 'water', 'parts', 'ammo']) if (b[r] > 0) { G.res[r] = (G.res[r] || 0) + b[r]; got.push(RES_INFO[r].name + '+' + b[r]); }
   for (const k of b.items) { addItem(k); got.push(itemName(k)); }
   const text = s.name + ' 带回：' + (got.length ? got.join(' ') : '什么也没找到');
   addFloat(s.x, s.y - 18, got.length ? s.name + ' 带回物资' : s.name + ' 空手而归', got.length ? '#a7f070' : '#94b0c2', true);
@@ -147,7 +148,7 @@ function updateSurvivorTrip(s, dt) {
       if (s.leaveT <= 0) {
         s.leaveT = null;
         s.lastOut = G.day;
-        s.bag = { food: 0, water: 0, parts: 0, items: [] };
+        s.bag = { food: 0, water: 0, parts: 0, ammo: 0, items: [] };
         s.trips = 0;
         if (pickTarget(s)) addFloat(s.x, s.y - 18, s.name + ' 出门搜刮了', '#73eff7', true);
         else s.bag = null;

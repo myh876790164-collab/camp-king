@@ -38,6 +38,7 @@ const RES_INFO = {
   food: { name: '食物', color: '#ef7d57' },
   water: { name: '水', color: '#73eff7' },
   parts: { name: '零件', color: '#c8d6e5' },
+  ammo: { name: '子弹', color: '#ffcd75' },
   coal: { name: '煤炭', color: '#94b0c2' },
   iron: { name: '铁', color: '#c8d6e5' },
 };

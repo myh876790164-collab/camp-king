@@ -183,7 +183,7 @@ function drawUI(ctx) {
 
   // ---- 顶部资源栏 ----
   drawPanel(ctx, 0, 0, sw, UI.topH);
-  const step = sw < 420 ? 66 : 90;
+  const step = sw < 420 ? (G.def.resources.length > 3 ? 60 : 66) : 90;
   let x = 10;
   for (const k of G.def.resources) {
     ctx.drawImage(SPR['icon_' + k].img, x, 12, 20, 20);
@@ -210,6 +210,7 @@ function drawUI(ctx) {
   const mini = !G.inside && G.state === 'play' ? miniLayout() : null;
   if (G.def.hooks.hud) drawPills(ctx, G.def.hooks.hud(), ly + 32, mini ? Math.max(160, sw - 2 * (mini.w + 20)) : sw - 16);
   drawMinimap(ctx);
+  if (G.def.hooks.hudExtra) G.def.hooks.hudExtra(ctx); // 丧尸模式：左上角的异能增益条
 
   // ---- 底部栏：科技/装备 + 建造（可翻页） ----
   const by = sh - UI.bottomH;

@@ -8,23 +8,24 @@
 
 // 强度 s = 配比份数 × (1 + 0.15 × 等级)，最高 5 × 2.5 = 12.5
 const ABIL = {
-  power: { name: '力量', color: '#d14a5e', desc: '近战伤害、生命上限提升', fx: (a, s) => { a.meleeMul += 0.12 * s; a.hpAdd += 8 * s; } },
-  speed: { name: '速度', color: '#73eff7', desc: '移动速度、攻击速度提升', fx: (a, s) => { a.moveMul += 0.05 * s; a.rateMul += 0.06 * s; } },
-  mind: { name: '智力', color: '#b06cd0', desc: '搜刮更快、物资更多、技能成长快、几率暴击', fx: (a, s) => { a.searchMul += 0.1 * s; a.lootMul += 0.05 * s; a.xpMul += 0.15 * s; a.crit += 0.03 * s; } },
-  tele: { name: '念力', color: '#c8a2ff', desc: '隔空攻击：攻击距离变远，击退敌人', fx: (a, s) => { a.rangeAdd += 0.3 * s; a.knock += 2 * s; a.rangedMul += 0.04 * s; } },
-  electric: { name: '电击', color: '#ffe066', desc: '攻击时闪电连锁到附近的丧尸', fx: (a, s) => { a.chain += Math.ceil(s / 2.5); a.chainDmg = Math.max(a.chainDmg, 0.3 + 0.04 * s); } },
-  fire: { name: '火焰', color: '#ef7d57', desc: '攻击点燃敌人，持续灼烧', fx: (a, s) => { a.burn += 0.12 * s; } },
-  ice: { name: '冰冻', color: '#a9e4ff', desc: '攻击使敌人减速，几率冻结', fx: (a, s) => { a.slow = Math.max(a.slow, 0.15 + 0.06 * s); a.freeze += 0.025 * s; } },
-  heal: { name: '治愈', color: '#a7f070', desc: '持续恢复自己和身边同伴的生命', fx: (a, s) => { a.regen += 0.5 * s; a.healAlly += 0.3 * s; } },
-  metal: { name: '金属', color: '#c8ccd8', desc: '金属皮肤：减少受到的伤害，反弹伤害', fx: (a, s) => { a.reduce += 0.035 * s; a.thorns += 0.08 * s; } },
-  earth: { name: '土石', color: '#c49a64', desc: '岩石护盾：不受伤一会儿后生成护盾吸收伤害', fx: (a, s) => { a.shieldMax += 10 * s; } },
-  wind: { name: '风', color: '#9be0b0', desc: '风刃：近战横扫多个敌人，击退，身法更快', fx: (a, s) => { a.sweep += Math.ceil(s / 3); a.knock += 1 * s; a.moveMul += 0.02 * s; } },
-  water: { name: '水', color: '#41a6f6', desc: '凝聚净水：每天产出水，攻击带水流减速', fx: (a, s) => { a.dawnWater += 1.5 * s; a.slow = Math.max(a.slow, 0.1 + 0.03 * s); } },
-  wood: { name: '木', color: '#38b764', desc: '藤蔓缠绕定身敌人，每天催生食物', fx: (a, s) => { a.root += 0.035 * s; a.dawnFood += 1.5 * s; } },
-  space: { name: '空间', color: '#7a86f0', desc: '空间闪避：几率瞬移躲开攻击；随身空间多带物资', fx: (a, s) => { a.dodge += 0.03 * s; a.lootMul += 0.04 * s; } },
-  spirit: { name: '精神', color: '#ff9ad5', desc: '精神控制：几率让丧尸陷入混乱；稳定队伍士气', fx: (a, s) => { a.confuse += 0.03 * s; a.moraleUp += 0.8 * s; } },
+  power: { name: '力量', color: '#d14a5e', desc: '近战伤害、生命上限提升', info: (s) => '近战伤害 +' + pct(0.12 * s) + '，生命上限 +' + Math.round(8 * s), fx: (a, s) => { a.meleeMul += 0.12 * s; a.hpAdd += 8 * s; } },
+  speed: { name: '速度', color: '#73eff7', desc: '移动速度、攻击速度提升', info: (s) => '移动速度 +' + pct(0.05 * s) + '，攻击速度 +' + pct(0.06 * s), fx: (a, s) => { a.moveMul += 0.05 * s; a.rateMul += 0.06 * s; } },
+  mind: { name: '智力', color: '#b06cd0', desc: '搜刮更快、物资更多、技能成长快、几率暴击', info: (s) => '搜刮速度 +' + pct(0.1 * s) + '，物资 +' + pct(0.05 * s) + '，技能经验 +' + pct(0.15 * s) + '，暴击率 +' + pct(0.03 * s), fx: (a, s) => { a.searchMul += 0.1 * s; a.lootMul += 0.05 * s; a.xpMul += 0.15 * s; a.crit += 0.03 * s; } },
+  tele: { name: '念力', color: '#c8a2ff', desc: '隔空攻击：攻击距离变远，击退敌人', info: (s) => '攻击距离 +' + (0.3 * s).toFixed(1) + ' 格（枪械减半），击退敌人，枪械伤害 +' + pct(0.04 * s), fx: (a, s) => { a.rangeAdd += 0.3 * s; a.knock += 2 * s; a.rangedMul += 0.04 * s; } },
+  electric: { name: '电击', color: '#ffe066', desc: '攻击时闪电连锁到附近的丧尸', info: (s) => '闪电连锁 ' + Math.ceil(s / 2.5) + ' 个目标，每个造成 ' + pct(0.3 + 0.04 * s) + ' 伤害', fx: (a, s) => { a.chain += Math.ceil(s / 2.5); a.chainDmg = Math.max(a.chainDmg, 0.3 + 0.04 * s); } },
+  fire: { name: '火焰', color: '#ef7d57', desc: '攻击点燃敌人，持续灼烧', info: (s) => '点燃敌人：每秒造成攻击伤害的 ' + pct(0.12 * s) + '，持续 3 秒', fx: (a, s) => { a.burn += 0.12 * s; } },
+  ice: { name: '冰冻', color: '#a9e4ff', desc: '攻击使敌人减速，几率冻结', info: (s) => '敌人减速 ' + pct(Math.min(0.75, 0.15 + 0.06 * s)) + '（2 秒），' + pct(0.025 * s) + ' 几率冻结 1.3 秒', fx: (a, s) => { a.slow = Math.max(a.slow, 0.15 + 0.06 * s); a.freeze += 0.025 * s; } },
+  heal: { name: '治愈', color: '#a7f070', desc: '持续恢复自己和身边同伴的生命', info: (s) => '自己每秒回复 ' + (0.5 * s).toFixed(1) + ' 生命，4 格内同伴每秒 ' + (0.3 * s).toFixed(1), fx: (a, s) => { a.regen += 0.5 * s; a.healAlly += 0.3 * s; } },
+  metal: { name: '金属', color: '#c8ccd8', desc: '金属皮肤：减少受到的伤害，反弹伤害', info: (s) => '受到的伤害 -' + pct(Math.min(0.6, 0.035 * s)) + '，反弹 ' + pct(0.24 * s) + ' 伤害给攻击者', fx: (a, s) => { a.reduce += 0.035 * s; a.thorns += 0.08 * s; } },
+  earth: { name: '土石', color: '#c49a64', desc: '岩石护盾：不受伤一会儿后生成护盾吸收伤害', info: (s) => '3 秒不受伤后生成护盾，最多吸收 ' + Math.round(10 * s) + ' 伤害', fx: (a, s) => { a.shieldMax += 10 * s; } },
+  wind: { name: '风', color: '#9be0b0', desc: '风刃：近战横扫多个敌人，击退，身法更快', info: (s) => '近战额外横扫 ' + Math.ceil(s / 3) + ' 个敌人（60% 伤害），击退，移动速度 +' + pct(0.02 * s), fx: (a, s) => { a.sweep += Math.ceil(s / 3); a.knock += 1 * s; a.moveMul += 0.02 * s; } },
+  water: { name: '水', color: '#41a6f6', desc: '凝聚净水：每天产出水，攻击带水流减速', info: (s) => '每天产出 ' + (1.5 * s).toFixed(1) + ' 份水，敌人减速 ' + pct(0.1 + 0.03 * s), fx: (a, s) => { a.dawnWater += 1.5 * s; a.slow = Math.max(a.slow, 0.1 + 0.03 * s); } },
+  wood: { name: '木', color: '#38b764', desc: '藤蔓缠绕定身敌人，每天催生食物', info: (s) => pct(0.035 * s) + ' 几率用藤蔓定身敌人 1.5 秒，每天产出 ' + (1.5 * s).toFixed(1) + ' 份食物', fx: (a, s) => { a.root += 0.035 * s; a.dawnFood += 1.5 * s; } },
+  space: { name: '空间', color: '#7a86f0', desc: '空间闪避：几率瞬移躲开攻击；随身空间多带物资', info: (s) => pct(Math.min(0.45, 0.03 * s)) + ' 几率闪避攻击，搜刮物资 +' + pct(0.04 * s), fx: (a, s) => { a.dodge += 0.03 * s; a.lootMul += 0.04 * s; } },
+  spirit: { name: '精神', color: '#ff9ad5', desc: '精神控制：几率让丧尸陷入混乱；稳定队伍士气', info: (s) => pct(Math.min(0.4, 0.03 * s)) + ' 几率让丧尸混乱 4 秒，全队每天士气 +' + (0.8 * s).toFixed(1), fx: (a, s) => { a.confuse += 0.03 * s; a.moraleUp += 0.8 * s; } },
 };
 const ABIL_KEYS = Object.keys(ABIL);
+function pct(v) { return Math.round(v * 100) + '%'; }
 
 // ---------- 化学反应：同时拥有这些异能就会触发 ----------
 const COMBOS = [
@@ -236,15 +237,16 @@ function dropCores(m) {
 
 // ---------- 战斗中的异能效果 ----------
 // 攻击前：暴击、冻结增伤、虚弱
+const BASE_CRIT = 0.05; // 所有人都有 5% 基础暴击
 function abilityDamage(p, m, dmg) {
   const a = AB(p);
   if (p.weakUntil > G.clock) dmg *= 0.7;
-  if (!a) return dmg;
-  if (m.frozenUntil > G.clock) dmg *= 1 + a.frozenBonus;
-  if (p.nextCrit || Math.random() < a.crit) {
+  if (a && m.frozenUntil > G.clock) dmg *= 1 + a.frozenBonus;
+  p.lastCrit = false;
+  if (p.nextCrit || Math.random() < BASE_CRIT + (a ? a.crit : 0)) {
     p.nextCrit = false;
-    dmg *= a.critMul;
-    addFloat(m.x, m.y - 16, '暴击', '#ffe066');
+    p.lastCrit = true;
+    dmg *= a ? a.critMul : 1.8;
   }
   return dmg;
 }
@@ -466,18 +468,28 @@ function drawAbilityTab(ctx, x, y, w, bottom) {
     const types = Object.keys(ab.w).sort((a, b) => ab.w[b] - ab.w[a]);
     for (const t of types) {
       const A = ABIL[t], lv = ab.lv[t], need = 2 + lv;
-      ctx.fillStyle = '#262b44'; ctx.fillRect(x, y, w, 40);
-      ctx.drawImage(SPR['icon_core_' + t].img, x + 4, y + 6, 28, 28);
+      // 当前效果（具体数值）+ 下一级的效果
+      const sNow = abStrength(p, t), sNext = ab.w[t] * (1 + 0.15 * (lv + 1));
+      const lines = wrapText(ctx, '当前：' + A.info(sNow), w - 46, 11);
+      if (lv < 10) lines.push(...wrapText(ctx, '下一级：' + A.info(sNext), w - 46, 11).map((l) => '>' + l));
+      const rh = 28 + lines.length * 15;
+      ctx.fillStyle = '#262b44'; ctx.fillRect(x, y, w, rh);
+      ctx.fillStyle = A.color; ctx.fillRect(x, y, 3, rh);
+      ctx.drawImage(SPR['icon_core_' + t].img, x + 6, y + 4, 26, 26);
       drawText(ctx, A.name + ' ×' + ab.w[t] + '　Lv ' + lv + (lv >= 10 ? '（满级）' : ''), x + 38, y + 12, 13, A.color);
-      drawText(ctx, A.desc, x + 38, y + 30, 11, '#c8d6e5', 'left', false);
-      const barW = Math.min(120, w * 0.25), barX = x + w - barW - 92;
-      ctx.fillStyle = '#1a1c2c'; ctx.fillRect(barX, y + 26, barW, 5);
-      ctx.fillStyle = A.color; ctx.fillRect(barX, y + 26, barW * Math.min(1, (ab.xp[t] || 0) / need), 5);
-      drawText(ctx, (ab.xp[t] || 0) + '/' + need, barX + barW / 2, y + 14, 10, '#94b0c2', 'center', false);
+      const barW = Math.min(110, w * 0.22), barX = x + w - barW - 92;
+      ctx.fillStyle = '#1a1c2c'; ctx.fillRect(barX, y + 14, barW, 5);
+      ctx.fillStyle = A.color; ctx.fillRect(barX, y + 14, barW * Math.min(1, (ab.xp[t] || 0) / need), 5);
+      drawText(ctx, (ab.xp[t] || 0) + '/' + need, barX + barW / 2, y + 6, 10, '#94b0c2', 'center', false);
       const n = G.inventory['k:' + t] || 0;
-      drawButton(ctx, x + w - 86, y + 5, 82, 30, '服用 (' + n + ')', n ? () => eatCore(p, t) : null, { dim: !n, size: 12, color: '#1f5e3a' });
-      y += 44;
+      drawButton(ctx, x + w - 86, y + 2, 82, 24, '服用 (' + n + ')', n ? () => eatCore(p, t) : null, { dim: !n, size: 12, color: '#1f5e3a' });
+      lines.forEach((ln, k) => { const nx = ln[0] === '>'; drawText(ctx, nx ? ln.slice(1) : ln, x + 38, y + 33 + k * 15, 11, nx ? '#94b0c2' : '#f4f4f4', 'left', false); });
+      y += rh + 4;
     }
+    // 当前生效的全部增益（配比、等级、化学反应都算进去之后的实际数值）
+    y += 4;
+    drawText(ctx, '当前增益（实际生效的数值）', x, y + 6, 13, '#ffcd75');
+    y = drawBuffChips(ctx, abBuffList(p), x, y + 18, w);
     // 化学反应
     const a = AB(p);
     y += 4;
@@ -533,7 +545,7 @@ function drawAbilityGuide(ctx, x, y, w, bottom) {
   y += 38;
   const cols = w >= 640 ? 2 : 1, cw = (w - (cols - 1) * 8) / cols;
   let items;
-  if (G.abPage === 0) items = ABIL_KEYS.map((t) => ({ icon: t, title: ABIL[t].name + '系', color: ABIL[t].color, text: ABIL[t].desc }));
+  if (G.abPage === 0) items = ABIL_KEYS.map((t) => ({ icon: t, title: ABIL[t].name + '系', color: ABIL[t].color, text: ABIL[t].desc + '。例（3 份配比、5 级）：' + ABIL[t].info(3 * 1.75) }));
   else if (G.abPage === 1) items = COMBOS.filter((c) => c.need.length === 2).map((c) => ({ title: c.name, color: '#ffe066', text: c.need.map((t) => ABIL[t].name).join(' + ') + '：' + c.desc }));
   else items = COMBOS.filter((c) => c.need.length === 3).map((c) => ({ title: c.name, color: '#ffe066', text: c.need.map((t) => ABIL[t].name).join(' + ') + '：' + c.desc }))
     .concat(ABIL_KEYS.map((t) => ({ icon: t, title: SPECIALS[t].name, color: ABIL[t].color, text: '变异丧尸（掉落' + CORES[t].name + '）' })));

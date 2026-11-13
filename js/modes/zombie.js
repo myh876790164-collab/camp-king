@@ -10,10 +10,14 @@ const WEAPONS = {
   knife: { name: '小刀', dmg: 9, range: 1.2, rate: 2, melee: true, tier: 1, craft: { parts: 6 } },
   bat: { name: '球棒', dmg: 15, range: 1.3, rate: 1.2, melee: true, tier: 1, craft: { parts: 10 } },
   axe: { name: '消防斧', dmg: 26, range: 1.3, rate: 0.9, melee: true, tier: 2, craft: { parts: 22 } },
-  pistol: { name: '手枪', dmg: 12, range: 5, rate: 1.6, tier: 2, craft: { parts: 28 } },
-  shotgun: { name: '霰弹枪', dmg: 28, range: 3.5, rate: 0.8, splash: 1.2, tier: 3, craft: { parts: 45 } },
-  rifle: { name: '步枪', dmg: 30, range: 7, rate: 1.1, tier: 3, craft: { parts: 60 } },
+  // 枪械：每次开枪消耗 ammo 发子弹；没子弹时只能用枪托砸
+  pistol: { name: '手枪', dmg: 18, range: 5, rate: 1.6, ammo: 1, tier: 2, craft: { parts: 28 } },
+  shotgun: { name: '霰弹枪', dmg: 38, range: 3.5, rate: 0.8, splash: 1.2, ammo: 2, tier: 3, craft: { parts: 45 } },
+  rifle: { name: '步枪', dmg: 46, range: 7, rate: 1.0, ammo: 1, tier: 3, craft: { parts: 60 } },
 };
+const GUN_BUTT = { name: '枪托', dmg: 6, range: 1.1, rate: 1.3, melee: true };
+// 工作台还能做的东西
+const MISC = { ammo: { name: '子弹 ×10', desc: '枪械弹药（也可以搜刮，或占据警察局每天产出）', tier: 1, craft: { parts: 8 } } };
 const ARMORS = {
   none: { name: '无护甲', hp: 0 },
   jacket: { name: '皮夹克', hp: 30, tier: 1, craft: { parts: 12 } },
@@ -53,8 +57,8 @@ const SURVIVOR_NAMES = ['老王', '小李', '阿强', '莉莉', '老陈', '小�
 const ZCAMPS = {
   police: {
     struct: 'police', name: '警察局', desc: '武器库里还剩些家伙，墙也够结实，就是没什么吃的。',
-    pros: ['初始：手枪×2、防弹背心', '路障、避难所生命 +50%'], cons: ['食物只有 5、水只有 10'],
-    start: { food: 5, water: 10, parts: 20 },
+    pros: ['初始：手枪×2、防弹背心、子弹 40 发', '路障、避难所生命 +50%'], cons: ['食物只有 5、水只有 10'],
+    start: { food: 5, water: 10, parts: 20, ammo: 40 },
     apply() { G.player.weapon = 'pistol'; addItem('w:pistol'); addItem('a:vest'); G.mods.wallHp = 1.5; G.mods.coreHp = 1.5; prebuild('barricade', 3); },
   },
   supermarket: {
@@ -72,7 +76,7 @@ const ZCAMPS = {
   factory: {
     struct: 'factory', name: '工厂', desc: '满地的零件和工具，自带工作台。可惜这里种不出粮食。',
     pros: ['零件 80', '自带工作台', '制作装备费用 -30%'], cons: ['食物、水都只有 8'],
-    start: { food: 8, water: 8, parts: 80 },
+    start: { food: 8, water: 8, parts: 80, ammo: 8 },
     apply() { prebuild('workbench', 1); G.camp.craftMul = 0.7; },
   },
   firestation: {
@@ -93,7 +97,7 @@ const ZCAMPS = {
   gasstation: {
     struct: 'gasstation', name: '加油站', desc: '有燃料就有电，机枪塔已经架好了。枪声会引来更多丧尸。',
     pros: ['零件 40，已掌握「机械学」', '自带 1 座机枪塔'], cons: ['水只有 8', '附近丧尸多 40%'],
-    start: { food: 15, water: 8, parts: 40 },
+    start: { food: 15, water: 8, parts: 40, ammo: 12 },
     apply() { G.techs.mech = true; G.unlocked.add('turret'); prebuild('turret', 1); G.camp.dangerMul = 1.4; },
   },
   apartment: {
@@ -105,7 +109,7 @@ const ZCAMPS = {
 };
 
 // ---------- 物品 ----------
-function itemTable(key) { return key[0] === 'w' ? WEAPONS : key[0] === 'a' ? ARMORS : key[0] === 'k' ? CORES : CONSUMABLES; }
+function itemTable(key) { return key[0] === 'w' ? WEAPONS : key[0] === 'a' ? ARMORS : key[0] === 'k' ? CORES : key[0] === 'x' ? MISC : CONSUMABLES; }
 function itemDef(key) { return itemTable(key)[key.slice(2)]; }
 function itemName(key) { return itemDef(key).name; }
 function addItem(key, n) { G.inventory[key] = (G.inventory[key] || 0) + (n || 1); }
@@ -116,7 +120,7 @@ function takeItem(key) {
 }
 function itemStat(key) {
   const it = itemDef(key);
-  if (key[0] === 'w') return '伤害 ' + it.dmg + ' 射程 ' + it.range + (it.splash ? ' 范围' : '') + (it.melee ? ' 近战' : ' 枪械');
+  if (key[0] === 'w') return '伤害 ' + it.dmg + ' 射程 ' + it.range + (it.splash ? ' 范围' : '') + (it.melee ? ' 近战' : ' 枪械·每枪 ' + it.ammo + ' 发子弹');
   if (key[0] === 'a') return '生命 +' + it.hp;
   return it.desc;
 }
@@ -170,7 +174,7 @@ function newPerson(name, forced) {
   p.hp = personMaxHp(p);
   return p;
 }
-const PERSON_KEYS = ['name', 'baseHp', 'hp', 'weapon', 'armor', 'traits', 'skills', 'xp', 'stats', 'morale', 'look', 'joined', 'down', 'x', 'y', 'ab', 'stay', 'lastOut'];
+const PERSON_KEYS = ['name', 'baseHp', 'hp', 'weapon', 'armor', 'traits', 'skills', 'xp', 'stats', 'morale', 'look', 'joined', 'down', 'x', 'y', 'ab', 'stay', 'lastOut', 'post'];
 function personSave(p) { const o = {}; for (const k of PERSON_KEYS) o[k] = p[k]; return o; }
 function personLoad(o) { return Object.assign(newPerson(o.name), { cd: 0, face: 1, hit: 0 }, o); }
 
@@ -216,8 +220,8 @@ function addCampSurvivor(traits) {
   return addSurvivor(newPerson(name, traits));
 }
 function placeSurvivors() {
-  const c = G.core, n = G.survivors.length;
-  G.survivors.forEach((s, i) => {
+  const camp = campSurvivors(), c = G.core, n = camp.length; // 派驻在分基地的人不算
+  camp.forEach((s, i) => {
     const a = i / Math.max(1, n) * Math.PI * 2 + 0.4;
     s.hx = c.cx + Math.cos(a) * 2.3 * T;
     s.hy = c.cy + Math.sin(a) * 2.0 * T + 6;
@@ -243,21 +247,33 @@ function prebuild(type, n) {
 function personAttack(p, dt, mult) {
   p.cd -= dt;
   if (p.cd > 0) return;
-  const w = WEAPONS[p.weapon];
+  let w = WEAPONS[p.weapon];
+  if (w.ammo && (G.res.ammo || 0) < w.ammo) { // 没子弹了：只能用枪托砸
+    w = GUN_BUTT;
+    if (p === G.player && G.clock - (G.noAmmoT || -99) > 6) { G.noAmmoT = G.clock; addFloat(p.x, p.y - 26, '没子弹了！', '#ef7d57', true); }
+  }
   const [best] = nearestMonsters(p.x, p.y - 4, personRange(p, w) * T);
   if (!best) { p.cd = 0; return; }
   const dmg = abilityDamage(p, best, w.dmg * mult * personDmgMult(p, w));
-  const a = AB(p);
+  const a = AB(p), fx = pickAbType(p); // fx = 这次攻击用哪种异能的特效
   p.lastMelee = !!w.melee;
+  // 伤害数字（自己的每次攻击都显示；同伴只显示暴击）
+  if (p === G.player || p.lastCrit) addFloat(best.x + rand(-4, 4), best.y - 12, (p.lastCrit ? '暴击 ' : '') + Math.round(dmg), p.lastCrit ? '#ffe066' : '#f4f4f4', p.lastCrit);
   if (w.melee) {
     const was = best.alive;
     hurtMonster(best, dmg);
     zCredit(p, dmg, was && !best.alive);
+    if (best.alive && !best.def.boss) { // 近战打中会让丧尸硬直一下
+      best.slowFactor = best.slowUntil > G.clock ? Math.min(best.slowFactor, 0.35) : 0.35;
+      best.slowUntil = Math.max(best.slowUntil, G.clock + 0.3);
+    }
     abilityHit(p, best, dmg, true);
     if (a && a.double && best.alive && Math.random() < a.double) { hurtMonster(best, dmg); abilityHit(p, best, dmg, true); } // 疾风连击
-    G.effects.push({ type: 'swing', x: p.x, y: p.y - 6, tx: best.x, ty: best.y - 4, t: 0, life: 0.15 });
+    if (fx) fxSwing(p, best, fx);
+    else G.effects.push({ type: 'swing', x: p.x, y: p.y - 6, tx: best.x, ty: best.y - 4, t: 0, life: 0.15 });
   } else {
-    shoot(p.x, p.y - 8, best, { kind: 'bullet', speed: 26 * T, dmg, splash: w.splash ? w.splash * T : 0, owner: p });
+    G.res.ammo -= w.ammo;
+    shoot(p.x, p.y - 8, best, { kind: 'bullet', speed: 26 * T, dmg, splash: w.splash ? w.splash * T : 0, owner: p, ab: fx });
     if (p === G.player && !G.inside) G.noise = { x: p.x, y: p.y, until: G.clock + 3 }; // 枪声会引来附近的丧尸
   }
   p.face = best.x < p.x ? -1 : 1;
@@ -404,10 +420,10 @@ function reachGoal(g) {
 function rollLoot(L, p) {
   const got = [];
   const mult = (1 + 0.05 * p.skills.scav) * (hasT(p, 'scavenger') ? 1.3 : 1) * (AB(p) ? AB(p).lootMul : 1), luck = hasT(p, 'lucky') ? 1.6 : 1;
-  for (const r of ['food', 'water', 'parts']) {
+  for (const r of ['food', 'water', 'parts', 'ammo']) {
     if (!L[r] || Math.random() > L[r][2]) continue;
     const k = Math.round(randInt(L[r][0], L[r][1]) * mult);
-    G.res[r] += k;
+    G.res[r] = (G.res[r] || 0) + k;
     got.push(RES_INFO[r].name + ' +' + k);
   }
   const found = (k) => { addItem(k); got.push('找到 ' + itemName(k)); showBanner('找到：' + itemName(k), '打开「幸存者」面板给大家装备上', 3, '#ffcd75'); };
@@ -469,7 +485,7 @@ function traitText(p) { return p.traits.map((t) => ZTRAITS[t].name).join('、') 
 
 function openNpcDialog(npc) {
   if (npc.kind === 'friendly') {
-    const full = G.survivors.length >= zombieHousing(), cost = { food: 8, water: 8 }, pp = npc.person;
+    const full = campSurvivors().length >= zombieHousing(), cost = { food: 8, water: 8 }, pp = npc.person;
     const best = Object.keys(ZSKILLS).sort((a, b) => pp.skills[b] - pp.skills[a])[0];
     G.dialog = {
       title: '遇到幸存者「' + npc.name + '」',
@@ -596,7 +612,7 @@ function craftItem(key) {
   const it = itemDef(key), cost = craftCostZ(it);
   if (!canAfford(cost)) { showBanner('材料不足', '', 1.5, '#ef7d57'); sfx('bad'); return; }
   pay(cost);
-  addItem(key);
+  if (key === 'x:ammo') G.res.ammo = (G.res.ammo || 0) + 10; else addItem(key);
   showBanner('制作完成：' + it.name, '', 2, '#ffcd75');
   sfx('build');
 }
@@ -657,7 +673,7 @@ function drawPeopleList(ctx, people, x, y, w, bottom) {
     ctx.globalAlpha = down ? 0.45 : 1;
     ctx.drawImage(personSprite(p).img, x + 4, ry + 5, 48, 48);
     ctx.globalAlpha = 1;
-    drawText(ctx, p.name + (p.ab && p.ab.w ? ' ★' : '') + (down ? '（倒下）' : ''), x + 56, ry + 13, 14, down ? '#ef7d57' : '#ffcd75');
+    drawText(ctx, p.name + (p.ab && p.ab.w ? ' ★' : '') + (down ? '（倒下）' : p.post !== undefined && p.post !== null ? '（派驻）' : ''), x + 56, ry + 13, 14, down ? '#ef7d57' : '#ffcd75');
     ctx.drawImage(itemIcon('w:' + p.weapon).img, x + w - 26, ry + 5, 18, 18);
     if (p.armor !== 'none') ctx.drawImage(itemIcon('a:' + p.armor).img, x + w - 46, ry + 5, 18, 18);
     let tx = x + 56;
@@ -705,7 +721,13 @@ function drawPersonDetail(ctx, p, x, y, w, bottom) {
   drawText(ctx, role + ' · ' + state + ' · 士气' + (p.morale >= 60 ? '高昂' : p.morale >= 30 ? '一般' : '低落'), x + 76, y + 36, 12, down ? '#ef7d57' : '#c8d6e5', 'left', false);
   if (p.morale < 30) drawText(ctx, '士气低落：伤害 -25%，可能离开营地', x + 76, y + 54, 11, '#ef7d57', 'left', false);
   y += 74;
-  if (p !== G.player) {
+  if (p !== G.player && p.post !== undefined && p.post !== null && G.structs[p.post]) {
+    // 派驻在分基地
+    const st = G.structs[p.post];
+    drawButton(ctx, x, y, 110, 30, '撤回营地', () => recallOutpost(st), { size: 12, color: '#5d275d' });
+    drawText(ctx, '派驻在 ' + STRUCTS[st.type].name + '分基地（' + st.op.lv + ' 级）· 每天产出 ' + outputText(st.type, outpostMul(st)), x + 120, y + 15, 12, '#73eff7', 'left', false);
+    y += 40;
+  } else if (p !== G.player) {
     drawButton(ctx, x, y, 150, 30, p.stay ? '白天：留守营地' : '白天：外出搜刮', () => { p.stay = !p.stay; if (p.stay && p.state !== 'base' && !p.down) goHome(p); }, { size: 12, color: p.stay ? '#333c57' : '#1f5e3a' });
     drawText(ctx, '状态：' + survivorTripText(p) + (p.bag ? '（背包：食物' + p.bag.food + ' 水' + p.bag.water + ' 零件' + p.bag.parts + (p.bag.items.length ? ' +' + p.bag.items.length + '件' : '') + '）' : ''), x + 160, y + 15, 12, '#73eff7', 'left', false);
     y += 40;
@@ -730,7 +752,7 @@ function drawPersonDetail(ctx, p, x, y, w, bottom) {
     ctx.drawImage(itemIcon(key).img, sx + 8, ly + 9, 32, 32);
     drawText(ctx, label, sx + 48, ly + 12, 10, '#94b0c2', 'left', false);
     drawText(ctx, itemName(key), sx + 48, ly + 27, 13, empty ? '#94b0c2' : '#f4f4f4');
-    const st = key[0] === 'w' ? '伤害 ' + Math.round(WEAPONS[p.weapon].dmg * personDmgMult(p, WEAPONS[p.weapon])) + ' 射程 ' + personRange(p, WEAPONS[p.weapon]).toFixed(1) : '生命 +' + ARMORS[p.armor].hp;
+    const st = key[0] === 'w' ? '伤害 ' + Math.round(WEAPONS[p.weapon].dmg * personDmgMult(p, WEAPONS[p.weapon])) + ' 射程 ' + personRange(p, WEAPONS[p.weapon]).toFixed(1) + (WEAPONS[p.weapon].ammo ? ' 耗弹' + WEAPONS[p.weapon].ammo : '') : '生命 +' + ARMORS[p.armor].hp;
     drawText(ctx, st, sx + 48, ly + 41, 10, '#73eff7', 'left', false);
   });
   ly += 58;
@@ -823,6 +845,7 @@ function drawZCraft(ctx, x, y, w, bottom) {
   for (const k in WEAPONS) if (WEAPONS[k].craft) list.push('w:' + k);
   for (const k in ARMORS) if (ARMORS[k].craft) list.push('a:' + k);
   for (const k in CONSUMABLES) if (CONSUMABLES[k].craft) list.push('c:' + k);
+  list.unshift('x:ammo');
   const notes = [];
   if (G.camp && G.camp.craftMul < 1) notes.push('工厂营地 -30%');
   if (allPeople().some((p) => hasT(p, 'engineer'))) notes.push('有工程师 -25%');
@@ -904,6 +927,7 @@ function drawCampSelect(ctx) {
   };
   list('优势', c.pros, '#a7f070', '✚');
   list('劣势', c.cons, '#ef7d57', '✖');
+  list('营地每天产出（独特）', [outputText(c.struct, 1) + '。把别的同类建筑清理后派人驻守，也能获得这种产出'], '#73eff7', '◆');
   const by = Math.max(y + 4, dy + dh - 56);
   drawButton(ctx, dx + 14, Math.min(by, dy + dh - 50), dw - 28, 40, '在「' + c.name + '」建立营地', () => startGame('zombie', { camp: G.campSel }), { color: '#1f5e3a', size: 15 });
 }
@@ -916,8 +940,8 @@ MODES.zombie = {
   icon: 'walker',
   desc: '丧尸爆发后的大城市。选择警局、超市、医院等 8 种营地开局；白天搜索公寓、工厂、医院等建筑，招募各有天赋的幸存者；夜晚尸潮来袭。',
   intro: 'WASD 或点地面移动。点建筑/汽车/垃圾箱搜索，点陌生人对话。枪声会引来丧尸，天黑前回到营地！',
-  resources: ['food', 'water', 'parts'],
-  startRes: { food: 20, water: 20, parts: 15 },
+  resources: ['food', 'water', 'parts', 'ammo'],
+  startRes: { food: 20, water: 20, parts: 15, ammo: 0 },
   mapW: 112, mapH: 84, cityGround: true, spawnRadius: 24,
   dayTime: 100,
   nightSpawnTime: 35,
@@ -945,7 +969,7 @@ MODES.zombie = {
   buildList: ['barricade', 'gate', 'collector', 'workbench', 'vegfarm', 'spikes', 'turret', 'floodlight'],
   buildings: {
     core: {
-      name: '避难所', size: 2, hp: 800, attack: 'bullet', range: 4, dmg: 6, rate: 1, light: 5,
+      name: '避难所', size: 2, hp: 800, attack: 'bullet', range: 4.5, dmg: 9, rate: 1.2, light: 5,
       upgrade: { parts: 30, food: 10, water: 10 }, desc: '被攻破就输了，升级提升生命和火力。床位在营地建筑里面摆放',
     },
     barricade: { name: '路障', hp: 250, cost: { parts: 4 }, wall: true, wallStyle: 'metal', sprite: 'wall_metal', desc: '阻挡丧尸，相邻的路障和门会自动连成一片' },
@@ -979,7 +1003,7 @@ MODES.zombie = {
     brute: { name: '巨尸', hp: 700, speed: 0.5, dmg: 45, rate: 0.6, gold: 15, scale: 2, boss: true, color: '#5d275d' },
     bandit: { name: '强盗', hp: 45, speed: 1.3, dmg: 7, rate: 1, gold: 3, ranged: 3.5, aggro: 9, color: '#1a1c2c' },
   },
-  wave: { baseCount: 8, perNight: 7, growth: 1.1, hpPerNight: 0.25, dmgPerNight: 0.08, bossEvery: 5 },
+  wave: { baseCount: 6, perNight: 6, growth: 1.1, hpPerNight: 0.22, dmgPerNight: 0.07, bossEvery: 5 },
   perks: null,
 
   hooks: {
@@ -992,7 +1016,7 @@ MODES.zombie = {
       G.survivors = [];
       G.inventory = { 'w:knife': 1 };
       G.stock = null;
-      G.res = Object.assign({}, camp.start);
+      G.res = Object.assign({ ammo: 0 }, camp.start);
       camp.apply();
       G.player.hp = personMaxHp(G.player);
       refreshAllBuildings();
@@ -1014,7 +1038,7 @@ MODES.zombie = {
         survivors: G.survivors.map(personSave),
         inventory: G.inventory,
         npcs: G.npcs.map((n) => ({ x: n.x, y: n.y, kind: n.kind, name: n.name, person: n.person ? personSave(n.person) : null })),
-        structs: G.structs.map((s) => [s.type, s.x, s.y, s.v, s.left, s.restock, s.home ? 1 : 0, s.opened || {}, s.zIn || 0, s.nc || 0, s.zs || null]),
+        structs: G.structs.map((s) => [s.type, s.x, s.y, s.v, s.left, s.restock, s.home ? 1 : 0, s.opened || {}, s.zIn || 0, s.nc || 0, s.zs || null, s.op || null]),
         decor: G.decor,
       };
     },
@@ -1028,12 +1052,19 @@ MODES.zombie = {
       G.structs = [];
       G.structAt = new Int16Array(MAP_W * MAP_H).fill(-1);
       G.home = d.home || { beds: [] }; G.citySeed = d.citySeed || 1; G.inside = null;
-      for (const [type, x, y, v, left, restock, home, opened, zIn, nc, zs] of d.structs) {
+      for (const [type, x, y, v, left, restock, home, opened, zIn, nc, zs, op] of d.structs) {
         const sd = STRUCTS[type], si = G.structs.length;
-        G.structs.push({ type, x, y, w: sd.w, h: sd.h, v, left, restock, home: !!home, opened: opened || {}, zIn: zIn || 0, nc: nc || 0, zs: zs || null });
+        G.structs.push({ type, x, y, w: sd.w, h: sd.h, v, left, restock, home: !!home, opened: opened || {}, zIn: zIn || 0, nc: nc || 0, zs: zs || null, op: op || null });
         for (let yy = y; yy < y + sd.h; yy++) for (let xx = x; xx < x + sd.w; xx++) G.structAt[idx(xx, yy)] = si;
       }
       G.decor = d.decor || [];
+      if (G.res.ammo === undefined) G.res.ammo = 0;
+      // 派驻在分基地的同伴
+      for (const s of G.survivors) {
+        const st = s.post !== undefined && s.post !== null ? G.structs[s.post] : null;
+        if (st && st.op) { s.state = 'post'; const e = structEntrance(st) || { x: st.x, y: st.y + st.h }; s.x = (e.x + 0.5) * T; s.y = (e.y + 0.5) * T; } else s.post = null;
+      }
+      placeSurvivors();
       G.roads = d.roads; G.fields = d.fields || []; G.crosswalks = d.crosswalks || []; G.parking = d.parking || [];
       G.natTer = new Uint8Array(MAP_W * MAP_H);
       for (let i = 0; i < G.natTer.length; i++) G.natTer[i] = d.natTer.charCodeAt(i) - 48;
@@ -1042,8 +1073,13 @@ MODES.zombie = {
     },
     update(dt) {
       if (G.inside) withInside(() => { updateInside(dt); if (G.inside) abilityTick(G.player, dt, [G.player]); }); // 在建筑里面
-      else { updatePlayer(dt); abilityTick(G.player, dt, allPeople()); }
-      for (const s of G.survivors) {
+      else {
+        updatePlayer(dt); abilityTick(G.player, dt, allPeople());
+        // 白天待在营地旁边、附近没有丧尸：慢慢回血
+        const pl = G.player;
+        if (pl.down <= 0 && G.phase === 'day' && pl.hp < personMaxHp(pl) && Math.hypot(pl.x - G.core.cx, pl.y - G.core.cy) < 5 * T && !nearestMonsters(pl.x, pl.y, 6 * T)[0]) pl.hp = Math.min(personMaxHp(pl), pl.hp + 2 * dt);
+      }
+      for (const s of campSurvivors()) {
         s.hit = Math.max(0, s.hit - dt);
         updateSurvivorTrip(s, dt); // 白天自己出门搜刮（js/scavenge.js）
         if (!s.down && s.state !== 'in') personAttack(s, dt, G.mods.survDmg);
@@ -1057,7 +1093,13 @@ MODES.zombie = {
         }
       }
     },
-    credit(owner, dmg, killed, m) { zCredit(owner, dmg, killed); if (m) abilityHit(owner, m, dmg, false); },
+    credit(owner, dmg, killed, m, proj) {
+      zCredit(owner, dmg, killed);
+      if (!m) return;
+      abilityHit(owner, m, dmg, false);
+      if (proj && proj.ab) fxImpact(proj.ab, m.x, m.y - 4, Math.atan2(proj.vy || 0, proj.vx || 0));
+    },
+    hudExtra(ctx) { drawBuffStrip(ctx); },
     onSpawn(m) { maybeSpecial(m); },
     drawMonsterFx(ctx, m) { drawMonsterFx(ctx, m); },
     monsterAI(m, dt) {
@@ -1078,14 +1120,14 @@ MODES.zombie = {
         if (m.cd <= 0) { m.cd = 1 / m.def.rate; hurtPlayer(m.dmg, m); }
         return true;
       }
-      for (const s of G.survivors) {
+      for (const s of campSurvivors()) {
         if (s.down || s.state === 'in' || Math.hypot(s.x - m.x, s.y - m.y) > T * 0.7) continue;
         if (m.cd <= 0) { m.cd = 1 / m.def.rate; hurtSurvivor(s, m.dmg, m); }
         return true;
       }
       if (m.wander) {
         if (pd < (m.def.aggro || 6) * T) { moveFree(m, p.x, p.y, monsterSpeed(m), dt); return true; }
-        const out = G.survivors.find((s) => !s.down && (s.state === 'go' || s.state === 'home') && Math.hypot(s.x - m.x, s.y - m.y) < 4 * T);
+        const out = campSurvivors().find((s) => !s.down && (s.state === 'go' || s.state === 'home') && Math.hypot(s.x - m.x, s.y - m.y) < 4 * T);
         if (out) { moveFree(m, out.x, out.y, monsterSpeed(m), dt); return true; }
         const nz = G.noise;
         if (nz && G.clock < nz.until && Math.hypot(nz.x - m.x, nz.y - m.y) < 11 * T) {
@@ -1135,9 +1177,12 @@ MODES.zombie = {
         msgs.push('食物或水不够了！大家士气大跌');
         G.player.hp = Math.max(1, G.player.hp - 15);
       }
+      // 分基地：昨晚的袭击 + 今天的产出；营地建筑自己的产出
+      outpostsDawn(msgs);
       // 士气太低的人会离开
       for (const s of G.survivors.slice()) {
         if (s.morale < 20 && Math.random() < 0.5) {
+          if (s.post !== undefined && s.post !== null && G.structs[s.post]) G.structs[s.post].op = null; // 驻守的人走了，分基地也没了
           G.survivors.splice(G.survivors.indexOf(s), 1);
           if (s.weapon !== 'fists') addItem('w:' + s.weapon);
           if (s.armor !== 'none') addItem('a:' + s.armor);
@@ -1152,7 +1197,7 @@ MODES.zombie = {
       for (const q of allPeople()) {
         const mx = personMaxHp(q);
         if (q !== p && q.down) { q.down = false; q.hp = mx * 0.5; }
-        if (q !== p && q.state !== 'base') { q.state = 'base'; q.target = null; q.bag = null; q.path = []; q.x = q.hx; q.y = q.hy; }
+        if (q !== p && q.state !== 'base' && q.state !== 'post') { q.state = 'base'; q.target = null; q.bag = null; q.path = []; q.x = q.hx; q.y = q.hy; }
         q.hp = Math.min(mx, q.hp + mx * (0.4 + (medic ? 0.25 : 0)));
         if (G.camp.fullHeal) q.hp = mx;
       }
@@ -1161,6 +1206,7 @@ MODES.zombie = {
       for (const s of G.structs) {
         if (s.home) continue;
         s.left = structLeftCount(s);
+        if (s.op) continue; // 分基地里不会再冒出丧尸
         const maxZ = Math.ceil(STRUCTS[s.type].danger * 0.8);
         if ((s.zIn || 0) < maxZ && Math.random() < 0.4) s.zIn = (s.zIn || 0) + 1;
       }
@@ -1171,6 +1217,7 @@ MODES.zombie = {
     },
     onKill(m) {
       dropCores(m);
+      if (m.type === 'bandit' && Math.random() < 0.6) { const k = randInt(3, 7); G.res.ammo = (G.res.ammo || 0) + k; addFloat(m.x, m.y - 30, '子弹 +' + k, '#ffcd75', true); }
       if (m.type === 'bandit' && Math.random() < 0.45) {
         const k = randomItem(Math.random() < 0.7 ? 'w' : 'a');
         addItem(k);
@@ -1188,7 +1235,7 @@ MODES.zombie = {
       const needFood = people + allPeople().filter((q) => hasT(q, 'glutton')).length;
       const pills = [
         { icon: 'heart', text: '生命 ' + Math.ceil(p.hp) + '/' + personMaxHp(p), color: p.hp < personMaxHp(p) * 0.3 ? '#ef7d57' : '#f4f4f4' },
-        { icon: 'person', text: '幸存者 ' + people + ' · 床位 ' + G.survivors.length + '/' + zombieHousing() },
+        { icon: 'person', text: '幸存者 ' + people + ' · 床位 ' + campSurvivors().length + '/' + zombieHousing() + (outposts().length ? ' · 分基地 ' + outposts().length : '') },
         { text: '每日 食物-' + needFood + ' 水-' + people, color: G.res.food < needFood || G.res.water < people ? '#ef7d57' : '#f4f4f4' },
       ];
       if (G.inside) {
@@ -1207,7 +1254,9 @@ MODES.zombie = {
     },
     extraButtons() {
       if (!G.inside) return [];
-      return [{ label: '离开', onClick: () => withInside(() => insideTap(G.inside.door.x, G.inside.door.y, (G.inside.door.x + 0.5) * T, (G.inside.door.y + 0.5) * T)) }];
+      const st = G.inside.s, more = [];
+      if (!st.home && OUTPUT[st.type]) more.push(st.op ? { label: '分基地', onClick: () => openOutpostDialog(st) } : { label: '派驻', onClick: () => openStationDialog(st) });
+      return more.concat([{ label: '离开', onClick: () => withInside(() => insideTap(G.inside.door.x, G.inside.door.y, (G.inside.door.x + 0.5) * T, (G.inside.door.y + 0.5) * T)) }]);
     },
     // 建造栏：在营地建筑里只能放床，在别的建筑里不能建造
     buildList() { return G.inside ? (G.inside.home ? ['bed'] : []) : null; },
@@ -1224,7 +1273,7 @@ MODES.zombie = {
         drawWorldLabel(ctx, n.kind === 'bandit' ? '!' : '?', n.x, n.y - 18 + bob, n.kind === 'bandit' ? '#ef7d57' : '#ffcd75');
       }
       // 幸存者
-      for (const s of G.survivors) {
+      for (const s of campSurvivors()) {
         if (s.state === 'in') continue; // 在楼里搜刮
         const spr = personSprite(s);
         ctx.globalAlpha = s.down ? 0.4 : 1;
