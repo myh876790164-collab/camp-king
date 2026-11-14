@@ -84,7 +84,7 @@ function setupInput(canvas) {
     }
     if (drag && pointers.size === 1) {
       if (!drag.moved && Math.hypot(p.x - drag.sx, p.y - drag.sy) > 8) drag.moved = true;
-      if (drag.moved && drag.scroll) scrollBy(drag.scroll, -(p.y - drag.ly)); // 拖动滚动面板里的文字
+      if (drag.moved && drag.scroll) scrollBy(drag.scroll, drag.scroll.horiz ? -(p.x - drag.lx) : -(p.y - drag.ly)); // 拖动滚动面板（横向拖动栏左右拖）
       if (drag.moved && !drag.onUI && G.state === 'play') {
         G.cam.x -= (p.x - drag.lx) / G.cam.zoom;
         G.cam.y -= (p.y - drag.ly) / G.cam.zoom;

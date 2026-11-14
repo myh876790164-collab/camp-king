@@ -55,8 +55,8 @@ const DAOS = {
     img: ['回春', '缠藤'], loc: 'forest', how: '于灵松林花草间采草木灵息。乙日 ×4，春季 ×1.5。', rate: stemRate('乙', 'mu') },
   zhen: { name: '震木', el: 'mu', src: '八卦', pol: 'yang', rare: 3, concept: '震为雷。春雷惊蛰，万物萌动，主震动、奋发。',
     path: { text: '术法威力 +30%', fx: { spell: 0.3 } }, gf: { name: '《震雷惊蛰经》', text: '突破失败时损失减半', fx: { failSafe: 0.5 } },
-    img: ['惊蛰', '奔雷'], loc: 'yanwu', how: '雷雨之时立于演武场，引天雷入体（有可能被雷击伤）。雷雨天 ×4，二月惊蛰前后 ×1.5，其余时候几乎采不到。',
-    rate: () => (G.sect.weather === 'storm' ? 4 : 0.15) * (sectCal().month === 2 ? 1.5 : 1) },
+    img: ['惊蛰', '奔雷'], loc: 'yanwu', how: '雷雨之时立于演武场，引天雷入体（有可能被雷击伤）。雷雨天 ×5，二月惊蛰前后 ×1.5，平时只能采到些许残雷（×0.5）。',
+    rate: () => (G.sect.weather === 'storm' ? 5 : 0.5) * (sectCal().month === 2 ? 1.5 : 1) },
   yin3: { name: '寅木', el: 'mu', src: '地支', pol: 'yang', rare: 2, concept: '寅为虎，正月建寅。春之始，主勇猛、开拓。',
     path: { text: '战力 +20%，灵兽战力 +30%', fx: { power: 0.2, beast: 0.3 } }, gf: { name: '《寅虎啸林功》', text: '遭遇战胜率提升（战力 +15%）', fx: { power: 0.15 } },
     img: ['啸林', '山君'], loc: 'forest', how: '于灵松林中长啸吐纳，采山林虎气。正月（寅月）×3，寅日 ×2。', rate: branchRate('寅') },
@@ -124,13 +124,13 @@ const DAOS = {
   // ===== 阴 =====
   taiyin: { name: '太阴', el: 'yin', src: '三阴', pol: 'yin', rare: 3, qiEl: 'tu', concept: '太阴主开，三阴之始，月之精华。六气属湿土。',
     path: { text: '修炼速度 +25%', fx: { speed: 0.25 } }, gf: { name: '《太阴炼形篇》', text: '寿元 +20%', fx: { life: 0.2 } },
-    img: ['太阴', '月华'], loc: 'zongzhu', how: '每月十四至十六满月之时，于宗主峰之巅吞吐月华（×4），其余日子几乎采不到。', rate: () => (fullMoon() ? 4 : 0.15) },
+    img: ['太阴', '月华'], loc: 'zongzhu', how: '每月十四至十六满月之时，于宗主峰之巅吞吐月华（×4），其余日子只能采到些许（×0.3）。', rate: () => (fullMoon() ? 4 : 0.3) },
   shaoyin: { name: '少阴', el: 'yin', src: '三阴', pol: 'yin', rare: 3, qiEl: 'huo', concept: '少阴为枢，心肾相交，水火既济。六气属君火。',
     path: { text: '突破成功率 +8%', fx: { brk: 0.08 } }, gf: { name: '《少阴既济经》', text: '悟性积累 +25%', fx: { wu: 0.25 } },
     img: ['既济', '心火'], loc: 'dianji', how: '于典籍峰静室调和心肾水火。冬季 ×2，子日 ×2。', rate: () => (sectSeason() === 3 ? 2 : 0.6) * (dayBranch() === '子' ? 2 : 1) },
   jueyin: { name: '厥阴', el: 'yin', src: '三阴', pol: 'yin', rare: 3, qiEl: 'mu', concept: '厥阴主阖，两阴交尽，阴尽而阳生。六气属风木。',
     path: { text: '突破失败后，下次突破成功率 +15%', fx: { comeback: 0.15 } }, gf: { name: '《厥阴风木经》', text: '参悟时神识精进几率 ×3', fx: { mindGrow: 2 } },
-    img: ['阴尽', '幽风'], loc: 'dianji', how: '每月末（廿八至三十）阴尽之时于典籍峰采气（×3），腊月 ×2。', rate: () => (sectCal().day >= 28 ? 3 : 0.3) * (sectCal().month === 12 ? 2 : 1) },
+    img: ['阴尽', '幽风'], loc: 'dianji', how: '每月末（廿八至三十）阴尽之时于典籍峰采气（×3），腊月 ×2。', rate: () => (sectCal().day >= 28 ? 3 : 0.4) * (sectCal().month === 12 ? 2 : 1) },
 };
 const DAO_IDS = Object.keys(DAOS);
 for (const id of DAO_IDS) { DAOS[id].id = id; DAOS[id].qiName = DAOS[id].name + '之气'; DAOS[id].color = EL[DAOS[id].el].color; }

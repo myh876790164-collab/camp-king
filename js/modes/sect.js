@@ -194,7 +194,12 @@ function cultSpeed(p) {
 // 修炼节奏：每个境界要修的年数和它给的延寿相当，寿元才有压力
 // （宗门条件一般时：筑基采气数年、炼气数十年、金丹上百年、化神数百年；资质平庸的弟子会在半路寿尽）
 const REALM_PACE = [1, 0.07, 0.012, 0.005, 0.007, 1];
-const QI_PACE = 0.04; // 采气速度（一缕真气要采好几年）
+const QI_PACE = 0.37; // 采气速度：条件一般时约半年一缕（筑基要的 3 缕约 2~3 年）
+// 每天能积累多少缕真气（1 = 一整缕）
+function qiPerDay(p) {
+  if (!p.manual) return 0;
+  return 0.012 * QI_PACE * G.mods.qiGather * (0.6 + p.mind * 0.08) * DAOS[p.manual].rate() * (1 + p.realm * 0.25) * (1 + sumFx(p, 'gather'));
+}
 function pace(p) { return REALM_PACE[p.realm] || 1; }
 function evPace(p) { return p.realm === 0 ? 1 : Math.min(1, pace(p) * 8); } // 事件、丹药推进比日常修炼显眼一些
 function breakChance(p) {
@@ -347,7 +352,7 @@ function sectDaily() {
       case 'gather': {
         const d = DAOS[p.manual], r = d.rate();
         if (r <= 0) break;
-        p.qiAcc += 0.012 * QI_PACE * G.mods.qiGather * (0.6 + p.mind * 0.08) * r * (1 + p.realm * 0.25) * (1 + sumFx(p, 'gather'));
+        p.qiAcc += qiPerDay(p);
         if (p.manual === 'zhen' && S.weather === 'storm' && Math.random() < 0.02) { p.hurt = randInt(15, 30); sectLog(p.name + ' 引雷时被天雷击伤，需养伤 ' + p.hurt + ' 天', '#ef7d57', p); break; }
         while (p.qiAcc >= 1) {
           p.qiAcc -= 1; S.qi[p.manual] = (S.qi[p.manual] || 0) + 1;

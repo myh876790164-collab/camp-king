@@ -7,6 +7,12 @@ let uiButtons = [];
 // onClick 为 null 的区域只用来“挡住”点击，不让点穿到地图上
 // 在可滚动区域里时：按钮跟着内容一起上下移动，超出区域的部分点不到
 function addButton(x, y, w, h, onClick) {
+  if (uiClipH) { // 横向拖动栏里：按钮跟着左右移动，超出栏外的部分点不到
+    x -= uiOffX;
+    const l = Math.max(x, uiClipH.x), r = Math.min(x + w, uiClipH.x + uiClipH.w);
+    if (r <= l) return;
+    w = r - l; x = l;
+  }
   if (uiClip) {
     y -= uiOffY;
     const top = Math.max(y, uiClip.y), bot = Math.min(y + h, uiClip.y + uiClip.h);
@@ -40,6 +46,35 @@ function endScroll(ctx, contentBottom) {
     ctx.fillStyle = 'rgba(148,176,194,0.18)'; ctx.fillRect(c.x + c.w + 2, c.y, 4, c.h);
     ctx.fillStyle = 'rgba(255,205,117,0.75)'; ctx.fillRect(c.x + c.w + 2, ty, 4, th);
     if (G.scroll[c.key] < max - 4) drawText(ctx, '▼ 拖动查看更多', c.x + c.w / 2, c.y + c.h - 8, 11, '#94b0c2', 'center', false);
+  }
+}
+// ---------- 横向拖动栏（一排按钮放不下时，左右拖动 / 滚轮查看） ----------
+let uiClipH = null, uiOffX = 0;
+function beginHScroll(ctx, key, x, y, w, h) {
+  G.scroll = G.scroll || {};
+  uiOffX = G.scroll[key] || 0;
+  uiClipH = { key, x, y, w, h };
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, y - 2, w, h + 4); ctx.clip();
+  ctx.translate(-uiOffX, 0);
+}
+// contentRight = 内容最右边的 x（滚动前的坐标）
+function endHScroll(ctx, contentRight) {
+  const c = uiClipH;
+  ctx.restore();
+  uiClipH = null; uiOffX = 0;
+  const max = Math.max(0, contentRight - c.x - c.w + 4);
+  G.scroll[c.key] = Math.max(0, Math.min(max, G.scroll[c.key] || 0));
+  scrollAreas.push({ x: c.x, y: c.y, w: c.w, h: c.h, key: c.key, max, horiz: true });
+  if (max > 0) {
+    const off = G.scroll[c.key];
+    // 两端渐隐，提示还有内容
+    if (off > 2) { const g = ctx.createLinearGradient(c.x, 0, c.x + 24, 0); g.addColorStop(0, 'rgba(26,28,44,0.95)'); g.addColorStop(1, 'rgba(26,28,44,0)'); ctx.fillStyle = g; ctx.fillRect(c.x, c.y, 24, c.h); drawText(ctx, '◀', c.x + 6, c.y + c.h / 2, 11, '#ffcd75', 'center'); }
+    if (off < max - 2) { const g = ctx.createLinearGradient(c.x + c.w - 24, 0, c.x + c.w, 0); g.addColorStop(0, 'rgba(26,28,44,0)'); g.addColorStop(1, 'rgba(26,28,44,0.95)'); ctx.fillStyle = g; ctx.fillRect(c.x + c.w - 24, c.y, 24, c.h); drawText(ctx, '▶', c.x + c.w - 6, c.y + c.h / 2, 11, '#ffcd75', 'center'); }
+    // 底部的细滚动条
+    const tw = Math.max(30, c.w * c.w / (c.w + max)), tx = c.x + (c.w - tw) * (off / max);
+    ctx.fillStyle = 'rgba(148,176,194,0.18)'; ctx.fillRect(c.x, c.y + c.h + 2, c.w, 3);
+    ctx.fillStyle = 'rgba(255,205,117,0.75)'; ctx.fillRect(tx, c.y + c.h + 2, tw, 3);
   }
 }
 function scrollAreaAt(sx, sy) {

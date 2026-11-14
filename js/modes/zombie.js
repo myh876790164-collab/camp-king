@@ -664,7 +664,8 @@ function drawEquipPanel(ctx) {
   let tab = G.equipTab;
   if (tab !== 'craft' && tab !== 'bag' && tab !== 'ability') tab = 'people';
   [['people', '幸存者'], ['ability', '异能'], ['craft', '制作'], ['bag', '背包']].forEach(([id, label], i) => {
-    drawButton(ctx, px + 12 + i * 92, top + 44, 86, 28, label, () => { G.equipTab = id; G.pickSlot = null; }, { active: tab === id, size: 13 });
+    const tw = Math.min(86, (pw - 24 - 18) / 4); // 手机上四个标签也要放得下
+    drawButton(ctx, px + 12 + i * (tw + 6), top + 44, tw, 28, label, () => { G.equipTab = id; G.pickSlot = null; }, { active: tab === id, size: 13 });
   });
   const y0 = top + 82;
   // 内容放在可滚动区域里：太长时可以拖动 / 滚轮查看
@@ -672,8 +673,12 @@ function drawEquipPanel(ctx) {
   if (tab === 'craft') { area('craft', px + 12, pw - 24, () => drawZCraft(ctx, px + 12, y0, pw - 24, bottom - 8)); return; }
   if (tab === 'bag') { area('bag', px + 12, pw - 24, () => drawZBag(ctx, px + 12, y0, pw - 24, bottom - 8)); return; }
   if (tab === 'ability') {
+    // 选人栏固定在上面（横向拖动），下面的异能详情可以上下滚动
+    let yA = y0;
+    if (!G.abGuide) { drawAbilityStrip(ctx, px + 12, y0, pw - 24); yA = y0 + 42; }
     const key = 'ab_' + (G.abGuide ? 'guide' + (G.abPage || 0) : (G.zSel ? G.zSel.name : ''));
-    area(key, px + 12, pw - 24, () => drawAbilityTab(ctx, px + 12, y0, pw - 24, bottom - 8));
+    beginScroll(ctx, key, px + 12, yA, pw - 24, bottom - 8 - yA);
+    endScroll(ctx, drawAbilityTab(ctx, px + 12, yA, pw - 24, bottom - 8, true));
     return;
   }
 
@@ -686,8 +691,10 @@ function drawEquipPanel(ctx) {
     drawPeopleList(ctx, people, px + 12, y0, lw, bottom - 8);
     area('pd_' + G.zSel.name, px + lw + 26, pw - lw - 38, () => drawPersonDetail(ctx, G.zSel, px + lw + 26, y0, pw - lw - 38, bottom - 8));
   } else if (G.zSel) {
-    drawButton(ctx, px + pw - 110, top + 44, 98, 28, '◀ 返回列表', () => { G.zSel = null; G.pickSlot = null; }, { size: 12 });
-    area('pd_' + G.zSel.name, px + 12, pw - 24, () => drawPersonDetail(ctx, G.zSel, px + 12, y0, pw - 24, bottom - 8));
+    drawButton(ctx, px + 12, y0, 110, 28, '◀ 返回列表', () => { G.zSel = null; G.pickSlot = null; }, { size: 12 }); // 放在标签下面，不和标签叠在一起
+    const yD = y0 + 36;
+    beginScroll(ctx, 'pd_' + G.zSel.name, px + 12, yD, pw - 24, bottom - 8 - yD);
+    endScroll(ctx, drawPersonDetail(ctx, G.zSel, px + 12, yD, pw - 24, bottom - 8));
   } else drawPeopleList(ctx, people, px + 12, y0, pw - 24, bottom - 8);
 }
 

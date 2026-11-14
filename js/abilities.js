@@ -427,29 +427,35 @@ function initAbilitySprites() {
 }
 
 // ---------- 异能面板 ----------
-function drawAbilityTab(ctx, x, y, w, bottom) {
+// 异能页顶部的选人栏：所有幸存者排成一排，放不下时左右拖动（手机上也能选到每个人）
+function drawAbilityStrip(ctx, x, y, w) {
   const people = allPeople();
   if (!G.zSel || !people.includes(G.zSel)) G.zSel = G.player;
-  if (G.abGuide) return drawAbilityGuide(ctx, x, y, w, bottom);
-  // 选人
+  drawButton(ctx, x + w - 90, y, 90, 30, '异能图鉴', () => { G.abGuide = true; G.abPage = 0; }, { size: 12, color: '#5d275d' });
+  beginHScroll(ctx, 'ab_people', x, y, w - 98, 30);
   let bx = x;
   for (const p of people) {
     ctx.font = 'bold 12px ' + FONT;
-    const label = p.name + (p.ab && p.ab.w ? ' ★' : '');
+    const label = p.name + (p.ab && p.ab.w ? ' ★' : '') + (isDown(p) ? '（倒下）' : '');
     const bw = ctx.measureText(label).width + 20;
-    if (bx + bw > x + w - 96) break;
-    drawButton(ctx, bx, y, bw, 28, label, () => { G.zSel = p; }, { active: p === G.zSel, size: 12, color: p === G.zSel ? '#29366f' : '#333c57' });
+    drawButton(ctx, bx, y, bw, 30, label, () => { G.zSel = p; }, { active: p === G.zSel, size: 12, color: p === G.zSel ? '#29366f' : '#333c57' });
     bx += bw + 4;
   }
-  drawButton(ctx, x + w - 90, y, 90, 28, '异能图鉴', () => { G.abGuide = true; G.abPage = 0; }, { size: 12, color: '#5d275d' });
-  y += 38;
+  endHScroll(ctx, bx - 4);
+}
+function drawAbilityTab(ctx, x, y, w, bottom, noStrip) {
+  const people = allPeople();
+  if (!G.zSel || !people.includes(G.zSel)) G.zSel = G.player;
+  if (G.abGuide) return drawAbilityGuide(ctx, x, y, w, bottom);
+  if (!noStrip) { drawAbilityStrip(ctx, x, y, w); y += 42; } // 选人栏（一般由面板固定在上方画）
   const p = G.zSel, ab = p.ab;
   const cores = ABIL_KEYS.filter((t) => G.inventory['k:' + t]);
   if (!ab || !ab.w) {
     // 未觉醒：展示已经服用的晶核
     drawText(ctx, p.name + ' · 未觉醒', x, y + 8, 16, '#ffcd75');
-    drawText(ctx, '前 5 颗晶核决定异能配比（例如 3 颗力量 + 2 颗速度），确定后不能更改，请谨慎选择', x, y + 30, 12, '#c8d6e5', 'left', false);
-    y += 46;
+    const tip = wrapText(ctx, '前 5 颗晶核决定异能配比（例如 3 颗力量 + 2 颗速度），确定后不能更改，请谨慎选择', w, 12); // 手机上自动换行
+    tip.forEach((ln, k) => drawText(ctx, ln, x, y + 30 + k * 16, 12, '#c8d6e5', 'left', false));
+    y += 46 + (tip.length - 1) * 16;
     for (let k = 0; k < 5; k++) {
       const t = ab && ab.cores[k];
       ctx.fillStyle = '#262b44'; ctx.fillRect(x + k * 46, y, 40, 40);
@@ -511,7 +517,7 @@ function drawAbilityTab(ctx, x, y, w, bottom) {
   if (!ab || !ab.w) {
     drawText(ctx, '背包里的晶核（点击服用）', x, y + 6, 13, '#ffcd75');
     y += 18;
-    if (!cores.length) drawText(ctx, '没有晶核——击杀丧尸有几率掉落，变异丧尸（脚下有彩色光环）必定掉落', x, y + 10, 12, '#94b0c2', 'left', false);
+    if (!cores.length) { const ls = wrapText(ctx, '没有晶核——击杀丧尸有几率掉落，变异丧尸（脚下有彩色光环）必定掉落', w, 12); ls.forEach((ln, k) => drawText(ctx, ln, x, y + 10 + k * 16, 12, '#94b0c2', 'left', false)); y += (ls.length - 1) * 16; }
     let ix = x;
     for (const t of cores) {
       const label = CORES[t].name + ' ×' + G.inventory['k:' + t];

@@ -221,6 +221,13 @@ function sectViewPerson(c, p) {
     cLine(c, '道途特性：' + d.path.text + (p.dao ? '（随精纯度发挥 ' + Math.round((0.5 + 0.5 * daoPurity(p)) * 100) + '%）' : '（定道后生效）'), 12, '#f4f4f4');
     cLine(c, '功法 ' + d.gf.name + '：' + d.gf.text, 12, '#ffcd75');
     cLine(c, '采气之法（' + d.qiName + '）：' + d.how + '　今日时机 ×' + (+d.rate().toFixed(2)), 12, d.color);
+    if (p.task === 'gather' && p.manual === did) {
+      const per = qiPerDay(p), r = d.rate();
+      cBar(c, p.qiAcc || 0, 1, d.color, '这一缕' + d.qiName + '：' + Math.floor((p.qiAcc || 0) * 100) + '%');
+      if (p.at !== taskLoc(p)) cLine(c, '正在赶往' + sectLocName(taskLoc(p)) + '，到了才开始采气。', 12, '#ffcd75');
+      else if (r <= 0) cLine(c, '今天时机不对，采不到（' + d.how + '）', 12, '#ef7d57');
+      else cLine(c, '按今天的时机，约 ' + Math.ceil(1 / per) + ' 天（' + (1 / per / 360).toFixed(1) + ' 年）采得一缕' + (r < 0.5 ? '——时机不佳，等对的时机会快很多' : ''), 12, r < 0.5 ? '#ffcd75' : '#a7f070');
+    }
     if (p.dao) {
       const pur = daoPurity(p);
       cBar(c, pur, 1, pur >= 0.85 ? '#a7f070' : pur >= 0.6 ? '#ffcd75' : '#ef7d57', '道途精纯 ' + Math.round(pur * 100) + '%');
