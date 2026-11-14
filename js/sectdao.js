@@ -152,6 +152,31 @@ const PROFS = {
   gui: { name: '鬼修', desc: '修阴魂鬼道。战力 +20%，战斗经验 ×1.5，寿元 -15%；陨落时一半几率残魂不灭', fx: { power: 0.2, train: 0.5, life: -0.15 } },
 };
 const PROF_IDS = Object.keys(PROFS);
+// ---------- 性格词条（每人两个，互斥的不会同时出现） ----------
+const SECT_TRAITS = {
+  qinfen: { name: '勤奋', desc: '修炼速度 +10%', fx: { speed: 0.1 }, no: 'lansan' },
+  lansan: { name: '懒散', desc: '修炼速度 -10%，但心宽体胖，寿元 +5%', fx: { speed: -0.1, life: 0.05 }, no: 'qinfen' },
+  haozhan: { name: '好战', desc: '战力 +10%，演武收益 +20%', fx: { power: 0.1, train: 0.2 }, no: 'jinshen' },
+  jinshen: { name: '谨慎', desc: '历练更安全（+25%）', fx: { safe: 0.25 }, no: 'haozhan' },
+  haoshuang: { name: '豪爽', desc: '人缘更好', fx: { charm: 0.2 }, no: 'gupi' },
+  gupi: { name: '孤僻', desc: '人缘较差，但悟性 +15%', fx: { charm: -0.2, wu: 0.15 }, no: 'haoshuang' },
+  tancai: { name: '贪财', desc: '历练收获 +30%', fx: { loot: 0.3 } },
+  fuyuan: { name: '福缘深厚', desc: '机缘事件 +40%', fx: { fortune: 0.4 } },
+  wuxing: { name: '悟性超群', desc: '悟性积累 +25%，参悟时神识更易精进', fx: { wu: 0.25, mindGrow: 0.5 } },
+  daoxin: { name: '道心坚定', desc: '突破成功率 +4%', fx: { brk: 0.04 }, no: 'jiaozao' },
+  jiaozao: { name: '急躁', desc: '战力 +5%，突破成功率 -3%', fx: { power: 0.05, brk: -0.03 }, no: 'daoxin' },
+  hushort: { name: '护短', desc: '宗门防御 +15%', fx: { def: 0.15 } },
+  yaoli: { name: '药理通达', desc: '炼丹速度 +20%，服丹效果 +10%', fx: { alch: 0.2, pill: 0.1 } },
+  qiaoshou: { name: '心灵手巧', desc: '炼器威力 +20%，符箓效果 +20%', fx: { forge: 0.2, fu: 0.2 } },
+};
+const SECT_TRAIT_IDS = Object.keys(SECT_TRAITS);
+function rollSectTraits() {
+  const a = pick(SECT_TRAIT_IDS);
+  let b = pick(SECT_TRAIT_IDS);
+  for (let k = 0; k < 20 && (b === a || SECT_TRAITS[a].no === b); k++) b = pick(SECT_TRAIT_IDS);
+  return [a, b];
+}
+function sectTraitText(p) { return (p.traits || []).map((t) => SECT_TRAITS[t].name).join('、'); }
 // 职业 × 道途契合度：-1 相悖 / 0 一般 / 1 良好 / 2 极佳
 const SYN = {
   jian: { jin: 2, huo: 1, mu: 1, shui: 0, tu: 0, yang: 1, yin: 0 },
@@ -204,6 +229,8 @@ function sumFx(p, key) {
   if (m) v += m.gf.fx[key] || 0;                                   // 功法特性
   if (p.prof) v += PROFS[p.prof].fx[key] || 0;                     // 职业
   if (p.apt && p.apt === p.prof && (key === 'power' || key === 'spell')) v += 0.1; // 天赋
+  if (typeof skillFx === 'function') v += skillFx(p, key);           // 道途辅助技能
+  for (const t of p.traits || []) v += SECT_TRAITS[t].fx[key] || 0;       // 性格
   return v;
 }
 // 精纯度：服下的真气、用过的物品里，和本命道途相同（1）/同属性（0.5）/其他（0）的比例
@@ -251,5 +278,5 @@ function daoClash(a, b) {
 const FOE_DAO = {
   '山中妖狼': 'yin3', '游荡散修': null, '邪修': 'jueyin', '夺宝贼人': 'shen', '黑熊精': 'wu',
   '劫修': 'geng', '恶霸修士': 'wu2', '海妖': 'gui', '蛟龙幼崽': 'ren', '毒蛟': 'kan', '瘴林妖王': 'yi',
-  '沙虫': 'xu', '古尸': 'taiyin', '冰原狼王': 'you', '雪妖': 'hai',
+  '沙虫': 'xu', '古尸': 'taiyin', '冰原狼王': 'you', '雪妖': 'hai', '遗府傀儡': 'kun', '守府灵兽': 'yin3',
 };

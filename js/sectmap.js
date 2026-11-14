@@ -108,6 +108,21 @@ function sectMapGen() {
   }
   // 山脚广场
   for (let y = 31; y <= 33; y++) for (let x = 29; x <= 35; x++) if (ter[idx(x, y)] === TER.GRASS || ter[idx(x, y)] === TER.DIRT) set(x, y, TER.DIRT);
+  // 溪流：西南群山的瀑布流下来，汇入灵泉
+  for (let i = 0; i + 1 < SECT_STREAM.length; i++) {
+    const [ax, ay] = SECT_STREAM[i], [bx, by] = SECT_STREAM[i + 1], L = Math.hypot(bx - ax, by - ay);
+    for (let s = 0; s <= L * 4; s++) { const t = s / (L * 4), x = Math.floor(ax + (bx - ax) * t + 0.5), y = Math.floor(ay + (by - ay) * t + 0.5); if (inMap(x, y) && ter[idx(x, y)] === TER.GRASS) set(x, y, TER.WATER); }
+  }
+  // 点缀：凉亭、石碑、竹林、梅树、香炉（只放在草地上，不挡路）
+  G.sectDecor = [];
+  for (const d of SECT_DECOR) {
+    const [x0, y0, w, h] = d.rect;
+    let ok = true;
+    for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) { const t = terrainAt(x, y); if (d.onPlaza ? t !== TER.PAVE : t !== TER.GRASS) ok = false; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (terrainAt(x + dx, y + dy) === TER.DIRT && !d.onPlaza) ok = false; }
+    if (!ok) continue;
+    for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) set(x, y, TER.LOT);
+    G.sectDecor.push(d);
+  }
   // 几块山石
   const rocks = [[19, 26, 2, 2], [38, 13, 2, 2], [8, 22, 3, 2], [56, 24, 2, 2], [38, 42, 2, 2], [15, 44, 2, 1]];
   for (const [x0, y0, w, h] of rocks) for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) if (ter[idx(x, y)] === TER.GRASS) set(x, y, TER.LOT);
@@ -121,6 +136,8 @@ function sectMapGen() {
 
 // 画地面时用：殿宇和器物下面当作石板地，群山、山石、崖壁下面当作草地（避免边缘混出奇怪的斑块）
 function sectNatTer() {
+  // 读档时地图生成不会重跑：从地形里还原点缀（凉亭、竹林……）
+  G.sectDecor = SECT_DECOR.filter((d) => { const [x0, y0, w, h] = d.rect; for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) if (terrainAt(x, y) !== TER.LOT) return false; return true; });
   const nt = new Uint8Array(G.terrain);
   const inPlat = (x, y) => { for (const k in PEAKS) { const [px, py, pw, ph] = PEAKS[k].rect; if (x >= px && x < px + pw && y >= py && y < py + ph) return true; } return false; };
   for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
@@ -204,7 +221,7 @@ function buildSectLayer() {
   }
   // 山石
   for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
-    if (terA(x, y) !== TER.LOT || sectBorder(x, y) || isCliffRow(x, y) || inHallOrProp(x, y)) continue;
+    if (terA(x, y) !== TER.LOT || sectBorder(x, y) || isCliffRow(x, y) || inHallOrProp(x, y) || isDecor(x, y)) continue;
     const bx = x * S, by = y * S;
     g.fillStyle = 'rgba(10,15,25,0.3)'; g.beginPath(); g.ellipse(bx + 16, by + 27, 16, 5, 0, 0, 7); g.fill();
     g.fillStyle = '#5b6168'; g.beginPath(); g.ellipse(bx + 16, by + 17, 15, 12, 0, 0, 7); g.fill();
@@ -347,12 +364,84 @@ function buildSectLayer() {
       for (let k = 0; k < 5; k++) { const sx = bx + 12 + k * 9; P(sx, by + 2, 2, 26, k % 2 ? '#c8d6e5' : '#94b0c2'); P(sx - 1, by + 20, 4, 3, '#b13e53'); }
     }
   }
+  // 瀑布所在的崖壁
+  drawWaterfallCliff(g, S);
+  // 点缀
+  for (const d of G.sectDecor || []) drawSectDecor(g, d, S, rng);
   // 殿宇
   for (const k in PEAKS) drawSectHall(g, PEAKS[k], S, k);
   // 山门牌坊
   drawSectGate(g, S);
   G.sectLayer = c;
+  // 冬天的积雪层（按季节调透明度叠上去）
+  const sc = createCanvas(MAP_W * S, MAP_H * S), sg = sc.getContext('2d');
+  for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
+    const t = terA(x, y);
+    if (t !== TER.GRASS && !(t === TER.LOT && (sectBorder(x, y) || isCliffRow(x, y)))) continue; // 只积在草地、群山、崖顶上
+    const bx = x * S, by = y * S;
+    sg.fillStyle = 'rgba(245,250,255,0.85)';
+    for (let k = 0; k < 3; k++) { sg.beginPath(); sg.ellipse(bx + R(4, 28), by + R(4, 28), R(5, 10), R(2.5, 5), 0, 0, 7); sg.fill(); }
+    if (isCliffRow(x, y)) { sg.fillRect(bx, by, S, 4); }
+  }
+  for (const k in PEAKS) { const [hx, hy, hw] = PEAKS[k].hall; sg.fillStyle = 'rgba(250,252,255,0.8)'; sg.fillRect(hx * S + 4, hy * S - 4, hw * S - 8, 8); }
+  G.sectSnow = sc;
 }
+// 一些固定点缀
+const SECT_STREAM = [[2, 44], [6, 45], [11, 44], [15, 43], [19, 42]];
+const SECT_DECOR = [
+  { kind: 'pavilion', rect: [36, 36, 2, 2] }, { kind: 'stele', rect: [34, 35, 1, 1] },
+  { kind: 'bamboo', rect: [17, 26, 2, 2] }, { kind: 'bamboo', rect: [40, 11, 2, 2] }, { kind: 'bamboo', rect: [8, 24, 2, 1] }, { kind: 'bamboo', rect: [57, 28, 2, 2] },
+  { kind: 'plum', rect: [23, 15, 1, 1] }, { kind: 'plum', rect: [41, 16, 1, 1] }, { kind: 'plum', rect: [19, 37, 1, 1] }, { kind: 'plum', rect: [42, 41, 1, 1] }, { kind: 'plum', rect: [25, 11, 1, 1] }, { kind: 'plum', rect: [38, 10, 1, 1] },
+  { kind: 'censer', rect: [35, 7, 1, 1], onPlaza: true }, { kind: 'censer', rect: [28, 7, 1, 1], onPlaza: true },
+];
+function isDecor(x, y) { for (const d of G.sectDecor || []) { const [dx, dy, w, h] = d.rect; if (x >= dx && x < dx + w && y >= dy && y < dy + h) return true; } return false; }
+function drawWaterfallCliff(g, S) {
+  const P = (a, b, w, h, col) => { g.fillStyle = col; g.fillRect(a, b, w, h); };
+  const [sx, sy] = SECT_STREAM[0];
+  P(0, (sy - 1) * S, sx * S, S * 2.2, '#4f5a55');
+  for (let i = 0; i < 6; i++) P(i * 10, (sy - 1) * S + i * 5, 8, 50 - i * 5, 'rgba(30,40,40,0.35)');
+  const grd = g.createLinearGradient(0, 0, sx * S, 0); grd.addColorStop(0, '#9fd8ff'); grd.addColorStop(1, '#41a6f6');
+  P(S * 0.8, (sy - 1) * S, sx * S - S * 0.8, S * 1.6, grd);
+  g.fillStyle = 'rgba(255,255,255,0.7)'; g.beginPath(); g.ellipse(sx * S, (sy + 0.6) * S, 14, 6, 0, 0, 7); g.fill();
+}
+function drawSectDecor(g, d, S, rng) {
+  const [x0, y0, w, h] = d.rect, bx = x0 * S, by = y0 * S, W = w * S, H = h * S;
+  const P = (a, b, ww, hh, col) => { g.fillStyle = col; g.fillRect(a, b, ww, hh); };
+  const O = (x, y, rx, ry, col) => { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 7); g.fill(); };
+  if (d.kind === 'pavilion') {
+    O(bx + W / 2, by + H - 4, W / 2, 7, 'rgba(10,15,25,0.3)');
+    P(bx + 4, by + H - 14, W - 8, 10, '#bdb8a8'); P(bx + 4, by + H - 14, W - 8, 3, '#dcd7c6');
+    for (const px of [bx + 10, bx + W / 2 - 2, bx + W - 14]) { P(px, by + 22, 4, H - 36, '#a8322d'); P(px + 3, by + 22, 1, H - 36, '#7a2020'); }
+    P(bx + 8, by + H - 26, W - 16, 3, '#8f6a42');
+    g.fillStyle = '#2e6b55'; g.beginPath(); g.moveTo(bx - 4, by + 26); g.quadraticCurveTo(bx + 8, by + 24, bx + 14, by + 12); g.lineTo(bx + W / 2, by - 2); g.lineTo(bx + W - 14, by + 12); g.quadraticCurveTo(bx + W - 8, by + 24, bx + W + 4, by + 26); g.closePath(); g.fill();
+    g.fillStyle = '#3f8a6a'; g.beginPath(); g.moveTo(bx + 2, by + 23); g.lineTo(bx + W / 2, by + 2); g.lineTo(bx + W / 2, by + 22); g.fill();
+    P(bx + W / 2 - 2, by - 8, 4, 8, '#c9a23a'); O(bx + W / 2, by - 9, 3, 3, '#ffcd75');
+  } else if (d.kind === 'stele') {
+    O(bx + 16, by + 28, 12, 4, 'rgba(10,15,25,0.3)');
+    O(bx + 16, by + 25, 11, 5, '#5b6168'); O(bx + 13, by + 22, 6, 3, '#7a8088'); // 龟趺
+    P(bx + 9, by - 10, 14, 34, '#8d909c'); P(bx + 9, by - 10, 14, 3, '#b3b7c2'); P(bx + 20, by - 10, 3, 34, '#6b6e7a');
+    g.fillStyle = '#3b3e4a'; for (let i = 0; i < 5; i++) g.fillRect(bx + 12, by - 4 + i * 5, 7, 2);
+  } else if (d.kind === 'bamboo') {
+    for (let i = 0; i < 9 * w * h / 2; i++) {
+      const x = bx + R2(rng, 3, W - 3), base = by + R2(rng, H * 0.5, H), top = base - R2(rng, 30, 46), col = rng() < 0.5 ? '#4c8a3c' : '#5fa04a';
+      P(x, top, 2.5, base - top, col);
+      for (let yy = top + 6; yy < base; yy += 7) P(x - 0.5, yy, 3.5, 1, '#2f5a28');
+      for (let k = 0; k < 3; k++) { g.fillStyle = rng() < 0.5 ? '#6bb050' : '#3f7a35'; g.beginPath(); g.ellipse(x + R2(rng, -6, 8), top + R2(rng, 0, 14), 5, 1.6, R2(rng, -0.6, 0.6), 0, 7); g.fill(); }
+    }
+  } else if (d.kind === 'plum') {
+    O(bx + 16, by + 28, 10, 3, 'rgba(10,15,25,0.3)');
+    g.strokeStyle = '#4a2e22'; g.lineWidth = 3; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(bx + 16, by + 28); g.quadraticCurveTo(bx + 12, by + 14, bx + 18, by + 4); g.stroke();
+    g.lineWidth = 1.6;
+    for (const [a, b, c2, d2] of [[15, 16, 4, 6], [17, 10, 28, 2], [14, 20, 26, 14], [18, 6, 10, -4]]) { g.beginPath(); g.moveTo(bx + a, by + b); g.lineTo(bx + c2, by + d2); g.stroke(); }
+  } else if (d.kind === 'censer') {
+    O(bx + 16, by + 28, 10, 3, 'rgba(10,15,25,0.3)');
+    P(bx + 8, by + 22, 16, 6, '#6a5022'); O(bx + 16, by + 18, 9, 7, '#8a6a2e'); O(bx + 14, by + 16, 5, 3, '#b08a3e');
+    P(bx + 6, by + 10, 20, 3, '#6a5022'); P(bx + 7, by + 9, 18, 1.5, '#c9a23a');
+    for (const x of [12, 16, 20]) P(bx + x, by + 2, 1, 8, '#8f6a42');
+  }
+}
+function R2(rng, a, b) { return a + rng() * (b - a); }
 function pick2(rng, arr) { return arr[Math.floor(rng() * arr.length)]; }
 function inHallOrProp(x, y) {
   for (const k in PEAKS) { const [hx, hy, hw, hh] = PEAKS[k].hall; if (x >= hx && x < hx + hw && y >= hy && y < hy + hh) return true; }
@@ -372,7 +461,7 @@ function sectPineSil(g, x, y, h, col) {
 function drawSectHall(g, peak, S, key) {
   const [hx, hy, hw, hh] = peak.hall, x = hx * S, y = hy * S, W = hw * S, H = hh * S;
   const P = (a, b, w, h, col) => { g.fillStyle = col; g.fillRect(a, b, w, h); };
-  const roof = peak.roof, roofDk = shadeHex(roof, 0.7), roofLt = shadeHex(roof, 1.25);
+  const roof = peak.roof, roofDk = sectShade(roof, 0.7), roofLt = sectShade(roof, 1.25);
   // 阴影
   P(x + 6, y + H - 2, W, 8, 'rgba(10,15,25,0.3)');
   // 台基 + 台阶
@@ -460,7 +549,7 @@ function drawSectGate(g, S) {
   P(x + W / 2 - tw / 2 - 2, y - 8, tw + 4, 20, '#c9a23a'); P(x + W / 2 - tw / 2, y - 6, tw, 16, '#1d2b53');
   g.fillStyle = '#ffcd75'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(name, x + W / 2, y + 2);
 }
-function shadeHex(hex, k) {
+function sectShade(hex, k) {
   const [r, g, b] = hexRgb(hex);
   const f = (v) => Math.max(0, Math.min(255, Math.round(k > 1 ? v + (255 - v) * (k - 1) : v * k)));
   return 'rgb(' + f(r) + ',' + f(g) + ',' + f(b) + ')';
@@ -582,9 +671,10 @@ function initSectSprites() {
 // ---------- 弟子小人（按境界换道袍颜色） ----------
 const REALM_ROBE = ['#8a7f6e', '#e6e0cf', '#5fa8d3', '#e0b84a', '#9b6bd3', '#e05050', '#f4f4f4', '#ffcd75'];
 function drawCultivator(ctx, p) {
+  const hairC = typeof lifeMax === "function" && p.age >= lifeMax(p) * 0.75 ? (p.age >= lifeMax(p) * 0.9 ? "#e8e8f0" : "#9a9aa8") : (p.hair || "#1a1c2c"); // 年老白发
   const x = Math.round(p.x), y = Math.round(p.y);
-  const robe = REALM_ROBE[p.realm] || '#8a7f6e', dk = shadeHex(robe, 0.72), lt = shadeHex(robe, 1.18);
-  const sitting = p.pose === 'sit', moving = p.moving;
+  const robe = REALM_ROBE[p.realm] || '#8a7f6e', dk = sectShade(robe, 0.72), lt = sectShade(robe, 1.18);
+  const sitting = p.pose === 'sit' && !p.moving, moving = p.moving; // 走路时不能保持打坐姿势
   const bob = moving ? -Math.abs(Math.sin(G.time * 9 + p.id)) * 1.2 : 0;
   const f = p.face < 0 ? -1 : 1;
   drawShadow(ctx, x, y + 0.5, sitting ? 13 : 10, 0.85);
@@ -612,9 +702,9 @@ function drawCultivator(ctx, p) {
   // 头
   const hy = sitting ? -13.5 : -13.5;
   P(-2.5, hy, 5, 4.5, '#f2d0a9');
-  P(-3, hy - 1, 6, 2, p.hair || '#1a1c2c');
-  if (p.sex === 'f') { P(-3, hy, 1.2, 6, p.hair || '#1a1c2c'); P(1.8, hy, 1.2, 6, p.hair || '#1a1c2c'); P(-1, hy - 2.5, 2, 1.5, p.hair || '#1a1c2c'); }
-  else { P(-1.2, hy - 3, 2.4, 2, p.hair || '#1a1c2c'); P(-0.4, hy - 3.6, 0.8, 0.8, '#ffcd75'); }
+  P(-3, hy - 1, 6, 2, hairC);
+  if (p.sex === 'f') { P(-3, hy, 1.2, 6, hairC); P(1.8, hy, 1.2, 6, hairC); P(-1, hy - 2.5, 2, 1.5, hairC); }
+  else { P(-1.2, hy - 3, 2.4, 2, hairC); P(-0.4, hy - 3.6, 0.8, 0.8, '#ffcd75'); }
   P(f > 0 ? 0.5 : -1.5, hy + 2, 1, 1, '#1a1c2c'); // 眼
   if (p.head) { P(-3, hy - 2, 6, 1.2, '#ffcd75'); P(-0.6, hy - 4, 1.2, 2, '#ffcd75'); } // 掌门玉冠
   if (p.hurt > 0) { ctx.fillStyle = '#b13e53'; ctx.fillRect(x + 3, y + hy - 3 + bob, 2, 2); }

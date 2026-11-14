@@ -151,7 +151,7 @@ function setupInput(canvas) {
       G.buildMode = G.buildMode === type ? null : type;
       G.selected = null;
     } else if (key === ' ') {
-      G.speed = G.speed >= (G.def.maxSpeed || 3) ? 1 : G.speed + 1;
+      nextSpeed();
       e.preventDefault();
     } else if (key === 'n') {
       startNightEarly();

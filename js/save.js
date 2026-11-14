@@ -13,7 +13,9 @@ function saveInfo(mode) {
     if (!d) return null;
     const t = new Date(d.time);
     const pad = (n) => String(n).padStart(2, '0');
-    return { day: d.day, when: t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate()) + ' ' + pad(t.getHours()) + ':' + pad(t.getMinutes()) };
+    let dayText = '第 ' + d.day + ' 天';
+    if (d.extra && d.extra.sect) { const t = Math.floor(d.extra.sect.t || 0); dayText = d.extra.sect.name + ' · 第 ' + (Math.floor(t / 360) + 1) + ' 年 ' + (Math.floor((t % 360) / 30) + 1) + ' 月'; } // 修仙门派用宗门历法
+    return { day: d.day, dayText, when: t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate()) + ' ' + pad(t.getHours()) + ':' + pad(t.getMinutes()) };
   } catch (e) { return null; }
 }
 

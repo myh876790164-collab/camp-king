@@ -191,7 +191,7 @@ function drawUI(ctx) {
     x += step;
   }
   drawButton(ctx, sw - 48, 6, 40, 32, '‖', () => { G.state = 'paused'; }, { size: 16 });
-  drawButton(ctx, sw - 96, 6, 44, 32, '×' + G.speed, () => { G.speed = G.speed >= (G.def.maxSpeed || 3) ? 1 : G.speed + 1; });
+  drawButton(ctx, sw - 96, 6, 44, 32, '×' + G.speed, () => { nextSpeed(); });
 
   // ---- 昼夜 + 模式状态 ----
   let label;
@@ -375,22 +375,32 @@ function drawDialog(ctx) {
   ctx.fillStyle = 'rgba(10,10,30,0.6)';
   ctx.fillRect(0, 0, sw, sh);
   addButton(0, 0, sw, sh, null);
-  const pw = Math.min(420, sw - 24);
+  const pw = Math.min(460, sw - 24);
   const lines = wrapText(ctx, d.text, pw - 32, 14);
-  const ph = 70 + lines.length * 20 + d.options.length * 44;
+  // 选项文字太长时自动换行，按钮跟着变高
+  const opts = d.options.map((o) => { const ls = wrapText(ctx, o.label, pw - 52, 13); return { o, ls, h: Math.max(36, ls.length * 17 + 14) }; });
+  const bodyH = lines.length * 20 + 14 + opts.reduce((s, x) => s + x.h + 8, 0);
+  const ph = Math.min(sh - 16, 44 + bodyH + 8);
   const px = (sw - pw) / 2, py = (sh - ph) / 2;
   drawPanel(ctx, px, py, pw, ph);
   drawText(ctx, d.title, px + 16, py + 24, 16, '#ffcd75');
-  lines.forEach((ln, k) => drawText(ctx, ln, px + 16, py + 52 + k * 20, 14, '#f4f4f4', 'left', false));
-  let y = py + 62 + lines.length * 20;
-  for (const o of d.options) {
-    drawButton(ctx, px + 16, y, pw - 32, 36, o.label, o.disabled ? null : () => {
+  // 内容太高时可以拖动 / 滚轮查看
+  const top = py + 42, areaH = ph - 50;
+  const scroll = bodyH > areaH;
+  if (scroll) beginScroll(ctx, 'dialog', px + 8, top, pw - 20, areaH);
+  lines.forEach((ln, k) => drawText(ctx, ln, px + 16, top + 10 + k * 20, 14, '#f4f4f4', 'left', false));
+  let y = top + lines.length * 20 + 14;
+  for (const { o, ls, h } of opts) {
+    drawButton(ctx, px + 16, y, pw - 40, h, '', o.disabled ? null : () => {
       G.dialog = null;
       G.state = 'play';
+      if (G.scroll) G.scroll.dialog = 0;
       o.action();
-    }, { dim: o.disabled, size: 13 });
-    y += 44;
+    }, { dim: o.disabled });
+    ls.forEach((ln, k) => drawText(ctx, ln, px + 16 + (pw - 40) / 2, y + h / 2 + (k - (ls.length - 1) / 2) * 17, 13, o.disabled ? '#94b0c2' : '#f4f4f4', 'center'));
+    y += h + 8;
   }
+  if (scroll) endScroll(ctx, y);
 }
 
 function drawEndOverlay(ctx, win) {

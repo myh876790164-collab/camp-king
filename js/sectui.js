@@ -114,7 +114,8 @@ function sectViewList(c) {
     drawText(ctx, (p.head ? '【掌门】' : '') + p.name, c.x + 20, y + 15, 14, p.head ? '#ffcd75' : '#f4f4f4');
     ctx.font = 'bold 14px ' + FONT;
     const nx = c.x + 28 + ctx.measureText((p.head ? '【掌门】' : '') + p.name).width;
-    drawText(ctx, REALMS[p.realm] + '期 · ' + profText(p) + ' · ' + p.age + '/' + lifeMax(p) + '岁 · 战力 ' + personPower(p), nx, y + 15, 12, '#c8d6e5', 'left', false);
+    const lleft = lifeLeft(p);
+    drawText(ctx, REALMS[p.realm] + '期 · ' + profText(p) + ' · ' + p.age + '/' + lifeMax(p) + '岁 · 战力 ' + personPower(p), nx, y + 15, 12, lleft <= lifeMax(p) * 0.1 ? '#ef7d57' : '#c8d6e5', 'left', false);
     const did = p.dao || p.manual;
     drawText(ctx, daoShort(p), c.x + 20, y + 35, 12, did ? DAOS[did].color : '#566c86', 'left', false);
     drawText(ctx, progressText(p), c.x + 120, y + 35, 12, ready ? '#a7f070' : '#73eff7', 'left', false);
@@ -133,7 +134,7 @@ function sectViewRecruit(c) {
   cLine(c, '属性 1~10。根骨：寿元与战力；神识：修炼与突破；灵气：术法与灵力；魅力：机缘与人缘。天赋：选对应职业时战力、术法 +10%。', 12, '#94b0c2');
   if (!S.cands.length) { cLine(c, '今年没有人来拜师了。', 13); return; }
   for (const p of S.cands.slice()) {
-    const y = c.y, h = 96;
+    const y = c.y, h = 108;
     ctx.fillStyle = '#262b44'; ctx.fillRect(c.x, y, c.w, h);
     drawText(ctx, p.name + '　' + (p.sex === 'f' ? '女' : '男') + '，' + p.age + ' 岁　' + APT_TEXT[p.apt] + '（宜' + PROFS[p.apt].name + '）', c.x + 10, y + 14, 14, '#f4f4f4');
     let ax = c.x + 10;
@@ -145,6 +146,7 @@ function sectViewRecruit(c) {
     }
     const sum = p.bone + p.mind + p.qi + p.charm;
     drawText(ctx, sum >= 28 ? '资质：天纵奇才' : sum >= 24 ? '资质：上佳' : sum >= 19 ? '资质：中平' : '资质：愚钝', c.x + 10, y + 74, 12, sum >= 24 ? '#ffcd75' : '#94b0c2', 'left', false);
+    drawText(ctx, '性格：' + p.traits.map((t) => SECT_TRAITS[t].name + (c.w >= 480 ? '（' + SECT_TRAITS[t].desc + '）' : '')).join('　'), c.x + 10, y + 97, 11, '#c8d6e5', 'left', false);
     drawButton(ctx, c.x + c.w - 150, y + 58, 140, 32, '收入门下（灵石 ' + p.cost + '）', () => recruit(p), { color: '#1f5e3a', size: 12, dim: G.res.lingshi < p.cost || discipleCount() >= sectCapacity() });
     c.y += h + 8;
   }
@@ -158,13 +160,17 @@ function sectViewPerson(c, p) {
   drawText(ctx, (p.head ? '【掌门】' : '') + p.name, c.x, c.y + 10, 18, p.head ? '#ffcd75' : '#f4f4f4');
   c.y += 26;
   cLine(c, REALMS[p.realm] + '期 ' + profText(p) + '　' + (p.sex === 'f' ? '女' : '男') + '　' + p.age + ' 岁（寿元 ' + lifeMax(p) + '）' + (p.head ? '' : '　忠诚 ' + p.loy) + (p.mate ? '　道侣：' + ((sectPerson(p.mate) || {}).name || '') : ''), 13, '#c8d6e5');
-  cLine(c, '天赋：' + APT_TEXT[p.apt] + '（宜' + PROFS[p.apt].name + '）', 12, '#94b0c2');
+  cLine(c, '天赋：' + APT_TEXT[p.apt] + '（宜' + PROFS[p.apt].name + '）　性格：' + (p.traits || []).map((t) => SECT_TRAITS[t].name + '（' + SECT_TRAITS[t].desc + '）').join('；'), 12, '#94b0c2');
   for (const k of ['bone', 'mind', 'qi', 'charm']) {
     const [nm, col, f] = ATTR_INFO[k];
     drawText(ctx, nm + ' ' + p[k], c.x, c.y + 8, 13, col);
     pips(ctx, c.x + 62, c.y + 4, p[k], col);
     if (c.w >= 480) { drawText(ctx, f(p), c.x + 160, c.y + 8, 12, '#94b0c2', 'left', false); c.y += 22; }
     else { c.y += 18; cLine(c, f(p), 11, '#94b0c2', false, 8); } // 手机：说明换到下一行
+  }
+  {
+    const lm = lifeMax(p), left = lm - p.age, lf = sumFx(p, 'life');
+    cLine(c, '寿元 ' + p.age + '/' + lm + ' 岁（还剩 ' + left + ' 年）　＝（先天 ' + (50 + p.bone * 3) + ' + 突破延寿 ' + Math.round(p.lifeGain || 0) + '）' + (lf ? '×' + (1 + lf).toFixed(2) + '（道途/功法/性格）' : '') + (p.lifeBonus ? ' ' + (p.lifeBonus > 0 ? '+' : '') + Math.round(p.lifeBonus) + '（丹药、天材地宝、折寿）' : ''), 12, left <= lm * 0.1 ? '#ef7d57' : '#c8d6e5');
   }
   cLine(c, '战力 ' + personPower(p) + '　术法 ' + spellPower(p) + '　灵力 ' + manaMax(p) + '　修炼速度 ×' + cultSpeed(p).toFixed(2) + (p.realm < REALM_CAP ? '　突破几率 ' + Math.round(breakChance(p) * 100) + '%' : ''), 13, '#f4f4f4', true);
   const bufs = [];
@@ -184,6 +190,7 @@ function sectViewPerson(c, p) {
   cLine(c, n.title + '：' + n.text, 12, '#c8d6e5');
   if (p.realm < REALM_CAP) cBar(c, n.v, n.max, n.ready ? '#a7f070' : '#41a6f6', p.realm === 1 ? '已服真气 ' + p.qiTaken + '/3' : Math.floor(n.v) + '/' + n.max);
   if (n.extra) cLine(c, n.extra, 12, '#94b0c2');
+  if (p.realm < REALM_CAP) cLine(c, '突破成功预计延寿约 ' + expectedLifeGain(p) + ' 年（基准 ' + REALM_LIFE_GAIN[p.realm + 1] + ' 年 × 道途精纯 × 机缘' + (p.fails ? '；已失败 ' + p.fails + ' 次，延寿 ×' + breakLifeFactor(p).tries.toFixed(2) : '') + '）', 12, '#a7f070');
   if (p.realm >= 3) cLine(c, '金丹：' + danName(p.dan) + (p.sht ? '　神通：「' + p.sht + '」（' + ST_EFFECT[p.prof || 'none'] + '）' : ''), 12, '#ffcd75');
   if (p.realm < REALM_CAP && !p.away) cButtons(c, [{ label: '冲击' + REALMS[p.realm + 1] + '（' + Math.round(breakChance(p) * 100) + '%）', dim: !n.ready, color: '#b13e53', onClick: () => askConfirm('让 ' + p.name + ' 冲击' + REALMS[p.realm + 1] + '？成功率 ' + Math.round(breakChance(p) * 100) + '%，失败会受伤、修为倒退。', () => attemptBreak(p)) }], 34);
   if ((p.realm === 1 || p.realm === 2) && !p.away) {
@@ -217,6 +224,17 @@ function sectViewPerson(c, p) {
   if (!p.dao && S.manuals.length) {
     cLine(c, '可修习的功法（服下第一缕真气后就不能再换）：', 12, '#94b0c2');
     cButtons(c, S.manuals.map((id) => ({ label: (p.manual === id ? '✔ ' : '') + DAOS[id].gf.name + '·' + DAOS[id].name, active: p.manual === id, onClick: () => learnManual(p, id) })));
+  }
+
+  // 道途技能
+  if (did) {
+    cHead(c, '道途技能（' + DAOS[did].name + '）');
+    cLine(c, '定道后随境界逐个领悟：筑基、炼气、金丹、化神、元婴各一个。战斗时自动挑最合适的两个战斗技能施展，护体类技能一直生效；辅助技能常驻生效。', 11, '#94b0c2');
+    for (const s of DAO_SKILLS[did]) {
+      const on = p.dao && p.realm >= s.tier;
+      cLine(c, (on ? '✔ ' : '○ ') + '【' + (s.kind === 'c' ? '战' : '辅') + '】' + s.n + '　' + (on ? '' : '（' + REALMS[s.tier] + '期领悟）'), 13, on ? (s.kind === 'c' ? '#ef7d57' : '#a7f070') : '#566c86', true);
+      cLine(c, s.desc, 11, on ? '#c8d6e5' : '#566c86', false, 14);
+    }
   }
 
   // 职业
@@ -262,12 +280,14 @@ function sectViewPerson(c, p) {
   cHead(c, '丹药 · 符箓 · 法器');
   cLine(c, '物品都带道途属性：同道途 100%，同属性 85%，同气 70%，相生 60%，无关 50%，相克 30%（无属性物品 60%）。', 11, '#94b0c2');
   const pills = Object.keys(S.items).filter((k) => S.items[k] > 0);
-  if (pills.length && !p.away) cButtons(c, pills.map((k) => { const s = splitKey(k); return { label: '服' + itemName(s.id, s.dao, PILLS) + '×' + S.items[k] + '（' + factorText(itemFactor(p, s.dao), s.dao, p) + '）', color: '#1f5e3a', onClick: () => usePill(p, k) }; }));
+  if (pills.length && !p.away) cButtons(c, pills.map((k) => { const s = splitKey(k); return { label: '服' + sectItemName(s.id, s.dao, PILLS) + '×' + S.items[k] + '（' + factorText(itemFactor(p, s.dao), s.dao, p) + '）', color: '#1f5e3a', onClick: () => usePill(p, k) }; }));
   else cLine(c, '没有可用的丹药（在炼丹峰炼制）。', 12, '#566c86');
   const jl = Object.keys(S.talis).filter((k) => S.talis[k] > 0 && splitKey(k).id === 'juling');
-  if (jl.length && !p.away) cButtons(c, jl.map((k) => { const s = splitKey(k); return { label: '贴' + itemName('juling', s.dao, TALIS) + '×' + S.talis[k] + '（×' + talisK(p, s.dao).toFixed(2) + '）', color: '#29366f', onClick: () => useJuling(p, k) }; }));
+  if (jl.length && !p.away) cButtons(c, jl.map((k) => { const s = splitKey(k); return { label: '贴' + sectItemName('juling', s.dao, TALIS) + '×' + S.talis[k] + '（×' + talisK(p, s.dao).toFixed(2) + '）', color: '#29366f', onClick: () => useJuling(p, k) }; }));
   const tg = Object.keys(S.talis).filter((k) => S.talis[k] > 0 && splitKey(k).id !== 'juling');
-  if (tg.length) cLine(c, '攻伐符、护身符在战斗时自动挑最契合的使用。宗门现有：' + tg.map((k) => { const s = splitKey(k); return itemName(s.id, s.dao, TALIS) + '×' + S.talis[k]; }).join('、'), 11, '#c8d6e5');
+  if (tg.length) cLine(c, '攻伐符、护身符在战斗时自动挑最契合的使用。宗门现有：' + tg.map((k) => { const s = splitKey(k); return sectItemName(s.id, s.dao, TALIS) + '×' + S.talis[k]; }).join('、'), 11, '#c8d6e5');
+  const trs = Object.keys(S.treasures || {}).filter((k) => S.treasures[k] > 0 && !TREASURES[k].auto);
+  if (trs.length && !p.away) { cLine(c, '天材地宝（给这位弟子用）：', 12, '#ffcd75'); cButtons(c, trs.map((k) => ({ label: TREASURES[k].name + '×' + S.treasures[k], color: '#5d275d', onClick: () => askConfirm('把「' + TREASURES[k].name + '」给 ' + p.name + ' 用吗？\n' + TREASURES[k].desc, () => useTreasure(p, k)) }))); }
   cLine(c, '法器：' + (p.weapon ? '「' + p.weapon.name + '」' + (p.weapon.dao ? DAOS[p.weapon.dao].name + '属 ' : '') + '基础 +' + p.weapon.power + ' → 实际 +' + weaponPower(p) : '无'), 12, '#c8d6e5');
   if (S.weapons.length && !p.away) cButtons(c, S.weapons.map((w, i) => ({ label: '祭炼「' + w.name + '」' + (w.dao ? DAOS[w.dao].name : '无属') + ' +' + Math.round(w.power * itemFactor(p, w.dao)), onClick: () => equipWeapon(p, i) })));
   // 人际
@@ -309,12 +329,12 @@ function sectViewPeak(c, id) {
     const lead = leadCrafter(task);
     cLine(c, '成品会带上主' + word[3] + '弟子的道途属性' + (lead ? '：现在由 ' + lead.name + '（' + (lead.dao ? DAOS[lead.dao].name : '无道途 → 无属性') + '）主' + word[3] : '（主' + word[3] + '弟子要先到场）'), 12, '#94b0c2');
     if (job) {
-      cLine(c, '正在制作「' + itemName(job.id, job.dao, book) + '」', 13, '#ffcd75', true);
+      cLine(c, '正在制作「' + sectItemName(job.id, job.dao, book) + '」', 13, '#ffcd75', true);
       cBar(c, job.work, job.days, '#ef7d57', Math.floor(job.work) + '/' + job.days + ' 工');
     } else {
       cLine(c, '选择' + word[2] + '开工（材料立即扣除，弟子每天出工推进进度）：', 12, '#94b0c2');
       for (const k in book) {
-        const r = book[k], locked = r.lv && S.peaks.lianqi.lv < r.lv, ok = canAfford(r.cost) && !locked;
+        const r = book[k], locked = r.lv && S.peaks[id].lv < r.lv, ok = canAfford(r.cost) && !locked;
         const y = c.y;
         drawButton(ctx, c.x, y, c.w, 46, '', () => startJob(id, k), { dim: !ok, color: '#333c57' });
         drawText(ctx, r.name, c.x + 10, y + 14, 13, ok ? '#ffcd75' : '#94b0c2');
@@ -349,6 +369,7 @@ function sectViewLibrary(c) {
       cLine(c, d.concept, 12, '#c8d6e5', false, 12);
       cLine(c, '道途特性：' + d.path.text + '；功法特性：' + d.gf.text, 12, '#f4f4f4', false, 12);
       cLine(c, '采气：' + d.how + '（今日 ×' + (+d.rate().toFixed(2)) + '）', 12, d.color, false, 12);
+      cLine(c, '技能：' + DAO_SKILLS[id].map((s) => '【' + (s.kind === 'c' ? '战' : '辅') + '】' + s.n).join(' → '), 12, '#ffcd75', false, 12);
       cLine(c, '修习者：' + (who.length ? who.join('、') : '无'), 11, '#94b0c2', false, 12);
       c.y += 4;
     }
@@ -360,6 +381,7 @@ function sectViewLibrary(c) {
         const d = DAOS[id], have = S.manuals.includes(id);
         cLine(c, d.name + '（' + d.src + (d.qiEl ? '·六气属' + EL[d.qiEl].name : '') + '）' + '◆'.repeat(d.rare) + (have ? '　【本门已有】' : '') + '　' + d.concept, 12, have ? d.color : '#c8d6e5');
         cLine(c, '道途：' + d.path.text + '｜' + d.gf.name + '：' + d.gf.text, 11, '#94b0c2', false, 12);
+        cLine(c, '技能：' + DAO_SKILLS[id].map((s) => (s.kind === 'c' ? '⚔' : '✚') + s.n).join('　'), 11, '#c8a86a', false, 12);
       }
     }
   } else if (ui.sub === 'store') {
@@ -378,8 +400,12 @@ function sectViewLibrary(c) {
       cHead(c, title);
       const ks2 = Object.keys(store).filter((k) => store[k] > 0);
       if (!ks2.length) cLine(c, '暂无。', 12, '#566c86');
-      for (const k of ks2) { const s = splitKey(k); cLine(c, itemName(s.id, s.dao, book) + ' × ' + store[k] + '　— ' + book[s.id].desc, 12, s.dao ? DAOS[s.dao].color : '#c8d6e5'); }
+      for (const k of ks2) { const s = splitKey(k); cLine(c, sectItemName(s.id, s.dao, book) + ' × ' + store[k] + '　— ' + book[s.id].desc, 12, s.dao ? DAOS[s.dao].color : '#c8d6e5'); }
     };
+    cHead(c, '天材地宝');
+    const tk = Object.keys(S.treasures || {}).filter((k) => S.treasures[k] > 0);
+    if (!tk.length) cLine(c, '暂无（来自奇遇、历练、拍卖会、天象、仙人遗府）', 12, '#566c86');
+    for (const k of tk) cLine(c, TREASURES[k].name + ' × ' + S.treasures[k] + '　— ' + TREASURES[k].desc + (TREASURES[k].auto ? '（自动生效）' : '（在人物面板使用）'), 12, '#ffcd75');
     list(S.items, PILLS, '丹药');
     list(S.talis, TALIS, '符箓');
     cHead(c, '法器');
@@ -500,6 +526,7 @@ function drawSectWorld(ctx) {
     ctx.fillStyle = 'rgba(160,230,255,' + (0.5 * Math.sin(ph * Math.PI)) + ')';
     ctx.fillRect((SPRING_C[0] + Math.cos(a) * 1.6) * T, (SPRING_C[1] + Math.sin(a) * 1.2) * T - ph * 14, 1.5, 1.5);
   }
+  drawSectScenery(ctx, t);
   // 山峰名字
   for (const k in PEAKS) {
     const P = PEAKS[k], [hx, hy, hw] = P.hall;
@@ -518,7 +545,9 @@ function drawSectWorld(ctx) {
       ctx.beginPath(); ctx.arc(bx + 3 * (p.face < 0 ? -1 : 1), by - 4.5, 1.8, 0, 7); ctx.fill();
       ctx.fillStyle = '#1a1c2c'; ctx.fillRect(bx + 3.5 * (p.face < 0 ? -1 : 1), by - 5, 0.8, 0.8);
     }
+    if (p.dao && !p.moving && p.at === taskLoc(p) && (p.task === 'cult' || p.task === 'study' || p.task === 'gather' || p.hurt > 0)) drawDaoAura(ctx, p);
     drawCultivator(ctx, p);
+    if (p.say && G.cam.zoom >= 1.8) drawSayBubble(ctx, p);
     if (p.task === 'gather' && p.at === taskLoc(p) && p.manual && DAOS[p.manual].rate() > 0) {
       const col = DAOS[p.manual].color;
       for (let k = 0; k < 4; k++) {
@@ -534,6 +563,88 @@ function drawSectWorld(ctx) {
   }
 }
 
+// 会动的景物：瀑布、旗幡、梅花（随季节）、香炉烟
+function drawSectScenery(ctx, t) {
+  const [sx, sy] = SECT_STREAM[0];
+  for (let i = 0; i < 10; i++) { // 瀑布水流
+    const ph = (t * 1.6 + i / 10) % 1, x = (0.5 + (i % 5) * 0.3) * T;
+    ctx.fillStyle = 'rgba(255,255,255,' + (0.6 * (1 - ph)) + ')';
+    ctx.fillRect(x, (sy - 1) * T + ph * T * 1.5, 1, 4);
+  }
+  for (let i = 0; i < 5; i++) { const ph = (t * 0.8 + i / 5) % 1; ctx.fillStyle = 'rgba(230,245,255,' + (0.5 * (1 - ph)) + ')'; ctx.beginPath(); ctx.arc(sx * T + Math.sin(i * 2) * 5, (sy + 0.6) * T - ph * 6, 1.5 + ph * 2, 0, 7); ctx.fill(); }
+  // 旗幡：每座殿前两面
+  const sectCol = '#b13e53';
+  for (const k in PEAKS) {
+    const [hx, hy, hw, hh] = PEAKS[k].hall;
+    for (const fx of [hx - 0.6, hx + hw + 0.3]) {
+      const px = fx * T, py = (hy + hh + 0.6) * T;
+      ctx.fillStyle = '#5a3e28'; ctx.fillRect(px, py - 22, 1.2, 22);
+      ctx.fillStyle = '#c9a23a'; ctx.fillRect(px - 0.5, py - 23, 2.2, 1.5);
+      ctx.fillStyle = sectCol; ctx.beginPath(); ctx.moveTo(px + 1.2, py - 21);
+      for (let i = 0; i <= 6; i++) ctx.lineTo(px + 1.2 + i * 1.3, py - 21 + Math.sin(t * 4 + i * 0.8 + hx) * 0.8);
+      for (let i = 6; i >= 0; i--) ctx.lineTo(px + 1.2 + i * 1.3, py - 12 + Math.sin(t * 4 + i * 0.8 + hx) * 0.8 + i * 0.3);
+      ctx.fill();
+      ctx.fillStyle = '#ffcd75'; ctx.fillRect(px + 4, py - 18 + Math.sin(t * 4 + 2.4 + hx) * 0.8, 2, 2);
+    }
+  }
+  // 梅花 / 桃花：冬季红梅、春季粉花、夏季绿叶、秋季黄叶
+  const s = sectSeason(), m = sectCal().month;
+  const col = (m === 12 || m === 1 || m === 11) ? '#e0405a' : s === 0 ? '#f7a8c8' : s === 1 ? '#5fa04a' : '#e0a040';
+  for (const d of G.sectDecor || []) {
+    if (d.kind === 'plum') {
+      const [x0, y0] = d.rect, bx = x0 * T, by = y0 * T;
+      for (let i = 0; i < 14; i++) { const a = i * 2.4, r = 3 + (i % 4) * 1.6; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(bx + 8 + Math.cos(a) * r, by + 4 + Math.sin(a) * r * 0.7, 1.1, 0, 7); ctx.fill(); }
+      if (s === 0 || m === 12 || m === 1) for (let i = 0; i < 3; i++) { const ph = (t * 0.3 + i / 3 + x0) % 1; ctx.fillStyle = col; ctx.fillRect(bx + 8 + Math.sin(i * 2 + t) * 8, by + 4 + ph * 14, 1, 1); }
+    } else if (d.kind === 'censer') {
+      const [x0, y0] = d.rect;
+      for (let i = 0; i < 4; i++) { const ph = (t * 0.4 + i / 4) % 1; ctx.fillStyle = 'rgba(230,230,240,' + (0.4 * (1 - ph)) + ')'; ctx.beginPath(); ctx.arc((x0 + 0.5) * T + Math.sin(t + i * 1.7) * 2 * ph, y0 * T - ph * 12, 0.8 + ph * 2, 0, 7); ctx.fill(); }
+    }
+  }
+}
+// ---------- 弟子说话（头顶气泡） ----------
+const SAY_TASK = {
+  cult: ['气沉丹田……', '今日灵气格外充沛', '就差一线了……', '心如止水，心如止水', '这周天总算转通了'],
+  gather: ['这一缕真气好难采', '时机未到，再等等', '来了来了！', '采气讲究天时地利'],
+  train: ['看招！', '再来一回合！', '好俊的身手！', '我这招叫什么来着', '承让承让'],
+  alchemy: ['火候要稳……', '好香的丹气', '千万别炸炉啊', '再添一株灵草'],
+  forge: ['叮！叮！叮！', '这块玄铁成色不错', '淬火！', '剑胚成了'],
+  fu: ['一笔成符，不可断', '朱砂快用完了', '这道符画歪了……'],
+  study: ['原来如此！', '这句经文何解……', '藏经阁的书真多', '嗯……似懂非懂'],
+  labor: ['这株灵草长得真好', '嘿哟——', '今天砍了好多灵松', '矿洞里好黑'],
+};
+const SAY_TRAIT = {
+  lansan: ['好困……', '偷个懒应该没人发现吧'], haozhan: ['谁来跟我打一场！'], tancai: ['灵石啊灵石', '月俸怎么还不发'],
+  haoshuang: ['哈哈哈，今晚喝酒！'], gupi: ['……'], qinfen: ['再练一个时辰'], jiaozao: ['怎么还不突破！'], fuyuan: ['今天运气不错'],
+};
+function sectChatter(dt) {
+  const S = G.sect, w = S.weather;
+  for (const p of S.people) {
+    if (p.away) continue;
+    if (p.say) { p.say.t -= dt; if (p.say.t <= 0) p.say = null; continue; }
+    if (Math.random() > dt * 0.035) continue;
+    let pool = SAY_TASK[p.task] || SAY_TASK.cult;
+    if (p.hurt > 0) pool = ['哎哟……', '伤口还在疼', '得好好养伤了'];
+    else if (Math.random() < 0.3) {
+      const tr = (p.traits || []).find((t) => SAY_TRAIT[t]);
+      if (tr) pool = SAY_TRAIT[tr];
+      else if (w === 'rain' || w === 'storm') pool = ['下雨了，快收药草！', '这雨下得真大'];
+      else if (w === 'snow') pool = ['好冷……', '瑞雪兆丰年'];
+      else if (fullMoon()) pool = ['今夜月色真美'];
+      else if (p.mate && sectPerson(p.mate)) pool = ['不知' + sectPerson(p.mate).name + '在做什么'];
+    }
+    p.say = { text: pick(pool), t: 3.5 };
+  }
+}
+function drawSayBubble(ctx, p) {
+  const z = G.cam.zoom, fs = 11 / z, a = Math.min(1, p.say.t * 2);
+  ctx.font = fs + 'px ' + FONT;
+  const w = ctx.measureText(p.say.text).width + 8 / z, h = fs + 6 / z, x = p.x - w / 2, y = p.y - 30 - h - (p.realm < REALM_CAP && realmNeed(p).ready ? 10 : 0);
+  ctx.globalAlpha = a;
+  ctx.fillStyle = 'rgba(244,244,244,0.92)'; ctx.fillRect(x, y, w, h);
+  ctx.beginPath(); ctx.moveTo(p.x - 2 / z * 2, y + h); ctx.lineTo(p.x, y + h + 4 / z * 2); ctx.lineTo(p.x + 2 / z * 2, y + h); ctx.fill();
+  ctx.fillStyle = '#1a1c2c'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(p.say.text, p.x, y + h / 2 + 0.5 / z);
+  ctx.globalAlpha = 1;
+}
 // ---------- 屏幕层：云雾、仙鹤、雨雪落花、雷光 ----------
 function sectAmbient(dt) {
   const F = G.sectFx || (G.sectFx = { parts: [], clouds: [], cranes: [], flash: 0 });
@@ -554,6 +665,7 @@ function sectAmbient(dt) {
   if (Math.random() < dt * 0.02 && F.cranes.length < 1) F.cranes.push({ x: -0.1, y: rand(0.15, 0.5), v: rand(0.04, 0.07), n: randInt(3, 5) });
   for (const c of F.cranes) c.x += c.v * dt;
   F.cranes = F.cranes.filter((c) => c.x < 1.2);
+  if (F.meteor) { F.meteor.t += dt; if (F.meteor.t > 2.5) F.meteor = null; }
 }
 function drawSectScreen(ctx) {
   const F = G.sectFx;
@@ -575,6 +687,13 @@ function drawSectScreen(ctx) {
   }
   if (w === 'rain' || w === 'storm') { ctx.fillStyle = 'rgba(20,30,60,0.18)'; ctx.fillRect(0, 0, sw, sh); }
   if (F.flash > 0) { ctx.fillStyle = 'rgba(230,220,255,' + F.flash + ')'; ctx.fillRect(0, 0, sw, sh); }
+  if (F.meteor) { // 流星坠地
+    const k = Math.min(1, F.meteor.t / 1.6), mx = sw * (0.85 - 0.6 * k), my = sh * (0.05 + 0.6 * k);
+    const g = ctx.createLinearGradient(mx, my, mx + 120, my - 90); g.addColorStop(0, 'rgba(255,240,200,0.95)'); g.addColorStop(1, 'rgba(255,160,80,0)');
+    ctx.strokeStyle = g; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx + 120, my - 90); ctx.stroke();
+    ctx.fillStyle = '#fff6c0'; ctx.beginPath(); ctx.arc(mx, my, 5, 0, 7); ctx.fill();
+    if (F.meteor.t > 1.6) { ctx.fillStyle = 'rgba(255,220,160,' + (1 - (F.meteor.t - 1.6) / 0.9) * 0.5 + ')'; ctx.fillRect(0, 0, sw, sh); }
+  }
   for (const c of F.cranes) {
     for (let k = 0; k < c.n; k++) {
       const x = c.x * sw - k * 22, y = c.y * sh + Math.abs(k - (c.n - 1) / 2) * 12, fl = Math.sin(G.time * 6 + k) * 4;

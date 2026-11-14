@@ -103,7 +103,8 @@ function drawModeSelect(ctx) {
   const y0 = Math.max(64, (sh - totalH) / 2 + 20);
   MODE_ORDER.forEach((id, i) => {
     const m = MODES[id];
-    const x = x0 + (i % cols) * (cw + gap), y = y0 + Math.floor(i / cols) * (ch + gap);
+    const lastAlone = cols === 2 && i === MODE_ORDER.length - 1 && MODE_ORDER.length % 2 === 1; // 最后一张单独一行时居中
+    const x = lastAlone ? (sw - cw) / 2 : x0 + (i % cols) * (cw + gap), y = y0 + Math.floor(i / cols) * (ch + gap);
     // 丧尸模式先选初始营地
     const go = () => (id === 'zombie' ? gotoScene('zcamp') : startGame(id));
     drawButton(ctx, x, y, cw, ch, '', () => {
@@ -139,7 +140,7 @@ function drawLoadScreen(ctx) {
     ctx.drawImage(SPR[MODES[id].icon].img, px + 10, y + 12, 40, 40);
     drawText(ctx, MODES[id].name, px + 60, y + 20, 15, '#ffcd75');
     if (info) {
-      drawText(ctx, '第 ' + info.day + ' 天 · ' + info.when, px + 60, y + 44, 12, '#c8d6e5', 'left', false);
+      drawText(ctx, (info.dayText || '第 ' + info.day + ' 天') + ' · ' + info.when, px + 60, y + 44, 12, '#c8d6e5', 'left', false);
       drawButton(ctx, px + pw - 140, y + 14, 70, 36, '读取', () => loadGame(id), { color: '#1f5e3a', size: 13 });
       drawButton(ctx, px + pw - 64, y + 14, 54, 36, '删除', () => askConfirm('确定删除「' + MODES[id].name + '」的存档吗？删除后无法恢复。', () => deleteSave(id)), { color: '#5d275d', size: 12 });
     } else {

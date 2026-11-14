@@ -8,14 +8,16 @@
 //    金丹：参悟、演武、顿悟来「体悟神妙」，悟性圆满时诞生神通（由道途 × 职业决定），再冲击化神
 //    化神：以神通为元神、金丹为胚胎，孕育元婴；孕婴圆满后冲击元婴
 //  道途越精纯，突破越容易、突破后提升越大；丹药、符箓、法器都带道途属性，同道途 / 同属性效果最好
-//  时间：1 天 = 1 秒（×1 速度），1 月 = 30 天，1 年 = 12 月（百日筑基 ≈ 100 秒）
+//  时间：1 年 = 1 分钟（×1 速度），1 月 = 5 秒，百日筑基 ≈ 17 秒
+//  寿元：突破时延寿（筑基 50、炼气 100、金丹 300、化神 500、元婴 1000 为基准），
+//        实际延寿 × 道途精纯 × 突破时的机缘 × 尝试次数（失败越多收益越少）；部分道途、丹药、天材地宝也能延寿
 // =============================================
-const SECT_DAY = 1;
+const SECT_DAY = 60 / 360; // 1 年 = 60 秒（×1 速度），1 天 = 1/6 秒
 const SECT_VER = 2; // 存档里的道途体系版本（旧存档读入时自动转换）
 const REALMS = ['凡人', '筑基', '炼气', '金丹', '化神', '元婴', '炼虚', '合道'];
 const REALM_CAP = 5; // 元婴以上暂未开放
 const REALM_MUL = [1, 3, 6, 15, 40, 100];
-const REALM_LIFE = [0, 30, 60, 200, 500, 1000];
+const REALM_LIFE_GAIN = [0, 50, 100, 300, 500, 1000]; // 每次突破的基准延寿（年）
 const STIPEND = [1, 2, 3, 6, 12, 24];
 const REALM_FAME = [0, 2, 5, 12, 25, 50];
 const MONTH_CN = ['正月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '冬月', '腊月'];
@@ -43,7 +45,25 @@ const PILLS = {
   liaoshang: { name: '疗伤丹', cost: { herb: 8 }, days: 10, desc: '治好伤势（契合度越高越彻底）' },
   ningshen: { name: '凝神丹', cost: { herb: 25 }, days: 40, desc: '金丹期悟性 +15；其他境界当前修炼进度 +10' },
   pojing: { name: '破境丹', cost: { herb: 30, lingshi: 20 }, days: 45, desc: '下次突破（筑基以上）成功率 +15%' },
-  yanshou: { name: '延寿丹', cost: { herb: 50, lingshi: 60 }, days: 90, desc: '寿元 +10 年（每人最多服用 2 颗）' },
+  yanshou: { name: '延寿丹', cost: { herb: 50, lingshi: 60 }, days: 90, desc: '寿元 +20 年（按契合度打折；每人最多服用 3 颗）' },
+  changsheng: { name: '长生丹', cost: { herb: 150, lingshi: 200 }, days: 180, lv: 3, desc: '寿元 +80 年（按契合度打折；每人一生只能服 1 颗；炼丹峰 3 级解锁）' },
+  dingshen: { name: '定神丹', cost: { herb: 35, lingshi: 25 }, days: 45, desc: '下次突破若失败，损失减少 60%' },
+  xisui: { name: '洗髓丹', cost: { herb: 45, lingshi: 50 }, days: 60, attr: 'bone', desc: '根骨 +1（按契合度几率吸收；每人最多 3 颗属性丹）' },
+  kaizhi: { name: '开智丹', cost: { herb: 45, lingshi: 50 }, days: 60, attr: 'mind', desc: '神识 +1（按契合度几率吸收；每人最多 3 颗属性丹）' },
+  yangling: { name: '养灵丹', cost: { herb: 45, lingshi: 50 }, days: 60, attr: 'qi', desc: '灵气 +1（按契合度几率吸收；每人最多 3 颗属性丹）' },
+  zhuyan: { name: '驻颜丹', cost: { herb: 40, lingshi: 40 }, days: 50, attr: 'charm', desc: '魅力 +1（按契合度几率吸收；每人最多 3 颗属性丹）' },
+};
+// 天材地宝：只能从机缘、历练、拍卖、天象中得到
+const TREASURES = {
+  lingzhi: { name: '千年灵芝', desc: '寿元 +30 年' },
+  shouguo: { name: '万年寿果', desc: '寿元 +100 年（极其罕见）' },
+  daoyuan: { name: '道源灵晶', desc: '洗去杂气：本命道途印记 +4，精纯度大增' },
+  huanhun: { name: '九转还魂草', desc: '宗门持有时，弟子遭遇陨落会自动用掉一株救回（重伤 120 天）', auto: true },
+  yuntie: { name: '天外陨铁', desc: '交给器修或自己祭炼：直接炼出一件战力 150~300、带使用者道途的灵宝' },
+  shoudan: { name: '灵兽蛋', desc: '孵出一只灵兽（任何职业都能养，御兽更强）' },
+  wudao: { name: '悟道茶', desc: '当前境界修炼进度 +15（金丹期悟性 +25）' },
+  tianyuan: { name: '天元果', desc: '随机一项属性 +1（不占属性丹名额）' },
+  leiyin: { name: '雷劫余烬', desc: '下次突破成功率 +20%' },
 };
 const FORGE = {
   faqi: { name: '法器', cost: { ore: 15, lingshi: 10 }, days: 30, power: [20, 60], desc: '战力 +20~60' },
@@ -53,13 +73,15 @@ const TALIS = {
   gong: { name: '攻伐符', cost: { herb: 6, lingshi: 8 }, days: 15, desc: '战斗时自动使用：战力 +40%' },
   hu: { name: '护身符', cost: { herb: 8, lingshi: 10 }, days: 20, desc: '战败时自动使用：免于受伤和陨落' },
   juling: { name: '聚灵符', cost: { herb: 10, lingshi: 15 }, days: 25, desc: '贴身佩戴：60 天内修炼速度 +30%' },
+  lei: { name: '天雷符', cost: { herb: 10, lingshi: 18 }, days: 25, desc: '战斗时自动使用：战力 +25%，对阴属敌人 +60%' },
+  dun: { name: '遁地符', cost: { herb: 8, lingshi: 12 }, days: 20, desc: '历练中战败时自动使用：遁地逃生，不会陨落，伤势减半' },
 };
 const WEAPON_NAMES = ['青锋剑', '赤炎扇', '玄铁印', '碧玉笛', '紫金葫芦', '寒霜刃', '流云袖', '镇山尺', '落星锤', '缚龙索', '照胆镜', '惊鸿伞'];
 const WEAPON_NOUN = ['剑', '刃', '印', '扇', '铃', '镜', '珠', '旗', '葫芦', '尺', '环', '钟'];
 function weaponName(dao) { return dao && DAOS[dao] ? pick(DAOS[dao].img) + pick(WEAPON_NOUN) : pick(WEAPON_NAMES); }
 function itemKey(id, dao) { return id + '|' + (dao || ''); }
 function splitKey(k) { const [id, dao] = k.split('|'); return { id, dao: dao || null }; }
-function itemName(id, dao, book) { return (dao ? DAOS[dao].name + '·' : '') + book[id].name; }
+function sectItemName(id, dao, book) { return (dao ? DAOS[dao].name + '·' : '') + book[id].name; }
 
 // ---------- 差事 ----------
 const TASKS = {
@@ -115,17 +137,27 @@ function makePerson(o) {
   const p = {
     id: sectPid++, name: o.name || randName(sex), sex, age: o.age || randInt(10, 18),
     bone: rollAttr(mean), mind: rollAttr(mean), qi: rollAttr(mean), charm: rollAttr(mean),
-    realm: o.realm || 0, task: 'cult', manual: null, dao: null, sht: null, prof: null, apt: pick(PROF_IDS), mix: {}, gain: 0, beast: null,
+    realm: o.realm || 0, task: 'cult', manual: null, dao: null, sht: null, prof: null, apt: pick(PROF_IDS), mix: {}, gain: 0, beast: null, traits: rollSectTraits(),
     zj: 0, base: 0, qiTaken: 0, refine: 0, dan: 0, wu: 0, ying: 0, qiAcc: 0, comeback: 0,
     weapon: null, exp: 0, hurt: 0, loy: 70, rel: {}, mate: null, log: [],
     lifeBonus: 0, yanshou: 0, buf: { peiyuan: 0, zhuji: 0, pojing: 0, juling: 0 },
     hair: pick(HAIRS), sash: pick(SASHES), head: false,
     x: 0, y: 0, route: [], loc: null, at: null, from: 'gate', moving: false, face: 1, wt: 0, away: 0, travel: null,
   };
+  p.lifeGain = REALM_LIFE_GAIN.slice(1, p.realm + 1).reduce((s, v) => s + Math.round(v * rand(0.7, 1)), 0); // 散修投奔时已有的境界
   if (o.head) { p.head = true; p.bone = Math.max(p.bone, 6); p.mind = Math.max(p.mind, 6); p.charm = Math.max(p.charm, 5); }
   return p;
 }
-function lifeMax(p) { return Math.round((50 + p.bone * 3 + REALM_LIFE[p.realm]) * Math.max(0.5, 1 + sumFx(p, 'life')) + p.lifeBonus); }
+// 寿元上限 = (先天寿元 + 历次突破延寿) × 道途/功法/性格的寿元加成 + 丹药天材地宝
+function lifeMax(p) { return Math.round((50 + p.bone * 3 + (p.lifeGain || 0)) * Math.max(0.5, 1 + sumFx(p, 'life')) + p.lifeBonus); }
+function lifeLeft(p) { return lifeMax(p) - p.age; }
+// 突破延寿：基准 × 道途精纯 × 机缘 × 尝试次数
+function breakLifeFactor(p) { return { pur: p.dao ? 0.6 + 0.6 * daoPurity(p) : 0.9, tries: Math.max(0.4, Math.pow(0.8, p.fails || 0)) }; }
+function expectedLifeGain(p) { if (p.realm >= REALM_CAP) return 0; const f = breakLifeFactor(p); return Math.round(REALM_LIFE_GAIN[p.realm + 1] * f.pur * f.tries * (1 + sumFx(p, 'life'))); }
+function rollBreakLuck(p) {
+  const v = rand(0.8, 1.2) + (p.charm - 5) * 0.015 + sumFx(p, 'fortune') * 0.1;
+  return { v, name: v >= 1.2 ? '大吉' : v >= 1.05 ? '吉' : v >= 0.9 ? '平' : '凶' };
+}
 function spellPower(p) { return Math.round(p.qi * 6 * REALM_MUL[p.realm] * (1 + sumFx(p, 'spell')) * (p.sht && p.prof === 'shu' ? 1.6 : 1)); }
 function manaMax(p) { return Math.round(p.qi * 10 * REALM_MUL[p.realm] * (1 + sumFx(p, 'mana'))); }
 function weaponPower(p) {
@@ -152,8 +184,16 @@ function cultSpeed(p) {
   if (p.buf.peiyuan > 0) s *= 1 + 0.5 * (p.buf.peiyuanK || 1);
   if (p.buf.juling > 0) s *= 1 + 0.3 * (p.buf.julingK || 1);
   if (p.mate) { const m = sectPerson(p.mate); if (m && !m.away && m.task === p.task) s *= 1.1; }
+  s *= 1 + auraAt(p); // 同门传道（薪火相传、龙脉聚灵……）
+  if (G.sect.boom > 0) s *= 1.25; // 灵脉涌动
   return s;
 }
+// 修炼节奏：每个境界要修的年数和它给的延寿相当，寿元才有压力
+// （宗门条件一般时：筑基采气数年、炼气数十年、金丹上百年、化神数百年；资质平庸的弟子会在半路寿尽）
+const REALM_PACE = [1, 0.07, 0.012, 0.005, 0.007, 1];
+const QI_PACE = 0.04; // 采气速度（一缕真气要采好几年）
+function pace(p) { return REALM_PACE[p.realm] || 1; }
+function evPace(p) { return p.realm === 0 ? 1 : Math.min(1, pace(p) * 8); } // 事件、丹药推进比日常修炼显眼一些
 function breakChance(p) {
   let c = [0.55, 0.5, 0.42, 0.38, 0.2][p.realm] + p.mind * 0.035 + sumFx(p, 'brk') + G.mods.brk + synergy(p) * 0.03 + (p.comeback || 0);
   if (p.dao) c += (daoPurity(p) - 0.7) * 0.3;
@@ -162,6 +202,7 @@ function breakChance(p) {
   if (p.realm === 1) c += p.base / 100 * 0.15;
   if (p.realm === 3) c += (9 - p.dan) * 0.02;
   if (p.head) c += 0.02 * peakLv('zongzhu');
+  if (p.buf && p.buf.leiyin) c += 0.2;
   if (p.hurt > 0) c -= 0.2;
   return Math.max(0.05, Math.min(0.95, c));
 }
@@ -223,7 +264,7 @@ function goTo(p, loc) {
 function movePerson(p, dt) {
   if (!p.route.length) { p.moving = false; return; }
   const tgt = p.route[0], dx = tgt.x - p.x, dy = tgt.y - p.y, d = Math.hypot(dx, dy);
-  const sp = 1.7 * T * (1 + p.realm * 0.18) * (p.hurt > 0 ? 0.6 : 1);
+  const sp = 3 * T * (1 + p.realm * 0.18) * (p.hurt > 0 ? 0.6 : 1);
   p.moving = true;
   if (Math.abs(dx) > 0.5) p.face = dx > 0 ? 1 : -1;
   if (d <= sp * dt) {
@@ -252,11 +293,10 @@ function assignTask(p, task, opt) {
 function setProf(p, id) {
   if (p.realm >= 3 || p.prof === id) return;
   if (p.prof === 'shou' && p.beast) sectLog(p.name + ' 放归了灵兽「' + p.beast.name + '」', '#94b0c2', p);
+  if (p.prof === 'shou' && p.beast && p.beast.pact) p.beast = null; // 只放走御兽契约的灵兽，蛋里孵出的照样养着
   p.prof = id;
-  p.beast = null;
   if (id === 'shou') {
-    const el = daoGroup(p.dao || p.manual) || pick(Object.keys(BEASTS));
-    p.beast = { name: pick(BEASTS[el]), el, lv: 0 };
+    if (!p.beast) { const el = daoGroup(p.dao || p.manual) || pick(Object.keys(BEASTS)); p.beast = { name: pick(BEASTS[el]), el, lv: 0, pact: true }; }
     sectLog(p.name + ' 转修御兽之道，与「' + p.beast.name + '」缔结灵契', '#a7f070', p);
   } else sectLog(p.name + ' 立志成为' + PROFS[id].name + (p.apt === id ? '（正合天赋）' : ''), '#ffcd75', p);
 }
@@ -267,38 +307,42 @@ function sectDaily() {
   if (S.weatherLeft > 0) S.weatherLeft--;
   else {
     const s = sectSeason(), r = Math.random();
-    if (s === 1 && r < 0.07) { S.weather = 'storm'; S.weatherLeft = randInt(1, 3); }
-    else if (r < [0.08, 0.1, 0.05, 0.02][s]) { S.weather = 'rain'; S.weatherLeft = randInt(1, 4); }
-    else if (s === 3 && r < 0.18) { S.weather = 'snow'; S.weatherLeft = randInt(2, 5); }
-    else { S.weather = 'clear'; S.weatherLeft = 0; }
+    // 1 天只有 1/6 秒，天气一旦变化就持续一段日子，避免画面闪来闪去
+    if (s === 1 && r < 0.015) { S.weather = 'storm'; S.weatherLeft = randInt(4, 12); }
+    else if (r < [0.018, 0.022, 0.012, 0.005][s]) { S.weather = 'rain'; S.weatherLeft = randInt(6, 20); }
+    else if (s === 3 && r < 0.045) { S.weather = 'snow'; S.weatherLeft = randInt(10, 30); }
+    else if (S.weather !== 'clear') { S.weather = 'clear'; S.weatherLeft = randInt(8, 20); }
   }
-  const acc = S.acc;
+  if (S.boom > 0) S.boom--;
+  sectFestival();
+  const acc = S.acc, healers = sectHealPower();
+  if (healers > 0 && Math.floor(S.t) % 12 === 0 && S.people.some((q) => !q.away && q.hurt > 0)) sectHealFx();
   for (const p of S.people) {
     if (p.away) continue;
     for (const k of ['peiyuan', 'juling']) if (p.buf[k] > 0) p.buf[k]--;
     if (sumFx(p, 'loyal')) p.loy = Math.max(p.loy, sumFx(p, 'loyal'));
     if (p.hurt > 0) {
-      p.hurt = Math.max(0, p.hurt - 1 - sumFx(p, 'heal'));
+      p.hurt = Math.max(0, p.hurt - 1 - sumFx(p, 'heal') - healers);
       if (p.hurt === 0) sectLog(p.name + ' 伤势痊愈', '#a7f070', p);
       if (p.loc !== taskLoc(p)) goTo(p, taskLoc(p));
       continue;
     }
     if (p.loc !== taskLoc(p)) goTo(p, taskLoc(p));
     if (p.at !== taskLoc(p)) continue;
-    const sp = cultSpeed(p);
+    const sp = cultSpeed(p), pc = pace(p);
     const wuK = 1 + sumFx(p, 'wu'), yingK = 1 + sumFx(p, 'ying');
     switch (p.task) {
       case 'cult':
         if (p.realm === 0) p.zj = Math.min(100, p.zj + sp);
-        else if (p.realm === 1) p.base = Math.min(100, p.base + sp * 0.5);
-        else if (p.realm === 2 && p.qiTaken > 0) p.refine = Math.min(100, p.refine + sp * 0.12 * (0.7 + p.bone * 0.06) * (1 + sumFx(p, 'refine')) * (1 + 0.08 * Math.max(0, p.qiTaken - 3)));
-        else if (p.realm === 3) p.wu = Math.min(100, p.wu + sp * 0.02 * wuK);
-        else if (p.realm === 4) p.ying = Math.min(100, p.ying + sp * 0.03 * yingK * (1.3 - p.dan * 0.06));
+        else if (p.realm === 1) p.base = Math.min(100, p.base + sp * 0.5 * pc);
+        else if (p.realm === 2 && p.qiTaken > 0) p.refine = Math.min(100, p.refine + pc * sp * 0.12 * (0.7 + p.bone * 0.06) * (1 + sumFx(p, 'refine')) * (1 + 0.08 * Math.max(0, p.qiTaken - 3)));
+        else if (p.realm === 3) p.wu = Math.min(100, p.wu + pc * sp * 0.02 * wuK);
+        else if (p.realm === 4) p.ying = Math.min(100, p.ying + pc * sp * 0.03 * yingK * (1.3 - p.dan * 0.06));
         break;
       case 'gather': {
         const d = DAOS[p.manual], r = d.rate();
         if (r <= 0) break;
-        p.qiAcc += 0.012 * (0.6 + p.mind * 0.08) * r * (1 + p.realm * 0.25) * (1 + sumFx(p, 'gather'));
+        p.qiAcc += 0.012 * QI_PACE * (0.6 + p.mind * 0.08) * r * (1 + p.realm * 0.25) * (1 + sumFx(p, 'gather'));
         if (p.manual === 'zhen' && S.weather === 'storm' && Math.random() < 0.02) { p.hurt = randInt(15, 30); sectLog(p.name + ' 引雷时被天雷击伤，需养伤 ' + p.hurt + ' 天', '#ef7d57', p); break; }
         while (p.qiAcc >= 1) {
           p.qiAcc -= 1; S.qi[p.manual] = (S.qi[p.manual] || 0) + 1;
@@ -316,11 +360,11 @@ function sectDaily() {
       }
       case 'train':
         p.exp += (0.4 + p.bone * 0.06) * (1 + 0.1 * peakLv('yanwu')) * REALM_MUL[p.realm] * 0.5 * (1 + sumFx(p, 'train'));
-        if (p.realm === 3) p.wu = Math.min(100, p.wu + 0.015 * wuK);
+        if (p.realm === 3) p.wu = Math.min(100, p.wu + pc * 0.015 * wuK);
         break;
       case 'study':
-        if (p.realm === 3) p.wu = Math.min(100, p.wu + (0.06 + p.mind * 0.008) * (1 + 0.1 * peakLv('dianji')) * wuK);
-        else if (p.realm === 4) p.ying = Math.min(100, p.ying + sp * 0.012 * yingK);
+        if (p.realm === 3) p.wu = Math.min(100, p.wu + (0.06 + p.mind * 0.008) * (1 + 0.1 * peakLv('dianji')) * wuK * pc);
+        else if (p.realm === 4) p.ying = Math.min(100, p.ying + pc * sp * 0.012 * yingK);
         else if (p.realm === 0) p.zj = Math.min(100, p.zj + sp * 0.3);
         if (p.mind < 10 && Math.random() < 0.0015 * peakLv('dianji') * (1 + sumFx(p, 'mindGrow'))) { p.mind++; sectLog(p.name + ' 参悟典籍有得，神识精进（神识 ' + p.mind + '）', '#73eff7', p); }
         break;
@@ -355,7 +399,7 @@ function finishCraft(task) {
   const lead = leadCrafter(task), mind = lead ? lead.mind : 4, dao = job.dao;
   if (task === 'alchemy') {
     const ok = Math.random() < Math.min(0.95, 0.5 + mind * 0.04 + peakLv('liandan') * 0.05 + G.mods.alchOk + (lead ? sumFx(lead, 'alchOk') + (lead.sht && lead.prof === 'dan' ? 0.1 : 0) : 0));
-    const name = itemName(job.id, dao, PILLS);
+    const name = sectItemName(job.id, dao, PILLS);
     if (ok) {
       const n = 1 + (Math.random() < 0.3 + peakLv('liandan') * 0.08 ? 1 : 0) + (Math.random() < 0.1 ? 1 : 0);
       S.items[itemKey(job.id, dao)] = (S.items[itemKey(job.id, dao)] || 0) + n;
@@ -369,7 +413,7 @@ function finishCraft(task) {
     sectLog('炼器峰炼成' + (dao ? DAOS[dao].name + '属' : '') + f.name + '「' + w.name + '」（战力 +' + power + '）', '#a7f070');
     showBanner('器成！', f.name + '「' + w.name + '」 战力 +' + power, 3, '#a7f070');
   } else {
-    const n = randInt(2, 4), name = itemName(job.id, dao, TALIS);
+    const n = randInt(2, 4), name = sectItemName(job.id, dao, TALIS);
     S.talis[itemKey(job.id, dao)] = (S.talis[itemKey(job.id, dao)] || 0) + n;
     sectLog('典籍峰书成「' + name + '」×' + n, '#a7f070');
     showBanner('符成！', name + ' ×' + n, 3, '#a7f070');
@@ -387,7 +431,7 @@ function attemptBreak(p) {
   if (p.realm === 0) p.buf.zhuji = 0; else p.buf.pojing = 0;
   if (Math.random() < c) {
     p.realm++;
-    p.comeback = 0;
+    p.comeback = 0; p.buf.leiyin = 0;
     const r = p.realm, pur = daoPurity(p);
     let msg = p.name + ' 突破成功，晋入' + to + '期！';
     if (r === 1) msg = p.name + ' 百日筑基功成，踏入仙途，晋入筑基期！';
@@ -398,25 +442,36 @@ function attemptBreak(p) {
     }
     if (r === 4) msg = p.name + ' 以神通「' + p.sht + '」化作元神，晋入化神期！';
     if (r === 5) msg = p.name + ' 元神与金丹相合，孕出元婴，晋入元婴期！成为一代老祖！';
+    // 延寿：基准 × 道途精纯 × 机缘 × 尝试次数（失败越多，这次成功时延寿越少）
+    const luck = rollBreakLuck(p), lf = breakLifeFactor(p), fails = p.fails || 0;
+    const gain = Math.round(REALM_LIFE_GAIN[r] * lf.pur * lf.tries * luck.v);
+    p.lifeGain = (p.lifeGain || 0) + gain;
+    p.fails = 0; p.oldWarned = false;
+    const realGain = Math.round(gain * Math.max(0.5, 1 + sumFx(p, 'life')));
     // 道途越精纯，突破后提升越大
-    let extra = '';
+    let extra = '寿元 +' + realGain + ' 年（机缘「' + luck.name + '」' + (fails ? '，失败过 ' + fails + ' 次，延寿打了折扣' : '') + '）';
     if (p.dao) {
       p.gain = (p.gain || 0) + pur;
-      extra = '道途精纯 ' + Math.round(pur * 100) + '%，战力根基 +' + Math.round(pur * 15) + '%';
+      extra += '，道途精纯 ' + Math.round(pur * 100) + '%，战力根基 +' + Math.round(pur * 15) + '%';
       if (Math.random() < pur * 0.8) { const k = pick(['bone', 'mind', 'qi']); if (p[k] < 10) { p[k]++; extra += '，' + { bone: '根骨', mind: '神识', qi: '灵气' }[k] + ' +1'; } }
     }
     if (p.beast) { p.beast.lv++; extra += (extra ? '，' : '') + '灵兽「' + p.beast.name + '」随之成长'; }
+    const nsk = p.dao && DAO_SKILLS[p.dao] && DAO_SKILLS[p.dao][r - 1];
+    if (nsk) extra += (extra ? '，' : '') + '领悟' + (nsk.kind === 'c' ? '战斗' : '辅助') + '技能「' + nsk.n + '」';
     G.sect.fame += REALM_FAME[r];
     sectLog(msg + (extra ? '（' + extra + '）' : ''), '#ffcd75', p);
     showBanner('突破成功！' + to + '期', msg + (extra ? '\n' + extra : '') + '（声望 +' + REALM_FAME[r] + '）', 5, '#ffcd75');
     sfx('win');
     addParticles(p.x, p.y - 8, '#ffcd75', 30);
+    sectBreakFx(p, true);
     if (r === 5 && !G.sect.won) {
       G.sect.won = true;
       victory('元婴老祖出世！', G.sect.name + ' 立宗 ' + sectCal().year + ' 年，' + p.name + ' 修成元婴，宗门从此名震天下。\n（炼虚、合道之境尚未开放，可以继续经营宗门）');
     }
   } else {
-    const safe = Math.min(0.9, sumFx(p, 'failSafe'));
+    const safe = Math.min(0.9, sumFx(p, 'failSafe') + 0.6 * (p.buf.dingshen || 0));
+    p.buf.dingshen = 0; p.buf.leiyin = 0;
+    p.fails = (p.fails || 0) + 1; // 失败次数越多，将来成功时延寿越少
     const lose = (v) => Math.round(v * (1 - safe));
     let msg;
     if (p.realm === 0) { p.zj = 100 - lose(40); p.hurt = lose(15); msg = '冲击筑基失败，经脉受损（修为退回 ' + Math.round(p.zj) + ' 天）'; }
@@ -432,6 +487,7 @@ function attemptBreak(p) {
     p.comeback = sumFx(p, 'comeback');
     if (p.comeback) msg += '。阴尽阳生，下次突破成功率 +' + Math.round(p.comeback * 100) + '%';
     sectLog(p.name + ' ' + msg, '#ef7d57', p);
+    sectBreakFx(p, false);
     showBanner('突破失败', p.name + ' ' + msg + (usedPill ? '（丹药药力已散）' : ''), 4, '#ef7d57');
     sfx('bad');
     goTo(p, taskLoc(p));
@@ -451,7 +507,7 @@ function takeQi(p, id) {
   G.sect.qi[id]--;
   p.qiTaken++;
   touchDao(p, id, 1);
-  if (!p.dao) { p.dao = id; sectLog(p.name + ' 服下第一缕' + d.qiName + '，道途已定：' + daoLabel(id), d.color, p); }
+  if (!p.dao) { p.dao = id; sectLog(p.name + ' 服下第一缕' + d.qiName + '，道途已定：' + daoLabel(id) + '，领悟技能「' + DAO_SKILLS[id][0].n + '」', d.color, p); }
   else sectLog(p.name + ' 服下一缕' + d.qiName + '（' + p.qiTaken + '/' + (p.realm === 1 ? 3 : 9) + '，道途精纯 ' + Math.round(daoPurity(p) * 100) + '%）', d.color, p);
   addParticles(p.x, p.y - 8, d.color, 16);
   sfx('coin');
@@ -460,17 +516,31 @@ function takeQi(p, id) {
 function usePill(p, key) {
   const S = G.sect, { id, dao } = splitKey(key);
   if (!(S.items[key] > 0)) return;
-  if (id === 'yanshou' && p.yanshou >= 2) { showBanner('无效', p.name + ' 已经服过 2 颗延寿丹，再服也没用了', 2.5, '#ef7d57'); return; }
+  if (id === 'yanshou' && p.yanshou >= 3) { showBanner('无效', p.name + ' 已经服过 3 颗延寿丹，再服也没用了', 2.5, '#ef7d57'); return; }
+  if (id === 'changsheng' && p.changsheng) { showBanner('无效', p.name + ' 已经服过长生丹，一生只能服一颗', 2.5, '#ef7d57'); return; }
   if (id === 'liaoshang' && !(p.hurt > 0)) { showBanner('不用吃', p.name + ' 没有受伤', 2, '#94b0c2'); return; }
+  if (PILLS[id].attr && (p.attrPill || 0) >= 3) { showBanner('无效', p.name + ' 已经服过 3 颗属性丹，体内丹毒太重了', 2.5, '#ef7d57'); return; }
   const f = itemFactor(p, dao) * (1 + sumFx(p, 'pill')) * (p.sht && p.prof === 'dan' ? 1.5 : 1);
   S.items[key]--;
+  if (PILLS[id].attr) {
+    const k = PILLS[id].attr, nm = { bone: '根骨', mind: '神识', qi: '灵气', charm: '魅力' }[k];
+    p.attrPill = (p.attrPill || 0) + 1;
+    if (dao) touchDao(p, dao, 0.3);
+    if (Math.random() < Math.min(0.95, f) && p[k] < 10) { p[k]++; sectLog(p.name + ' 服下' + sectItemName(id, dao, PILLS) + '，药力化开，' + nm + ' +1（现为 ' + p[k] + '）', '#a7f070', p); showBanner(nm + ' +1', p.name + ' 成功吸收了药力', 2.5, '#a7f070'); }
+    else sectLog(p.name + ' 服下' + sectItemName(id, dao, PILLS) + '，可惜药性与道途不合，药力散去了（契合 ' + Math.round(f * 100) + '%）', '#ef7d57', p);
+    addParticles(p.x, p.y - 8, '#a7f070', 14);
+    sfx('coin');
+    return;
+  }
+  if (id === 'dingshen') p.buf.dingshen = f;
   if (id === 'zhuji') p.buf.zhuji = f;
   if (id === 'pojing') p.buf.pojing = f;
   if (id === 'peiyuan') { p.buf.peiyuan = 60; p.buf.peiyuanK = f; }
   if (id === 'liaoshang') p.hurt = Math.max(0, Math.round(p.hurt * (1 - Math.min(1, f))));
-  if (id === 'yanshou') { p.yanshou++; p.lifeBonus += Math.round(10 * f); }
+  if (id === 'yanshou') { p.yanshou++; p.lifeBonus += Math.round(20 * f); }
+  if (id === 'changsheng') { p.changsheng = 1; p.lifeBonus += Math.round(80 * f); }
   if (id === 'ningshen') {
-    const v = 10 * f;
+    const v = 10 * f * evPace(p); // 境界越高，丹药相对越难推动进度
     if (p.realm === 0) p.zj = Math.min(100, p.zj + v);
     else if (p.realm === 1) p.base = Math.min(100, p.base + v);
     else if (p.realm === 2) p.refine = Math.min(100, p.refine + v);
@@ -478,7 +548,7 @@ function usePill(p, key) {
     else if (p.realm === 4) p.ying = Math.min(100, p.ying + v);
   }
   if (dao) touchDao(p, dao, 0.3);
-  sectLog(p.name + ' 服下' + itemName(id, dao, PILLS) + '（契合 ' + Math.round(f * 100) + '%）', '#a7f070', p);
+  sectLog(p.name + ' 服下' + sectItemName(id, dao, PILLS) + '（契合 ' + Math.round(f * 100) + '%）', '#a7f070', p);
   addParticles(p.x, p.y - 8, '#a7f070', 14);
   sfx('coin');
 }
@@ -489,7 +559,7 @@ function useJuling(p, key) {
   const f = talisK(p, dao);
   p.buf.juling = 60; p.buf.julingK = f;
   if (dao) touchDao(p, dao, 0.2);
-  sectLog(p.name + ' 贴上' + itemName('juling', dao, TALIS) + '（效果 ×' + f.toFixed(2) + '）', '#a7f070', p);
+  sectLog(p.name + ' 贴上' + sectItemName('juling', dao, TALIS) + '（效果 ×' + f.toFixed(2) + '）', '#a7f070', p);
   sfx('coin');
 }
 function talisK(p, dao) { return itemFactor(p, dao) * (1 + sumFx(p, 'fu')) * (p.sht && p.prof === 'fu' ? 2 : 1); }
@@ -517,12 +587,12 @@ function equipWeapon(p, i) {
 }
 function startJob(peak, id) {
   const S = G.sect, task = PEAK_TASK[peak], book = CRAFT[task].book(), rec = book[id];
-  if (S.jobs[peak] || !canAfford(rec.cost)) return;
+  if (S.jobs[peak] || !canAfford(rec.cost) || (rec.lv && S.peaks[peak].lv < rec.lv)) return;
   pay(rec.cost);
   const lead = leadCrafter(task);
   const dao = lead ? lead.dao : null;
   S.jobs[peak] = { id, work: 0, days: rec.days, dao };
-  sectLog({ liandan: '炼丹峰开炉炼制「', lianqi: '炼器峰开始炼制「', dianji: '典籍峰开始书写「' }[peak] + itemName(id, dao, book) + '」' + (lead ? '（主' + (task === 'fu' ? '笔' : '炼') + '：' + lead.name + '）' : ''), '#ffcd75');
+  sectLog({ liandan: '炼丹峰开炉炼制「', lianqi: '炼器峰开始炼制「', dianji: '典籍峰开始书写「' }[peak] + sectItemName(id, dao, book) + '」' + (lead ? '（主' + (task === 'fu' ? '笔' : '炼') + '：' + lead.name + '）' : ''), '#ffcd75');
   sfx('build');
 }
 function upgradePeak(id) {
@@ -545,7 +615,7 @@ function makeCandidates() {
     p.cost = Math.max(5, 10 + (p.bone + p.mind + p.qi + p.charm - 20) * 2);
     G.sect.cands.push(p);
   }
-  G.sect.candUntil = G.sect.t + 90;
+  G.sect.candUntil = G.sect.t + 180; // 半年（30 秒）内可以挑
 }
 function recruit(c) {
   if (discipleCount() >= sectCapacity()) { showBanner('门下已满', '扩建宗门香鼎或修建洞府可以收更多弟子', 3, '#ef7d57'); sfx('bad'); return; }
@@ -562,8 +632,16 @@ function addPerson(p, at) {
   G.sect.people.push(p);
   goTo(p, taskLoc(p));
 }
-// 陨落：鬼修有机会残魂不灭（返回 true = 真的死了）
+// 陨落：还魂草救命；鬼修有机会残魂不灭（返回 true = 真的死了）
 function personFalls(p, reason) {
+  if (G.sect.treasures && G.sect.treasures.huanhun > 0) {
+    G.sect.treasures.huanhun--;
+    p.hurt = 120;
+    sectLog('【还魂】' + p.name + ' 命悬一线，宗门以一株九转还魂草将其救回（重伤 120 天）', '#a7f070', p);
+    showBanner('九转还魂', p.name + ' 被还魂草救回了一命', 4, '#a7f070');
+    if (p.away) travelReturn(p);
+    return false;
+  }
   if (p.prof === 'gui' && (p.sht || Math.random() < 0.5)) {
     p.hurt = 180; p.exp = Math.round(p.exp * 0.5);
     if (p.realm === 4) p.ying = Math.max(0, p.ying - 30); else if (p.realm === 3) p.wu = Math.max(0, p.wu - 30); else if (p.realm === 2) p.refine = Math.max(0, p.refine - 30);
@@ -621,10 +699,10 @@ function personEvent(p) {
     const lines = ['观云海翻涌，忽有所悟', '听松涛阵阵，心境澄明', '梦中见一白发老者传道', '于月下练剑，剑意自生', '看落叶飘零，悟得枯荣之理'];
     let gain = '';
     if (p.realm === 0) { p.zj = Math.min(100, p.zj + 15); gain = '修为 +15 天'; }
-    else if (p.realm === 1) { p.base = Math.min(100, p.base + 20); gain = '根基 +20'; }
-    else if (p.realm === 2) { p.refine = Math.min(100, p.refine + 12); gain = '炼化 +12%'; }
-    else if (p.realm === 3) { p.wu = Math.min(100, p.wu + 25); gain = '悟性 +25'; }
-    else if (p.realm === 4) { p.ying = Math.min(100, p.ying + 8); gain = '孕婴 +8%'; }
+    else if (p.realm === 1) { p.base = Math.min(100, p.base + 20 * evPace(p)); gain = '根基 +' + Math.round(20 * evPace(p)); }
+    else if (p.realm === 2) { p.refine = Math.min(100, p.refine + 12 * evPace(p)); gain = '炼化 +' + (12 * evPace(p)).toFixed(1) + '%'; }
+    else if (p.realm === 3) { p.wu = Math.min(100, p.wu + 25 * evPace(p)); gain = '悟性 +' + (25 * evPace(p)).toFixed(1); }
+    else if (p.realm === 4) { p.ying = Math.min(100, p.ying + 8 * evPace(p)); gain = '孕婴 +' + (8 * evPace(p)).toFixed(1) + '%'; }
     else { p.exp += 200; gain = '战力 +200'; }
     sectLog('【顿悟】' + N + ' ' + pick(lines) + '（' + gain + '）', '#73eff7', p);
   } else if (type === 'qi') {
@@ -687,7 +765,7 @@ function giveManual(id, why, p) {
 // 战斗：战力比较 × 道途克制 × 符箓
 function fight(p, foe, danger, where) {
   const year = sectCal().year, foeDao = FOE_DAO[foe] || null;
-  const ep = Math.round((80 + year * 25 + Math.pow(year, 1.6) * 6) * danger * rand(0.5, 1.5) * (where === '山门外' ? 0.7 : 1));
+  const ep = Math.round((80 + year * 6 + Math.pow(year, 1.3) * 2) * danger * rand(0.5, 1.5) * (where === '山门外' ? 0.7 : 1));
   let pp = personPower(p);
   const clash = daoClash(p.dao, foeDao);
   pp *= clash.k;
@@ -695,16 +773,22 @@ function fight(p, foe, danger, where) {
   if (ep > pp) pp *= 1 + sumFx(p, 'underdog');
   const notes = [];
   if (clash.text) notes.push(clash.text);
+  const sk = useSkills(p, foeDao);
+  pp *= sk.mul;
+  const epEff = ep * sk.foeMul;
+  if (sk.text) notes.push(sk.text);
   const gong = bestTalis(p, 'gong');
-  if (gong) { G.sect.talis[gong.key]--; pp *= 1 + 0.4 * gong.k; notes.push('祭出' + itemName('gong', splitKey(gong.key).dao, TALIS)); }
+  if (gong) { G.sect.talis[gong.key]--; pp *= 1 + 0.4 * gong.k; notes.push('祭出' + sectItemName('gong', splitKey(gong.key).dao, TALIS)); }
+  const lei = bestTalis(p, 'lei');
+  if (lei) { G.sect.talis[lei.key]--; pp *= 1 + (foeDao && DAOS[foeDao].pol === 'yin' ? 0.6 : 0.25) * lei.k; notes.push('引动' + sectItemName('lei', splitKey(lei.key).dao, TALIS)); }
   const foeName = foe + (foeDao ? '（' + DAOS[foeDao].name + '属）' : '');
   const tail = notes.length ? '〔' + notes.join('；') + '〕' : '';
-  const win = Math.random() < pp / (pp + ep);
+  const win = Math.random() < pp / (pp + epEff);
   if (win) {
-    const loot = Math.round(ep * rand(0.1, 0.25));
+    const loot = Math.round(ep * rand(0.1, 0.25) * (1 + sk.lo));
     p.exp += Math.round(ep * 0.05 * (1 + sumFx(p, 'train')));
     if (p.travel) p.travel.loot.lingshi += loot; else G.res.lingshi += loot;
-    if (p.realm === 3) p.wu = Math.min(100, p.wu + 5);
+    if (p.realm === 3) p.wu = Math.min(100, p.wu + 5 * evPace(p));
     sectLog('【遭遇】' + p.name + ' 在' + where + '遇上' + foeName + '（战力约 ' + ep + '），一番斗法将其击退（灵石 +' + loot + '）' + tail, '#ffcd75', p);
     return true;
   }
@@ -714,10 +798,17 @@ function fight(p, foe, danger, where) {
     sectLog('【遭遇】' + p.name + ' 在' + where + '遇上' + foeName + '（战力约 ' + ep + '），不敌，幸得护身符护住周身，全身而退' + tail, '#ffcd75', p);
     return true;
   }
+  const dun = p.travel ? bestTalis(p, 'dun') : null;
+  if (dun) {
+    G.sect.talis[dun.key]--;
+    p.hurt = Math.max(p.hurt, Math.round(randInt(10, 30) * (1 - sk.def)));
+    sectLog('【遭遇】' + p.name + ' 在' + where + '遇上' + foeName + '（战力约 ' + ep + '），不敌，捏碎遁地符遁走（养伤 ' + p.hurt + ' 天）' + tail, '#ef7d57', p);
+    return false;
+  }
   const safe = Math.min(0.9, sumFx(p, 'safe'));
-  const hurt = Math.round(randInt(20, 60) * (1 - safe * 0.5));
+  const hurt = Math.round(randInt(20, 60) * (1 - safe * 0.5) * (1 - sk.def));
   p.hurt = Math.max(p.hurt, hurt);
-  if (pp < ep * 0.35 && Math.random() < 0.15 * (1 - safe)) {
+  if (pp < epEff * 0.35 && Math.random() < 0.15 * (1 - safe) * (1 - sk.def)) {
     sectLog('【遭遇】' + p.name + ' 在' + where + '遇上' + foeName + '（战力约 ' + ep + '），力战不敌……' + tail, '#b13e53', p);
     return !personFalls(p, p.name + ' 在' + where + '陨落，身死道消');
   }
@@ -729,10 +820,16 @@ function travelMonth(p) {
   const tv = p.travel, reg = REGIONS[tv.region], S = G.sect;
   const secret = S.secret && S.secret.region === tv.region, lootK = 1 + sumFx(p, 'loot');
   p.exp += 10 * (1 + p.realm);
-  if (p.realm === 3) p.wu = Math.min(100, p.wu + 3 * (1 + sumFx(p, 'wu')));
-  if (p.realm === 4) p.ying = Math.min(100, p.ying + 0.6);
+  if (p.realm === 3) p.wu = Math.min(100, p.wu + 3 * pace(p) * (1 + sumFx(p, 'wu')));
+  if (p.realm === 4) p.ying = Math.min(100, p.ying + 0.6 * pace(p));
   if (p.hurt > 0) p.hurt = Math.max(0, p.hurt - 30);
-  if (Math.random() < 0.45 + p.charm * 0.02) {
+  if (tv.ruin && Math.random() < 0.65) { // 仙人遗府
+    const r = Math.random();
+    if (r < 0.45) giveTreasure(pick(Object.keys(TREASURES)), '【遗府】' + p.name + ' 破开遗府中一道禁制', p);
+    else if (r < 0.7) { const left = DAO_IDS.filter((k) => !S.manuals.includes(k)); giveManual(left.length ? pick(left) : pick(DAO_IDS), '【遗府】' + p.name + ' 在遗府石室的玉简中', p); }
+    else if (!fight(p, pick(['遗府傀儡', '守府灵兽']), 1.6, '仙人遗府')) return;
+    if (!S.people.includes(p) || !p.travel) return;
+  } else if (Math.random() < 0.45 + p.charm * 0.02) {
     const r = Math.random(), where = reg.name;
     if (r < 0.32) {
       const foes = { center: ['劫修', '恶霸修士'], east: ['海妖', '蛟龙幼崽'], south: ['毒蛟', '瘴林妖王'], west: ['沙虫', '古尸'], north: ['冰原狼王', '雪妖'] }[tv.region];
@@ -789,7 +886,7 @@ function sectEvent() {
   if (r < 0.05 && home.length) {
     const beast = pick(['一群赤眼妖狼', '一头千年黑熊精', '一伙山匪散修', '一条修炼成精的大蟒']);
     const year = sectCal().year;
-    const ep = (150 + year * 60) * rand(0.7, 1.3);
+    const ep = (150 + year * 12) * rand(0.7, 1.3);
     if (sectDefense(home) > ep) { const n = Math.round(ep * 0.1); G.res.lingshi += n; S.fame += 2; sectLog('【宗门】' + beast + '来犯山门，被众弟子合力击退（灵石 +' + n + '，声望 +2）', '#ffcd75'); }
     else {
       const lose = { lingshi: Math.floor(G.res.lingshi * 0.2), herb: Math.floor(G.res.herb * 0.3) };
@@ -805,9 +902,9 @@ function sectEvent() {
       sectLog('【往来】' + o.name + ' 遣使来访，赠灵石 ' + n + '（与' + o.name + '交情 +5）', '#a7f070');
     } else if (home.length) {
       const champ = home.slice().sort((a, b) => personPower(b) - personPower(a))[0];
-      const clash = daoClash(champ.dao, o.dao);
-      const ep = o.power * rand(0.25, 0.5), mp = personPower(champ) * clash.k, win = Math.random() < mp / (mp + ep);
-      const tail = '〔' + o.name + '修' + DAOS[o.dao].name + '道途' + (clash.text ? '；' + clash.text : '') + '〕';
+      const clash = daoClash(champ.dao, o.dao), sk = useSkills(champ, o.dao);
+      const ep = o.power * rand(0.25, 0.5) * sk.foeMul, mp = personPower(champ) * clash.k * sk.mul, win = Math.random() < mp / (mp + ep);
+      const tail = '〔' + o.name + '修' + DAOS[o.dao].name + '道途' + (clash.text ? '；' + clash.text : '') + (sk.text ? '；' + sk.text : '') + '〕';
       if (win) { S.fame += 5; o.att -= 3; sectLog('【往来】' + o.name + ' 弟子上门挑战，' + champ.name + ' 出战获胜，扬我宗威（声望 +5）' + tail, '#ffcd75', champ); }
       else { S.fame = Math.max(0, S.fame - 2); champ.hurt = Math.max(champ.hurt, 15); sectLog('【往来】' + o.name + ' 弟子上门挑战，' + champ.name + ' 惜败（声望 -2）' + tail, '#ef7d57', champ); }
     }
@@ -869,16 +966,19 @@ function sectMonthly() {
   for (const p of S.people.slice()) {
     if (!S.people.includes(p)) continue;
     if (p.away) { travelMonth(p); continue; }
-    if (Math.random() < (0.05 + p.charm * 0.01) * (1 + sumFx(p, 'fortune'))) personEvent(p);
+    // 一年只有一分钟，事件按“每年”的频率来，不然加速时会刷屏
+    if (Math.random() < (0.05 + p.charm * 0.01) * 0.5 * (1 + sumFx(p, 'fortune'))) personEvent(p);
+    if (S.people.includes(p) && Math.random() < (0.04 + p.charm * 0.006) * 0.5 * (1 + sumFx(p, 'fortune'))) personEvent2(p);
   }
-  sectEvent();
+  if (Math.random() < 0.35) sectEvent();
+  if (G.state === 'play' && Math.random() < 0.06) sectEvent2();
   if (Math.random() < 0.35) worldEvent();
   if (S.secret && --S.secret.left <= 0) { worldLog(REGIONS[S.secret.region].name + '的秘境关闭了'); S.secret = null; }
   sectRegrow();
   if (cal.month === 6) {
     const home = S.people.filter((q) => !q.away && !q.head);
     if (home.length >= 2) {
-      const rank = home.map((q) => [q, personPower(q) * rand(0.8, 1.2)]).sort((a, b) => b[1] - a[1]);
+      const rank = home.map((q) => [q, personPower(q) * useSkills(q, null).mul * rand(0.8, 1.2)]).sort((a, b) => b[1] - a[1]);
       const w = rank[0][0];
       w.exp += 50 * (1 + w.realm); G.res.lingshi += 20; S.fame += 2; w.loy = Math.min(100, w.loy + 10);
       sectLog('【宗门大比】' + rank.slice(0, 3).map((x, i) => ['魁首', '次席', '三甲'][i] + ' ' + x[0].name + (x[0].dao ? '（' + DAOS[x[0].dao].name + '）' : '')).join('，') + '（魁首获赏，声望 +2）', '#ffcd75', w);
@@ -895,7 +995,22 @@ function sectYearly() {
   const S = G.sect, y = sectCal().year;
   for (const p of S.people.slice()) {
     p.age++;
-    if (p.age >= lifeMax(p)) personDies(p, (p.head ? '掌门 ' : '') + p.name + ' 寿元耗尽，于' + (p.away ? '外' : '洞府中') + '坐化，享年 ' + p.age + ' 岁');
+    const left = lifeLeft(p);
+    if (left <= 0) {
+      // 坐化前传功：境界越高，留给后辈的越多
+      const heirs = S.people.filter((q) => q !== p && !q.away);
+      const heir = heirs.sort((a, b) => ((b.dao && p.dao && daoGroup(b.dao) === daoGroup(p.dao)) - (a.dao && p.dao && daoGroup(a.dao) === daoGroup(p.dao))) || b.realm - a.realm)[0];
+      if (heir && p.realm >= 1) {
+        progressBump(heir, 8 + p.realm * 6); heir.exp += Math.round(p.exp * 0.3);
+        if (p.weapon) { if (heir.weapon) S.weapons.push(heir.weapon); heir.weapon = p.weapon; p.weapon = null; }
+        sectLog('【传功】' + p.name + ' 自知大限将至，将毕生修为感悟传给 ' + heir.name + (heir.weapon ? '，并将随身法器相赠' : ''), '#ffcd75', heir);
+      }
+      personDies(p, (p.head ? '掌门 ' : '') + p.name + '（' + REALMS[p.realm] + '期）寿元耗尽，于' + (p.away ? '外' : '洞府中') + '坐化，享年 ' + p.age + ' 岁');
+    } else if (left <= Math.max(5, Math.round(lifeMax(p) * 0.06)) && !p.oldWarned) {
+      p.oldWarned = true;
+      sectLog('【寿元】' + p.name + ' 寿元将尽，只剩约 ' + left + ' 年（突破境界、服延寿丹或千年灵芝可以续命）', '#ef7d57', p);
+      if (p.head || p.realm >= 2) showBanner('寿元将尽', p.name + ' 只剩约 ' + left + ' 年寿元', 4, '#ef7d57');
+    }
   }
   if (G.state === 'over') return;
   makeCandidates();
@@ -904,9 +1019,188 @@ function sectYearly() {
   worldEvent();
 }
 
+// ---------- 天材地宝 ----------
+function giveTreasure(id, why, p) {
+  const S = G.sect;
+  S.treasures = S.treasures || {};
+  S.treasures[id] = (S.treasures[id] || 0) + 1;
+  sectLog(why + '，得到天材地宝「' + TREASURES[id].name + '」（' + TREASURES[id].desc + '）', '#ffcd75', p);
+  showBanner('天材地宝', TREASURES[id].name + '：' + TREASURES[id].desc, 3.5, '#ffcd75');
+}
+function useTreasure(p, id) {
+  const S = G.sect, tr = S.treasures || {};
+  if (!(tr[id] > 0) || TREASURES[id].auto) return;
+  let msg = '';
+  if (id === 'lingzhi') { p.lifeBonus += 30; p.oldWarned = false; msg = '寿元 +30 年'; }
+  else if (id === 'shouguo') { p.lifeBonus += 100; p.oldWarned = false; msg = '寿元 +100 年'; }
+  else if (id === 'daoyuan') { if (!p.dao) { showBanner('无用', p.name + ' 尚未定道，道源灵晶无从着力', 2.5, '#ef7d57'); return; } touchDao(p, p.dao, 4); msg = '杂气被洗去，道途精纯升至 ' + Math.round(daoPurity(p) * 100) + '%'; }
+  else if (id === 'yuntie') { const w = { name: weaponName(p.dao) + '·陨', power: randInt(150, 300), dao: p.dao || null }; S.weapons.push(w); msg = '炼出灵宝「' + w.name + '」（战力 +' + w.power + '，已放入宗门库存）'; }
+  else if (id === 'shoudan') {
+    const el = daoGroup(p.dao || p.manual) || pick(Object.keys(BEASTS));
+    if (p.beast) { p.beast.lv += 2; msg = '灵兽「' + p.beast.name + '」吞下蛋中精华，成长了'; }
+    else { p.beast = { name: pick(BEASTS[el]), el, lv: 0 }; msg = '孵出了一只「' + p.beast.name + '」'; }
+  }
+  else if (id === 'wudao') {
+    if (p.realm === 0) p.zj = Math.min(100, p.zj + 15); else if (p.realm === 1) p.base = Math.min(100, p.base + 15 * evPace(p));
+    else if (p.realm === 2) p.refine = Math.min(100, p.refine + 15 * evPace(p)); else if (p.realm === 3) p.wu = Math.min(100, p.wu + 25 * evPace(p)); else if (p.realm === 4) p.ying = Math.min(100, p.ying + 15 * evPace(p));
+    msg = '品茶悟道，修为精进';
+  }
+  else if (id === 'tianyuan') { const k = pick(['bone', 'mind', 'qi', 'charm'].filter((a) => p[a] < 10)) || 'bone'; if (p[k] < 10) p[k]++; msg = { bone: '根骨', mind: '神识', qi: '灵气', charm: '魅力' }[k] + ' +1'; }
+  else if (id === 'leiyin') { p.buf.leiyin = 1; msg = '下次突破成功率 +20%'; }
+  tr[id]--;
+  sectLog(p.name + ' 用了「' + TREASURES[id].name + '」：' + msg, '#ffcd75', p);
+  showBanner(TREASURES[id].name, p.name + '：' + msg, 3, '#ffcd75');
+  if (p.dao) castDaoFx('pillar', daoFx(p), p.x, p.y, p.x, p.y, 1);
+  sfx('win');
+}
+function progressBump(p, v) {
+  const cl = (x) => Math.max(0, Math.min(100, x));
+  v *= evPace(p);
+  if (p.realm === 0) p.zj = cl(p.zj + v); else if (p.realm === 1) p.base = cl(p.base + v);
+  else if (p.realm === 2) p.refine = cl(p.refine + v * 0.8); else if (p.realm === 3) p.wu = cl(p.wu + v); else if (p.realm === 4) p.ying = cl(p.ying + v * 0.5);
+  else p.exp += v * 20;
+}
+
+// ---------- 更多人物机缘 ----------
+function personEvent2(p) {
+  const S = G.sect, head = headOf(), home = S.people.filter((q) => q !== p && !q.away);
+  const same = p.dao ? home.filter((q) => q.dao && daoGroup(q.dao) === daoGroup(p.dao)) : [];
+  const w = [
+    ['master', head && head !== p && !head.away && head.realm > p.realm ? 2 : 0],
+    ['reson', same.length ? 1.5 : 0],
+    ['treasure', 0.6 + p.charm * 0.08],
+    ['demon', p.realm >= 3 ? 1.2 : 0],
+    ['awaken', 0.35],
+    ['dream', p.dao ? 1 : 0],
+    ['love', p.mate ? 0.8 : 0],
+    ['beastfind', 0.4],
+    ['lazy', p.head ? 0 : 0.8],
+  ];
+  let r = Math.random() * w.reduce((s, x) => s + x[1], 0), type = 'treasure';
+  for (const [k, v] of w) { r -= v; if (r <= 0) { type = k; break; } }
+  const N = p.name;
+  if (type === 'master') {
+    progressBump(p, 12); p.loy = Math.min(100, p.loy + 5);
+    sectLog('【传道】掌门 ' + head.name + ' 亲自为 ' + N + ' 讲解' + (head.dao ? DAOS[head.dao].name + '道' : '修行') + '的关窍，' + N + ' 茅塞顿开（修为精进，忠诚 +5）', '#73eff7', p);
+    if (head.dao) castDaoFx('beam', daoFx(head), head.x, head.y, p.x, p.y, 1);
+  } else if (type === 'reson') {
+    const q = pick(same);
+    progressBump(p, 8); progressBump(q, 8);
+    sectLog('【共鸣】' + N + ' 与 ' + q.name + ' 同修' + EL[daoGroup(p.dao)].name + '属道途，二人对坐论道，真气共鸣，双双精进', DAOS[p.dao].color, p);
+    q.log.unshift(fmtDate() + '　与 ' + N + ' 道途共鸣');
+  } else if (type === 'treasure') {
+    const pool = ['lingzhi', 'wudao', 'tianyuan', 'daoyuan', 'leiyin', 'shoudan', 'huanhun'];
+    const id = Math.random() < 0.05 ? 'shouguo' : pick(pool), where = pick(['后山古松树下', '灵泉泉眼深处', '一处坍塌的古洞', '雷劈过的山崖', '鸟兽衔来的锦囊中']);
+    giveTreasure(id, '【奇遇】' + N + ' 在' + where + '偶然发现', p);
+  } else if (type === 'demon') {
+    const pur = daoPurity(p);
+    if (Math.random() < 0.35 + pur * 0.5) { p.wu = Math.min(100, p.wu + 10 * evPace(p)); sectLog('【心魔劫】' + N + ' 闭关时心魔现形，凭着' + Math.round(pur * 100) + '% 的道途精纯稳住道心，反而有所感悟（悟性 +10）', '#73eff7', p); }
+    else { p.hurt = Math.max(p.hurt, 30); progressBump(p, -10); sectLog('【心魔劫】' + N + ' 道心不稳，被心魔所伤（养伤 30 天，修为倒退）——道途越精纯越不容易被心魔所乘', '#ef7d57', p); sectBreakFx(p, false); }
+  } else if (type === 'awaken') {
+    const k = pick(['bone', 'mind', 'qi', 'charm']), nm = { bone: '根骨', mind: '神识', qi: '灵气', charm: '魅力' }[k];
+    if (p[k] < 10) { p[k]++; sectLog('【觉醒】' + N + ' 体内沉睡的灵根忽然苏醒，' + nm + ' +1', '#ffcd75', p); showBanner('灵根觉醒', N + ' 的' + nm + ' +1', 3, '#ffcd75'); }
+  } else if (type === 'dream') {
+    const d = DAOS[p.dao];
+    touchDao(p, p.dao, 1);
+    sectLog('【梦道】' + N + ' 梦见' + d.concept.split('。')[0] + '，醒来后对' + d.name + '之道体会更深（道途更加精纯）', d.color, p);
+  } else if (type === 'love') {
+    const q = sectPerson(p.mate);
+    if (!q) return;
+    if (Math.random() < 0.7) { progressBump(p, 6); progressBump(q, 6); sectLog('【道侣】' + N + ' 与道侣 ' + q.name + ' 月下同修，阴阳相济，双双精进', '#f7a8c8', p); }
+    else { p.loy = Math.max(0, p.loy - 6); sectLog('【情劫】' + N + ' 与道侣 ' + q.name + ' 生了嫌隙，心神不宁（忠诚 -6）', '#ef7d57', p); }
+  } else if (type === 'beastfind') {
+    if (p.prof === 'shou' || Math.random() < 0.4) giveTreasure('shoudan', '【奇遇】' + N + ' 在山崖上发现一窝被遗弃的灵兽蛋', p);
+    else { const n = randInt(15, 35); G.res.herb += n; sectLog('【奇遇】' + N + ' 跟着一只灵狐找到一片灵草（灵草 +' + n + '）', '#a7f070', p); }
+  } else if (type === 'lazy') {
+    if (p.loy > 60) { p.exp += 20 * (1 + p.realm); sectLog('【勤勉】' + N + ' 天不亮就起来练功，被同门传为佳话', '#a7f070', p); }
+    else { progressBump(p, -5); p.loy = Math.max(0, p.loy - 3); sectLog('【懈怠】' + N + ' 偷偷溜下山去凡间游玩了几日，被执法长老罚抄门规', '#ef7d57', p); }
+  }
+}
+
+// ---------- 更多宗门大事 ----------
+function sectEvent2() {
+  const S = G.sect, home = S.people.filter((q) => !q.away), r = Math.random(), year = sectCal().year;
+  const best = home.slice().sort((a, b) => personPower(b) - personPower(a))[0];
+  if (r < 0.14) {
+    S.boom = 60;
+    sectLog('【天象】地底灵脉翻涌，山中灵气大盛（60 天内全宗修炼速度 +25%）', '#73eff7');
+    showBanner('灵脉涌动', '60 天内全宗修炼速度 +25%', 4, '#73eff7');
+  } else if (r < 0.26) {
+    S.weather = 'rain'; S.weatherLeft = 18;
+    const n = randInt(25, 50); G.res.herb += n; sectRegrow(); sectRegrow();
+    sectLog('【天象】天降灵雨三日，草木疯长（灵草 +' + n + '）', '#a7f070');
+    showBanner('天降灵雨', '灵草 +' + n + '，山中草木疯长', 3.5, '#a7f070');
+  } else if (r < 0.34) {
+    if (G.sectFx) G.sectFx.meteor = { t: 0 };
+    giveTreasure('yuntie', '【天象】夜空中一颗流星坠落后山，弟子们循着火光找到');
+  } else if (r < 0.48) {
+    const offers = [];
+    const ids = Object.keys(TREASURES).sort(() => Math.random() - 0.5).slice(0, 2);
+    for (const id of ids) offers.push({ kind: 't', id, price: { shouguo: 600, lingzhi: 150, daoyuan: 220, huanhun: 260, yuntie: 200, shoudan: 160, wudao: 120, tianyuan: 180, leiyin: 200 }[id] });
+    const left = DAO_IDS.filter((k) => !S.manuals.includes(k));
+    if (left.length) { const id = pick(left); offers.push({ kind: 'm', id, price: [0, 140, 220, 360][DAOS[id].rare] }); }
+    G.state = 'dialog';
+    G.dialog = { title: '坊市拍卖会', text: '山下坊市举办拍卖会，送来请柬。今日压轴之物有：', options: offers.map((o) => ({
+      label: (o.kind === 't' ? TREASURES[o.id].name + '（' + TREASURES[o.id].desc + '）' : DAOS[o.id].gf.name + '（' + daoLabel(o.id) + '）') + ' — 灵石 ' + o.price,
+      disabled: G.res.lingshi < o.price,
+      action: () => { G.res.lingshi -= o.price; if (o.kind === 't') giveTreasure(o.id, '在拍卖会上拍下'); else giveManual(o.id, '在拍卖会上拍下功法'); },
+    })).concat([{ label: '只看不买', action: () => {} }]) };
+  } else if (r < 0.6 && best) {
+    const o = pick(S.sects);
+    G.state = 'dialog';
+    G.dialog = { title: o.name + '求援', text: o.name + '（主修' + DAOS[o.dao].name + '）遭邪修围攻，派人星夜赶来求援。派出门中最强的 ' + best.name + '（战力 ' + personPower(best) + '）前往相助吗？\n成功可得重谢与交情，失败会负伤。', options: [
+      { label: '派 ' + best.name + ' 前往', action: () => {
+        const ok = fight(best, '邪修', 1.1 + year * 0.004, o.name + '山门');
+        if (ok && S.people.includes(best)) { const n = randInt(60, 140); G.res.lingshi += n; S.fame += 6; o.att = Math.min(100, o.att + 20); sectLog('【援手】' + best.name + ' 助' + o.name + '击退邪修，' + o.name + '奉上谢礼（灵石 +' + n + '，声望 +6，交情大增）', '#ffcd75', best); if (Math.random() < 0.4) giveTreasure(pick(['lingzhi', 'wudao', 'tianyuan']), o.name + '另赠'); }
+      } },
+      { label: '婉拒（交情 -10）', action: () => { o.att -= 10; } },
+    ] };
+  } else if (r < 0.72 && home.length) {
+    const p = best, ep = (120 + year * 10) * rand(0.7, 1.3);
+    const clash = daoClash(p.dao, 'jueyin'), sk = useSkills(p, 'jueyin'), mp = personPower(p) * clash.k * sk.mul;
+    if (Math.random() < mp / (mp + ep * sk.foeMul)) sectLog('【魔修】一名魔修夜潜藏经阁，被 ' + p.name + ' 当场擒下〔' + [clash.text, sk.text].filter(Boolean).join('；') + '〕（声望 +3）', '#ffcd75', p), S.fame += 3;
+    else {
+      const k = DAO_IDS.filter((x) => S.qi[x] > 0), lost = k.length ? pick(k) : null;
+      if (lost) S.qi[lost] = Math.max(0, S.qi[lost] - 2);
+      const n = Math.floor(G.res.lingshi * 0.15); G.res.lingshi -= n;
+      sectLog('【魔修】一名魔修夜潜山门，盗走灵石 ' + n + (lost ? '和两缕' + DAOS[lost].qiName : '') + '后扬长而去', '#ef7d57');
+    }
+  } else if (r < 0.84 && home.length) {
+    const cands = home.filter((q) => !q.head && q.realm >= 1 && !(q.hurt > 0)).sort((a, b) => personPower(b) - personPower(a)).slice(0, 3);
+    if (!cands.length) return;
+    G.state = 'dialog';
+    G.dialog = { title: '仙人遗府', text: '有樵夫在深山中见到一座被云雾遮掩的仙人遗府，洞口禁制正在松动。派谁去探一探？（去 3 个月，机缘大，凶险也大）', options: cands.map((q) => ({
+      label: q.name + '（' + REALMS[q.realm] + '期' + (q.dao ? ' · ' + DAOS[q.dao].name : '') + '，战力 ' + personPower(q) + '）',
+      action: () => { assignTask(q, 'travel', { region: pick(Object.keys(REGIONS)), months: 3 }); q.travel.ruin = true; sectLog(q.name + ' 动身前往仙人遗府', '#ffcd75', q); },
+    })).concat([{ label: '不去冒险', action: () => {} }]) };
+  } else if (r < 0.92) {
+    G.state = 'dialog';
+    G.dialog = { title: '凡间王朝来使', text: '山下大周王朝派使者上山，愿奉' + G.sect.name + '为护国仙门。', options: [
+      { label: '受封护国仙门（灵石 +200，但俗务缠身：全宗忠诚 -5）', action: () => { G.res.lingshi += 200; for (const q of S.people) q.loy = Math.max(0, q.loy - 5); sectLog('受大周王朝册封为护国仙门（灵石 +200）', '#ffcd75'); } },
+      { label: '婉拒，只收香火（声望 +8）', action: () => { S.fame += 8; sectLog('婉拒大周王朝册封，清名远播（声望 +8）', '#ffcd75'); } },
+    ] };
+  } else {
+    const ep = (200 + year * 18) * rand(0.8, 1.3);
+    if (sectDefense(home) > ep) { const n = Math.round(ep * 0.15); G.res.ore += Math.round(n / 3); G.res.lingshi += n; S.fame += 4; sectLog('【兽潮】妖兽潮涌至山脚，' + G.sect.name + '弟子结阵死守，斩获颇丰（灵石 +' + n + '，声望 +4）', '#ffcd75'); }
+    else { for (const q of home.slice(0, 3)) q.hurt = Math.max(q.hurt, randInt(20, 50)); G.res.herb = Math.floor(G.res.herb * 0.6); sectLog('【兽潮】妖兽潮冲破山门，多名弟子受伤，药圃被毁（修建护山阵眼、提升战力可以防御）', '#ef7d57'); showBanner('兽潮破山', '多名弟子受伤，药圃被毁', 4, '#ef7d57'); }
+  }
+}
+// ---------- 节日 ----------
+function sectFestival() {
+  const S = G.sect, c = sectCal(), home = S.people.filter((q) => !q.away);
+  if (c.month === 5 && c.day === 5) { for (const q of home) q.hurt = Math.max(0, q.hurt - 10); sectLog('【端午】门中悬艾草、饮雄黄，驱邪避疫（所有伤势 -10 天）', '#a7f070'); }
+  if (c.month === 7 && c.day === 15) { for (const q of home) if (q.prof === 'gui' || (q.dao && DAOS[q.dao].pol === 'yin')) progressBump(q, 6); sectLog('【中元】鬼门开，阴气大盛（鬼修与阴性道途弟子修为精进）', '#b8a8ff'); }
+  if (c.month === 8 && c.day === 15) { for (const q of home) q.loy = Math.min(100, q.loy + 5); S.qi.taiyin = (S.qi.taiyin || 0) + 1; sectLog('【中秋】全宗于宗主峰赏月，掌门亲收一缕太阴月华（全宗忠诚 +5）', '#e8f0ff'); showBanner('中秋赏月', '全宗忠诚 +5，收得一缕太阴月华', 3, '#e8f0ff'); }
+  if (c.month === 9 && c.day === 9) { for (const q of home) if (q.realm >= 3) q.wu = Math.min(100, q.wu + 5 * evPace(q)); sectLog('【重阳】弟子登高望远，金丹修士心有所感（悟性 +5）', '#ffcd75'); }
+}
+
 // ---------- 旧存档转换（8 种真气 → 31 条道途） ----------
 const OLD_DAO = { jin: 'geng', mu: 'yi', shui: 'gui', huo: 'bing', tu: 'wu', lei: 'zhen', yin: 'taiyin', feng: 'jueyin' };
 function migrateSect(S) {
+  S.treasures = S.treasures || {};
+  for (const p of S.people) if (p.lifeGain === undefined) p.lifeGain = REALM_LIFE_GAIN.slice(1, p.realm + 1).reduce((s, v) => s + v * 0.9, 0); // 旧存档：补算历次突破的延寿
+  for (const p of S.people) if (!p.traits) p.traits = rollSectTraits();
+  S.boom = S.boom || 0;
   if (S.v >= SECT_VER) return;
   const m = (id) => (id && OLD_DAO[id]) || id;
   S.manuals = [...new Set(S.manuals.map(m))];
@@ -942,7 +1236,7 @@ MODES.sect = {
   hasNights: false,
   tapGather: true,
   coreSprite: 'core_sect',
-  mapW: SECT_W, mapH: SECT_H, startZoom: 2.4, maxSpeed: 5,
+  mapW: SECT_W, mapH: SECT_H, startZoom: 2.4, speeds: [1, 2, 5, 10, 20], // 1 年 = 1 分钟，修到元婴要几百年，所以允许 ×20
   techLabel: '传承', techTitle: '宗门传承',
   groundColors: {
     [TER.GRASS]: ['#477a4a', '#3a6640', '#558a52'],
@@ -994,7 +1288,7 @@ MODES.sect = {
       const manuals = DAO_STARTER.slice().sort(() => Math.random() - 0.5).slice(0, 2);
       G.sect = {
         v: SECT_VER, name: pick(SECT_NAMES), seed: randInt(1, 1e9), t: 0, fame: 5, people: [], cands: [], candUntil: 0,
-        manuals, qi: {}, items: { [itemKey('zhuji', null)]: 1 }, talis: {}, weapons: [], jobs: { liandan: null, lianqi: null, dianji: null },
+        manuals, qi: {}, items: { [itemKey('zhuji', null)]: 1 }, talis: {}, treasures: {}, boom: 0, weapons: [], jobs: { liandan: null, lianqi: null, dianji: null },
         peaks: {}, log: [], world: [], weather: 'clear', weatherLeft: 0, secret: null, acc: { herb: 0, wood: 0, ore: 0, lingshi: 0 },
         sects: OTHER_SECTS.slice().sort(() => Math.random() - 0.5).slice(0, 6).map((n) => ({ name: n, region: pick(Object.keys(REGIONS)), lv: randInt(1, 3), power: randInt(300, 1200), att: randInt(-20, 30), dao: pick(DAO_IDS) })),
       };
@@ -1037,7 +1331,7 @@ MODES.sect = {
           if (G.state === 'over') return;
           if (d % 360 === 0) sectYearly();
           if (G.state === 'over') return;
-          if (G.state === 'play') saveGame();
+          if (G.state === 'play' && d % 90 === 0) saveGame(); // 每季度自动存档一次
         }
       }
       if (S.cands.length && S.t > S.candUntil) { S.cands = []; sectLog('今年的拜师少年们下山去了', '#94b0c2'); }
@@ -1049,6 +1343,8 @@ MODES.sect = {
       }
       G.members = S.people.filter((q) => !q.away);
       sectAmbient(dt);
+      sectTrainCasts(dt);
+      sectChatter(dt);
     },
     dayLabel() {
       const c = sectCal(), wn = { clear: '晴', rain: '雨', storm: '雷雨', snow: '雪' }[G.sect.weather];
@@ -1083,7 +1379,11 @@ MODES.sect = {
       if (b.type === 'dongfu') return '门下名额 +2';
       return null;
     },
-    drawUnder(ctx) { if (G.sectLayer) ctx.drawImage(G.sectLayer, 0, 0, MAP_W * T, MAP_H * T); },
+    drawUnder(ctx) {
+      if (G.sectLayer) ctx.drawImage(G.sectLayer, 0, 0, MAP_W * T, MAP_H * T);
+      const m = sectCal().month, snow = { 10: 0.15, 11: 0.4, 12: 0.6, 1: 0.35, 2: 0.1 }[m] || 0;
+      if (snow && G.sectSnow) { ctx.globalAlpha = snow; ctx.drawImage(G.sectSnow, 0, 0, MAP_W * T, MAP_H * T); ctx.globalAlpha = 1; }
+    },
     drawWorld(ctx) { drawSectWorld(ctx); },
     drawScreen(ctx) { drawSectScreen(ctx); },
     drawOverlay(ctx) { if (G.state === 'sect') drawSectPanel(ctx); },

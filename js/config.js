@@ -80,3 +80,10 @@ const GENERIC_PERKS = [
     apply: (m, g) => { const r = g.def.resources; g.res[r[0]] += 60; g.res[r[1]] += 40; g.res[r[2]] += 15; },
   },
 ];
+
+// 加速档位：各模式可以在配置里用 speeds 自定义（修仙门派 ×1 ×2 ×5 ×10）
+function nextSpeed() {
+  const list = (G.def && G.def.speeds) || [1, 2, 3];
+  const i = list.indexOf(G.speed);
+  G.speed = list[(i + 1) % list.length];
+}

@@ -25,6 +25,7 @@ function setupMode(mode) {
     inside: null, home: null, citySeed: 0, cityCam: null, // 丧尸模式：建筑内部
     mapOpen: false, miniBase: null, scavLog: [], // 小地图、同伴搜刮记录
     members: [], sect: null, sectFx: null, sectLayer: null, sui: null, // 修仙门派
+    speed: 1, // 换模式时速度回到 ×1（修仙门派可以开到 ×10，别的模式最高 ×3）
   });
 }
 
