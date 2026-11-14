@@ -175,7 +175,7 @@ function sectScatter(type, count, prefer) {
 function sectRegrow() {
   const want = { lingpine: 6, herb: 4, orevein: 1, spiritvein: 0.4 };
   for (const type in want) {
-    let k = want[type];
+    let k = want[type] * ((type === 'lingpine' || type === 'herb') && G.mods.regrow ? G.mods.regrow : 1); // 青帝沃土：草木再生翻倍
     if (k < 1) { if (Math.random() > k) continue; k = 1; }
     const list = G.nodes.filter((n) => n && n.type === type);
     for (let i = 0, tries = 0; i < k && tries < 60; tries++) {

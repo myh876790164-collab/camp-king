@@ -54,6 +54,7 @@ const ATTR_INFO = {
 
 function drawSectPanel(ctx) {
   const sw = G.sw, sh = G.sh, ui = G.sui || { view: 'list' };
+  if (ui.view === 'build') { drawSectBuildPopup(ctx); return; } // 建筑：小弹窗
   ctx.fillStyle = 'rgba(10,10,30,0.7)'; ctx.fillRect(0, 0, sw, sh);
   addButton(0, 0, sw, sh, null);
   const pw = Math.min(720, sw - 12), px = (sw - pw) / 2, top = 6, bottom = sh - 6;
@@ -76,6 +77,7 @@ function drawSectPanel(ctx) {
   else if (ui.view === 'world') sectViewWorld(c);
   else if (ui.view === 'chron') sectViewChron(c);
   else if (ui.view === 'peak') sectViewPeak(c, ui.peak);
+  else if (ui.view === 'market') sectViewMarket(c);
   endScroll(ctx, c.y + 10);
 }
 
@@ -111,9 +113,10 @@ function sectViewList(c) {
     const y = c.y, h = 62, ready = p.realm < REALM_CAP && realmNeed(p).ready && !p.away;
     drawButton(ctx, c.x, y, c.w, h, '', () => openSect('person', { pid: p.id }), { color: ready ? '#3a3a1e' : '#262b44', active: ready });
     ctx.fillStyle = REALM_ROBE[p.realm]; ctx.fillRect(c.x + 6, y + 6, 6, h - 12);
-    drawText(ctx, (p.head ? '【掌门】' : '') + p.name, c.x + 20, y + 15, 14, p.head ? '#ffcd75' : '#f4f4f4');
+    const ttl = p.head ? '【掌门】' : masterTitleOf(p) ? '【' + masterTitleOf(p) + '】' : '';
+    drawText(ctx, ttl + p.name, c.x + 20, y + 15, 14, ttl ? '#ffcd75' : '#f4f4f4');
     ctx.font = 'bold 14px ' + FONT;
-    const nx = c.x + 28 + ctx.measureText((p.head ? '【掌门】' : '') + p.name).width;
+    const nx = c.x + 28 + ctx.measureText(ttl + p.name).width;
     const lleft = lifeLeft(p);
     drawText(ctx, REALMS[p.realm] + '期 · ' + profText(p) + ' · ' + p.age + '/' + lifeMax(p) + '岁 · 战力 ' + personPower(p), nx, y + 15, 12, lleft <= lifeMax(p) * 0.1 ? '#ef7d57' : '#c8d6e5', 'left', false);
     const did = p.dao || p.manual;
@@ -157,8 +160,13 @@ function sectViewPerson(c, p) {
   const S = G.sect, ctx = c.ctx, ui = G.sui;
   cButtons(c, [{ label: '◀ 返回弟子名录', onClick: () => openSect('list') }]);
   if (!p) { cLine(c, '此人已不在门中。', 14); return; }
-  drawText(ctx, (p.head ? '【掌门】' : '') + p.name, c.x, c.y + 10, 18, p.head ? '#ffcd75' : '#f4f4f4');
+  drawText(ctx, (p.head ? '【掌门】' : masterTitleOf(p) ? '【' + masterTitleOf(p) + '】' : '') + p.name, c.x, c.y + 10, 18, p.head || masterTitleOf(p) ? '#ffcd75' : '#f4f4f4');
   c.y += 26;
+  if (canChallengeHead(p)) {
+    const h = headOf();
+    cLine(c, '此人修为（' + REALMS[p.realm] + '）已在掌门 ' + h.name + '（' + REALMS[h.realm] + '）之上，可以在演武场发起挑战，胜者执掌宗门。', 12, '#ef7d57');
+    cButtons(c, [{ label: '⚔ 在演武场挑战掌门之位（战力 ' + personPower(p) + ' 对 ' + personPower(h) + '）', color: '#b13e53', onClick: () => askConfirm('让 ' + p.name + ' 在演武场挑战掌门 ' + h.name + ' 吗？\n胜者成为掌门，宗门品阶跟着新掌门的境界走；败者受伤。', () => { startHeadDuel(p, false); closeSect(); }) }], 34);
+  }
   cLine(c, REALMS[p.realm] + '期 ' + profText(p) + '　' + (p.sex === 'f' ? '女' : '男') + '　' + p.age + ' 岁（寿元 ' + lifeMax(p) + '）' + (p.head ? '' : '　忠诚 ' + p.loy) + (p.mate ? '　道侣：' + ((sectPerson(p.mate) || {}).name || '') : ''), 13, '#c8d6e5');
   cLine(c, '天赋：' + APT_TEXT[p.apt] + '（宜' + PROFS[p.apt].name + '）　性格：' + (p.traits || []).map((t) => SECT_TRAITS[t].name + '（' + SECT_TRAITS[t].desc + '）').join('；'), 12, '#94b0c2');
   for (const k of ['bone', 'mind', 'qi', 'charm']) {
@@ -224,6 +232,29 @@ function sectViewPerson(c, p) {
   if (!p.dao && S.manuals.length) {
     cLine(c, '可修习的功法（服下第一缕真气后就不能再换）：', 12, '#94b0c2');
     cButtons(c, S.manuals.map((id) => ({ label: (p.manual === id ? '✔ ' : '') + DAOS[id].gf.name + '·' + DAOS[id].name, active: p.manual === id, onClick: () => learnManual(p, id) })));
+  }
+
+  // 师承
+  cHead(c, '师承');
+  for (const r of MENTOR_ROLES.filter((r) => roleHolder(r) === p)) {
+    const st = studentsOf(r);
+    cLine(c, '身为' + roleTitle(r) + '：门下弟子 ' + st.length + '/' + mentorCap(r) + (st.length ? '（' + st.map((q) => q.name).join('、') + '）' : '') + '。境界越高，能收的徒弟越多', 12, '#ffcd75');
+    if (st.length) cButtons(c, st.map((q) => ({ label: '逐出 ' + q.name, color: '#5d275d', onClick: () => askConfirm('把 ' + q.name + ' 逐出师门吗？（忠诚 -15）', () => expelStudent(q)) })));
+  }
+  if (!p.head) {
+    if (p.mentor) {
+      const mi = mentorInfo(p), h = mi && mi.h;
+      cLine(c, '师从' + roleTitle(p.mentor) + (h ? ' ' + h.name + '（' + REALMS[h.realm] + '期' + (h.dao ? ' · ' + DAOS[h.dao].name : '') + '）' : '（此位空缺，等新任接手）') + '：' + mentorText(mi, p.mentor), 12, '#a7f070');
+      cLine(c, '师承挂在职位上：' + roleTitle(p.mentor) + '换人时，会自动转到新任名下。', 11, '#94b0c2');
+      cButtons(c, [{ label: '逐出师门', color: '#5d275d', onClick: () => askConfirm('把 ' + p.name + ' 逐出师门吗？（忠诚 -15）', () => expelStudent(p)) }]);
+    } else {
+      cLine(c, '尚无师承。可以拜掌门或峰主为师：师父境界越高、道途越相近，指点越多（修炼、突破）；峰主还会传授本行技艺，技艺经验也涨得更快。', 12, '#94b0c2');
+      const opts = MENTOR_ROLES.filter((r) => roleHolder(r) && roleHolder(r) !== p).map((r) => {
+        const h = roleHolder(r), mi = mentorInfo({ mentor: r, dao: p.dao });
+        return { label: '拜' + roleTitle(r) + ' ' + h.name + '（' + studentsOf(r).length + '/' + mentorCap(r) + '，修炼 +' + Math.round((mi ? mi.speed : 0) * 100) + '%）', dim: !canApprentice(p, r), color: '#1f5e3a', onClick: () => apprentice(p, r) };
+      });
+      if (opts.length) cButtons(c, opts); else cLine(c, '门中还没有可以拜的师父（掌门以外的师父要先推举出峰主）。', 12, '#566c86');
+    }
   }
 
   // 道途技能
@@ -320,6 +351,14 @@ function sectViewPeak(c, id) {
       c.y += 44;
     } else cLine(c, '已扩建到最高级', 12, '#ffcd75');
   }
+  if (PEAK_MASTER[id]) {
+    const M = PEAK_MASTER[id], m = peakMaster(id);
+    cHead(c, M.title);
+    if (m) { const st = studentsOf(id); cLine(c, M.title + '：' + m.name + '（' + REALMS[m.realm] + '期，技艺 ' + masterScore(m, id).toFixed(1) + '）——门下弟子 ' + st.length + '/' + mentorCap(id) + (st.length ? '：' + st.map((q) => q.name).join('、') : '') + '。传授' + M.effect.replace(/（.*）/, '') + '给门下弟子', 12, '#ffcd75'); }
+    else cLine(c, '暂无' + M.title + '（每两年推举一次）', 12, '#94b0c2');
+    const top = G.sect.people.filter((q) => !q.head && !q.away).sort((a, b) => masterScore(b, id) - masterScore(a, id)).slice(0, 3);
+    if (top.length) cLine(c, '门中技艺排名：' + top.map((q) => q.name + ' ' + masterScore(q, id).toFixed(1)).join('　') + '（技艺 = 属性 + 职业 + 平时干这份差事攒的经验）', 11, '#94b0c2');
+  }
   const task = PEAK_TASK[id];
   if (task) {
     const job = S.jobs[id], book = CRAFT[task].book(), crafters = S.people.filter((q) => !q.away && q.task === task);
@@ -358,9 +397,10 @@ function sectViewPeak(c, id) {
 // ---------- 典籍（分页：功法 / 道途总览 / 库存 / 生克） ----------
 function sectViewLibrary(c) {
   const S = G.sect, ctx = c.ctx, ui = G.sui;
-  ui.sub = ui.sub || 'gf';
-  cButtons(c, [['gf', '本门功法'], ['all', '道途总览'], ['store', '库存'], ['rule', '生克与职业']].map(([k, name]) => ({ label: name, active: ui.sub === k, color: ui.sub === k ? '#29366f' : '#333c57', onClick: () => { ui.sub = k; G.scroll.sect_library = 0; } })));
-  if (ui.sub === 'gf') {
+  ui.sub = ui.sub || 'guide';
+  cButtons(c, [['guide', '修炼指南'], ['gf', '本门功法'], ['all', '道途总览'], ['store', '库存'], ['rule', '生克与职业']].map(([k, name]) => ({ label: name, active: ui.sub === k, color: ui.sub === k ? '#29366f' : '#333c57', onClick: () => { ui.sub = k; G.scroll.sect_library = 0; } })));
+  if (ui.sub === 'guide') sectViewGuides(c);
+  else if (ui.sub === 'gf') {
     cHead(c, '藏经阁功法（' + S.manuals.length + '/' + DAO_IDS.length + '）');
     cLine(c, '今日：' + MONTH_CN[sectCal().month - 1] + '（' + monthBranch() + '月）' + dayCN(sectCal().day) + ' ' + ganzhiText() + '，' + SEASON_CN[sectSeason()] + '季，' + { clear: '晴', rain: '雨', storm: '雷雨', snow: '雪' }[S.weather] + (fullMoon() ? '，满月' : '') + '。天干道途逢本日干、地支道途逢本月建最旺。', 12, '#73eff7');
     for (const id of S.manuals) {
@@ -435,6 +475,7 @@ function sectViewLibrary(c) {
 // ---------- 天下 ----------
 function sectViewWorld(c) {
   const S = G.sect;
+  sectViewBounties(c);
   cHead(c, '五域');
   for (const k in REGIONS) {
     const R = REGIONS[k], here = S.people.filter((p) => p.away && p.travel && p.travel.region === k).map((p) => p.name);
@@ -534,6 +575,15 @@ function drawSectWorld(ctx) {
   }
   sectLabel(ctx, '灵泉', SPRING_C[0] * T, (SPRING_C[1] - 3) * T, '#73eff7');
   sectLabel(ctx, '灵松林', 44.5 * T, 21 * T, '#a7f070');
+  drawChoreWorkers(ctx);
+  // 峰主
+  for (const k in PEAK_MASTER) {
+    const m = peakMaster(k);
+    if (!m) continue;
+    const P = PEAKS[k], [hx, hy, hw] = P.hall;
+    sectLabel(ctx, PEAK_MASTER[k].title + '：' + m.name, (hx + hw / 2) * T, hy * T - (P.tiers === 3 ? 34 : P.tiers === 2 ? 26 : 16) + 12 / G.cam.zoom * 1.3, '#c8d6e5', 10);
+  }
+  if (S.duel && S.duel.fightT !== undefined) { const [ax, ay] = PEAKS.yanwu.anchor; sectLabel(ctx, '⚔ 掌门之位比斗中 ⚔', (ax + 0.5) * T, (ay - 1.2) * T, '#ef7d57', 13); }
   // 弟子
   const ps = S.people.filter((p) => !p.away).sort((a, b) => a.y - b.y);
   for (const p of ps) {

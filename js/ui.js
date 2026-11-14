@@ -262,7 +262,7 @@ function drawUI(ctx) {
     const def = bdef(G.buildMode);
     const pw = Math.min(480, sw - 16), ph = 40, px = (sw - pw) / 2, py = by - ph - 8;
     drawPanel(ctx, px, py, pw, ph);
-    const txt = wrapText(ctx, def.name + '：' + def.desc, pw - 90, 13);
+    const txt = wrapText(ctx, G.def.hooks.buildHint ? G.def.hooks.buildHint(def) : def.name + '：' + def.desc, pw - 90, 13);
     txt.slice(0, 2).forEach((ln, k, arr) => drawText(ctx, ln, px + 12, py + ph / 2 + (k - (arr.length - 1) / 2) * 15, 13, '#ffcd75'));
     drawButton(ctx, px + pw - 66, py + 6, 58, ph - 12, '取消', () => { G.buildMode = null; }, { size: 13 });
   }
