@@ -212,6 +212,18 @@ function rdNearSite() {
   }
   return best;
 }
+// 刚开过、还没搜的建筑（4 公里以内，可以倒车回去）
+function rdBehindSite() {
+  const R = rdR();
+  if (rdNearSite()) return null;
+  return R.sites.filter((s) => !s.searched && s.km < R.km && s.km > R.km - 4).sort((a, b) => b.km - a.km)[0] || null;
+}
+function rdStartReverse(s) {
+  const R = rdR();
+  R.driving = false;
+  R.reverse = s;
+  rdLog('倒车回去搜索' + RD_SITES[s.type].name, '#94b0c2');
+}
 // 前方最近的建筑（瞭望 / 雷达用）
 function rdNextSite() {
   const R = rdR();
@@ -231,6 +243,22 @@ function rdUpdate(dt) {
   if (canDrive && st.fuelKm > 0 && G.res.fuel <= 0) { target = 0; if (!R.noFuelWarn) { R.noFuelWarn = true; rdLog('没油了！去加油站找找，或者等商人路过。', '#ef7d57'); showBanner('燃油耗尽', '停车搜索附近的建筑，或者换省油/电动的引擎', 4, '#ef7d57'); } R.driving = false; }
   if (canDrive && st.powKm > 0 && G.res.power <= 0) { target = 0; if (!R.noPowWarn) { R.noPowWarn = true; rdLog('电池没电了！停下来充电（太阳能、发电机）。', '#ef7d57'); showBanner('电量耗尽', '停车等太阳能充电，或装发电机', 4, '#ef7d57'); } R.driving = false; }
   if (target > 0) { R.noFuelWarn = false; R.noPowWarn = false; }
+  // 倒车回到刚开过的建筑（先刹停，再以 30 km/h 往回倒）
+  if (R.reverse) {
+    const s = R.reverse;
+    if (R.driving || me.loc === 'out' || me.loc === 'site' || s.searched || R.broken) R.reverse = null;
+    else if (R.speedNow < 1) {
+      const d = (s.km - R.km) * RD_PX_KM;
+      if (Math.abs(d) < 15) { R.reverse = null; rdStartSearch(s); }
+      else if (st.fuelKm > 0 && G.res.fuel <= 0 || st.powKm > 0 && G.res.power <= 0) { R.reverse = null; showBanner('没有燃料', '倒不回去了', 2, '#ef7d57'); }
+      else {
+        const back = Math.min(Math.abs(d) / RD_PX_KM, 30 * RD_KM_RATE * dt) * Math.sign(d);
+        R.km += back; R.reversing = true;
+        if (st.fuelKm > 0) G.res.fuel = Math.max(0, G.res.fuel - Math.abs(back) * st.fuelKm);
+        if (st.powKm > 0) G.res.power = Math.max(0, G.res.power - Math.abs(back) * st.powKm);
+      }
+    }
+  } else R.reversing = false;
   const acc = target > R.speedNow ? 28 : 80;
   R.speedNow += Math.sign(target - R.speedNow) * Math.min(Math.abs(target - R.speedNow), acc * dt);
   const dkm = R.speedNow * RD_KM_RATE * dt;

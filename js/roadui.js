@@ -132,6 +132,15 @@ function rdDrawUI(ctx) {
       const lw = ctx.measureText(label).width + 24, lx = Math.max(6, Math.min(sw - lw - 6, p.x - lw / 2)), ly = Math.max(topH + 40, p.y - 40);
       drawButton(ctx, lx, ly, lw, 34, label, () => rdStartSearch(s), { color: S.trade ? '#5d275d' : '#a8794f', size: 13, active: true });
     }
+    // 开过头了：倒车回去
+    const bs = !outside && !R.broken ? rdBehindSite() : null;
+    if (bs && !s) {
+      const S = RD_SITES[bs.type], dist = (R.km - bs.km).toFixed(1);
+      const label = R.reverse === bs ? '◀ 正在倒车……（' + dist + ' 公里）' : '◀ 倒车回去' + (S.trade ? '拜访 ' : '搜索 ') + S.name + '（' + dist + ' 公里）';
+      ctx.font = 'bold 13px ' + FONT;
+      const lw = ctx.measureText(label).width + 24;
+      drawButton(ctx, 8, yb - 50, lw, 34, label, R.reverse === bs ? () => { R.reverse = null; } : () => rdStartReverse(bs), { color: '#566c86', size: 13, active: R.reverse === bs });
+    }
     if (outside && R.search) {
       const t = R.search.phase === 'in' ? '正在搜索……' : R.search.phase === 'back' ? '回车上……' : '走向建筑……';
       drawText(ctx, t, sw / 2, yb - 22, 14, '#ffcd75', 'center');
@@ -178,6 +187,7 @@ function rdToggleDrive() {
   if (st.fuelKm > 0 && G.res.fuel <= 0) { showBanner('没有油', '去搜索加油站，或者等商人', 2, '#ef7d57'); return; }
   if (st.powKm > 0 && G.res.power <= 0) { showBanner('没有电', '等太阳能充电或装发电机', 2, '#ef7d57'); return; }
   R.driving = true;
+  R.reverse = null;
   if (me.act && me.act.type === 'sleep' && !st.autopilot) me.act = null;
 }
 function rdOpenPanel(p) { const R = G.road; R.panel = p; R.pick = null; G.state = 'rpanel'; if (G.scroll) G.scroll.rpanel = 0; }
@@ -449,7 +459,7 @@ function rdKey(key) {
   if (G.state === 'rpanel' && key === 'escape') { G.state = 'play'; return true; }
   if (G.state !== 'play') return false;
   if (key === 'enter' || key === 'w') rdToggleDrive();
-  else if (key === 'f') { const s = rdNearSite(); if (s) rdStartSearch(s); }
+  else if (key === 'f') { const s = rdNearSite(); if (s) rdStartSearch(s); else { const b = rdBehindSite(); if (b) rdStartReverse(b); } }
   else if (key === 'i' || key === 'tab') R.view = R.view === 'in' ? 'out' : 'in';
   else if (key === 'g') rdOpenPanel('garage');
   else if (key === 'b') rdOpenPanel('inv');
