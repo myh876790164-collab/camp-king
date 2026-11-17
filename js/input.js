@@ -40,6 +40,7 @@ function handleTap(sx, sy) {
   const hit = hitUI(sx, sy);
   if (hit) { if (hit.onClick) hit.onClick(); return; }
   if (G.scene !== 'game' || G.state !== 'play') return;
+  if (G.def.custom) { if (G.def.hooks.tap) G.def.hooks.tap(sx, sy); return; }
   const t = screenToTile(sx, sy), w = screenToWorld(sx, sy);
   if (G.inside && G.def.hooks.tapInside) { G.def.hooks.tapInside(t.x, t.y, w.x, w.y); return; } // 丧尸模式：在建筑里面
   if (G.buildMode) { tryBuild(G.buildMode, t.x, t.y); return; }
@@ -64,7 +65,7 @@ function setupInput(canvas) {
     if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
     if (pointers.size === 1) {
       drag = { sx: p.x, sy: p.y, lx: p.x, ly: p.y, moved: false, onUI: !!hitUI(p.x, p.y), button: e.button, scroll: scrollAreaAt(p.x, p.y) };
-    } else if (pointers.size === 2 && G.cam) {
+    } else if (pointers.size === 2 && G.cam && !(G.def && G.def.custom && G.scene === 'game')) {
       const [a, b] = [...pointers.values()];
       pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, zoom: G.cam.zoom };
       if (drag) drag.moved = true;
@@ -85,7 +86,9 @@ function setupInput(canvas) {
     if (drag && pointers.size === 1) {
       if (!drag.moved && Math.hypot(p.x - drag.sx, p.y - drag.sy) > 8) drag.moved = true;
       if (drag.moved && drag.scroll) scrollBy(drag.scroll, drag.scroll.horiz ? -(p.x - drag.lx) : -(p.y - drag.ly)); // 拖动滚动面板（横向拖动栏左右拖）
-      if (drag.moved && !drag.onUI && G.state === 'play') {
+      if (drag.moved && !drag.onUI && G.state === 'play' && G.def.custom) {
+        if (G.def.hooks.drag) G.def.hooks.drag(p.x - drag.lx, p.y - drag.ly);
+      } else if (drag.moved && !drag.onUI && G.state === 'play') {
         G.cam.x -= (p.x - drag.lx) / G.cam.zoom;
         G.cam.y -= (p.y - drag.ly) / G.cam.zoom;
         G.camFollow = false;
@@ -121,6 +124,7 @@ function setupInput(canvas) {
     const p = getPos(e);
     const area = scrollAreaAt(p.x, p.y);
     if (area) { scrollBy(area, e.deltaY > 0 ? 48 : -48); return; } // 滚轮滚动面板
+    if (G.def.custom) { if (G.def.hooks.drag && G.state === 'play') G.def.hooks.drag(e.deltaY > 0 ? -40 : 40, 0); return; }
     if (G.state !== 'play') return; // 打开面板时不缩放地图
     zoomAt(p.x, p.y, G.cam.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15));
   }, { passive: false });
@@ -129,6 +133,13 @@ function setupInput(canvas) {
   window.addEventListener('keydown', (e) => {
     const key = e.key.toLowerCase();
     if (G.scene !== 'game') return;
+    if (G.def && G.def.custom) { // 公路求生：自己的快捷键
+      if (key === 'escape' && G.confirm) { G.confirm = null; return; }
+      if (G.def.hooks.key && G.def.hooks.key(key)) { e.preventDefault(); return; }
+      if (key === 'escape') { if (G.state === 'play') G.state = 'paused'; else if (G.state === 'paused') G.state = 'play'; return; }
+      if (key === ' ' && G.state === 'play') { nextSpeed(); e.preventDefault(); }
+      return;
+    }
     if (KEYMAP[key] && G.player) {
       G.keys[KEYMAP[key]] = true;
       e.preventDefault();

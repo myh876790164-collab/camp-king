@@ -47,7 +47,7 @@ const RES_INFO = {
 };
 
 const MODES = {};
-const MODE_ORDER = ['classic', 'island', 'zombie', 'frost', 'sect'];
+const MODE_ORDER = ['classic', 'island', 'zombie', 'frost', 'sect', 'road'];
 
 // 所有加成的初始值（科技和肉鸽强化会修改这些数）
 function defaultMods() {

@@ -96,15 +96,45 @@ const TASKS = {
   labor: { name: '宗门杂务', loc: 'forest', desc: '采药、伐木、挖矿，为宗门产出资源' },
   travel: { name: '外出历练', loc: 'gate', desc: '下山去天下各处历练，有机缘也有凶险' },
 };
-const TASK_ORDER = ['cult', 'gather', 'alchemy', 'forge', 'fu', 'train', 'study', 'labor'];
+// 常设差事（默认闭关修炼）；炼丹、炼器、制符不再是常设差事：开炉后由该峰峰主和门下弟子自行前往，完工后回到原来的差事
+const TASK_ORDER = ['cult', 'gather', 'train', 'study', 'labor'];
 const CRAFT = { alchemy: { peak: 'liandan', book: () => PILLS }, forge: { peak: 'lianqi', book: () => FORGE }, fu: { peak: 'dianji', book: () => TALIS } };
 const PEAK_TASK = { liandan: 'alchemy', lianqi: 'forge', dianji: 'fu' };
+// 此刻实际在干的事：被叫去开炉 > 常设差事；没有功法就采不了气，按闭关修炼算
+function workTask(p) {
+  if (p.job && G.sect && G.sect.jobs[p.job]) return PEAK_TASK[p.job];
+  if (p.task === 'gather' && !p.manual) return 'cult';
+  if (p.task === 'alchemy' || p.task === 'forge' || p.task === 'fu') return 'cult';
+  return p.task;
+}
+// 原本的常设差事（不算被叫去开炉）
+function workTaskBase(p) {
+  if (p.task === 'gather' && !p.manual) return 'cult';
+  if (p.task === 'alchemy' || p.task === 'forge' || p.task === 'fu' || !TASKS[p.task]) return 'cult';
+  return p.task;
+}
 function taskLoc(p) {
   if (G.sect && G.sect.duel && (G.sect.duel.a === p.id || G.sect.duel.b === p.id)) return 'yanwu'; // 正在演武场比斗
   if (p.hurt > 0) return p.head ? 'zongzhu' : 'zhufeng';
-  if (p.task === 'cult') return p.head ? 'zongzhu' : 'zhufeng';
-  if (p.task === 'gather') return p.manual ? DAOS[p.manual].loc : 'zhufeng';
-  return TASKS[p.task].loc || 'zhufeng';
+  if (p.job && G.sect && G.sect.jobs[p.job]) return p.job; // 去峰上开炉
+  const t = workTask(p);
+  if (t === 'cult') return p.head ? 'zongzhu' : 'zhufeng';
+  if (t === 'gather') return DAOS[p.manual].loc;
+  return TASKS[t].loc || 'zhufeng';
+}
+// 开炉时谁来干活：该峰峰主和门下弟子；没有的话，找门中这门技艺最好的两人来帮忙
+function craftCrew(peak) {
+  const S = G.sect;
+  const free = S.people.filter((q) => !q.head && !q.away && !(q.hurt > 0) && q.task !== 'travel' && !(q.job && q.job !== peak && S.jobs[q.job]) && !(S.duel && (S.duel.a === q.id || S.duel.b === q.id)));
+  const m = S.masters && S.masters[peak];
+  let crew = free.filter((q) => q.id === m || q.mentor === peak);
+  if (!crew.length) crew = free.slice().sort((a, b) => masterScore(b, peak) - masterScore(a, peak)).slice(0, 2);
+  return crew;
+}
+function assignCrew(peak) {
+  const crew = craftCrew(peak);
+  for (const q of crew) { q.job = peak; q.pose = 'stand'; goTo(q, taskLoc(q)); }
+  return crew;
 }
 // ---------- 天下 ----------
 const REGIONS = {
@@ -283,7 +313,7 @@ function movePerson(p, dt) {
 }
 function idleWander(p, dt) {
   if (p.route.length || p.at !== p.loc) return;
-  const roam = p.task === 'labor' || p.task === 'train' || p.task === 'alchemy' || p.task === 'forge';
+  const wt = workTask(p), roam = wt === 'labor' || wt === 'train' || wt === 'alchemy' || wt === 'forge';
   p.pose = !roam && !p.moving ? 'sit' : 'stand';
   if (!roam) return;
   p.wt -= dt;
@@ -291,7 +321,9 @@ function idleWander(p, dt) {
 }
 function assignTask(p, task, opt) {
   if (task === 'gather' && !p.manual) { showBanner('还不能采气', p.name + ' 尚未修习功法，不知道采气之法（在人物面板修习功法）', 3, '#ef7d57'); sfx('bad'); return; }
+  if (task === 'alchemy' || task === 'forge' || task === 'fu') task = 'cult'; // 不再是常设差事
   if (task === 'travel') {
+    p.job = null; // 下山就不再管炉子了，峰上会另外叫人
     p.travel = { region: opt.region, months: opt.months, left: opt.months, loot: { lingshi: 0, herb: 0, ore: 0 }, notes: [] };
     sectLog(p.name + ' 辞别师门，前往' + REGIONS[opt.region].name + '历练（' + opt.months + ' 个月）', '#ffcd75', p);
   }
@@ -324,6 +356,8 @@ function sectDaily() {
   }
   if (S.boom > 0) S.boom--;
   sectFestival();
+  // 正在开炉的峰：干活的人都走了（外出、受伤、去世），就重新叫人
+  for (const peak in PEAK_TASK) if (S.jobs[peak] && !S.people.some((q) => q.job === peak && !q.away && !(q.hurt > 0))) assignCrew(peak);
   const acc = S.acc, healers = sectHealPower();
   if (healers > 0 && Math.floor(S.t) % 12 === 0 && S.people.some((q) => !q.away && q.hurt > 0)) sectHealFx();
   for (const p of S.people) {
@@ -338,10 +372,10 @@ function sectDaily() {
     }
     if (p.loc !== taskLoc(p)) goTo(p, taskLoc(p));
     if (p.at !== taskLoc(p)) continue;
-    const sp = cultSpeed(p), pc = pace(p);
-    if (p.task !== 'cult' && p.task !== 'gather' && p.task !== 'labor') { p.xp = p.xp || {}; p.xp[p.task] = (p.xp[p.task] || 0) + (mentorCraft(p, p.task) ? 1.5 : 1); } // 技艺经验（峰主推举看这个；跟着本行峰主学更快）
+    const sp = cultSpeed(p), pc = pace(p), wt = workTask(p);
+    if (wt !== 'cult' && wt !== 'gather' && wt !== 'labor') { p.xp = p.xp || {}; p.xp[wt] = (p.xp[wt] || 0) + (mentorCraft(p, wt) ? 1.5 : 1); } // 技艺经验（峰主推举看这个；跟着本行峰主学更快）
     const wuK = 1 + sumFx(p, 'wu'), yingK = 1 + sumFx(p, 'ying');
-    switch (p.task) {
+    switch (wt) {
       case 'cult':
         if (p.realm === 0) p.zj = Math.min(100, p.zj + sp);
         else if (p.realm === 1) p.base = Math.min(100, p.base + sp * 0.5 * pc);
@@ -362,8 +396,8 @@ function sectDaily() {
         break;
       }
       case 'alchemy': case 'forge': case 'fu': {
-        const cr = CRAFT[p.task], job = S.jobs[cr.peak];
-        const k = (p.task === 'alchemy' ? (1 + sumFx(p, 'alch')) * G.mods.alch : p.task === 'fu' ? 1 + sumFx(p, 'fuSpeed') : 1) * (1 + mentorCraft(p, p.task)); // 师父（本行峰主）的技艺加成
+        const cr = CRAFT[wt], job = S.jobs[cr.peak];
+        const k = (wt === 'alchemy' ? (1 + sumFx(p, 'alch')) * G.mods.alch : wt === 'fu' ? 1 + sumFx(p, 'fuSpeed') : 1) * (1 + mentorCraft(p, wt)); // 师父（本行峰主）的技艺加成
         if (job) job.work += (0.6 + p.mind * 0.1 + p.qi * 0.05) * (1 + 0.1 * peakLv(cr.peak)) * k;
         else p.exp += 0.05;
         break;
@@ -397,7 +431,9 @@ function sectDaily() {
 }
 // 主炼弟子：本行职业优先，其次神识高的
 function leadCrafter(task) {
-  const cs = G.sect.people.filter((q) => !q.away && q.task === task && q.at === CRAFT[task].peak);
+  const peak = CRAFT[task].peak;
+  let cs = G.sect.people.filter((q) => !q.away && q.job === peak && q.at === peak);
+  if (!cs.length) cs = G.sect.people.filter((q) => !q.away && q.job === peak);
   const prof = { alchemy: 'dan', forge: 'qi', fu: 'fu' }[task];
   cs.sort((a, b) => (b.prof === prof) - (a.prof === prof) || b.mind - a.mind);
   return cs[0] || null;
@@ -405,8 +441,12 @@ function leadCrafter(task) {
 function finishCraft(task) {
   const S = G.sect, cr = CRAFT[task], job = S.jobs[cr.peak];
   if (!job || job.work < job.days) return;
-  S.jobs[cr.peak] = null;
   const lead = leadCrafter(task), mind = lead ? lead.mind : 4, dao = job.dao;
+  S.jobs[cr.peak] = null;
+  // 完工：干活的人各自回到原来的差事
+  const crew = S.people.filter((q) => q.job === cr.peak);
+  for (const q of crew) { q.job = null; goTo(q, taskLoc(q)); }
+  if (crew.length) sectLog(crew.map((q) => q.name).join('、') + ' 完工，回到原来的差事', '#94b0c2');
   if (task === 'alchemy') {
     const ok = Math.random() < Math.min(0.95, 0.5 + mind * 0.04 + peakLv('liandan') * 0.05 + G.mods.alchOk + (lead ? mentorCraft(lead, 'alchemy') * 0.25 : 0) + (lead ? sumFx(lead, 'alchOk') + (lead.sht && lead.prof === 'dan' ? 0.1 : 0) : 0));
     const name = sectItemName(job.id, dao, PILLS);
@@ -604,10 +644,12 @@ function startJob(peak, id) {
   const S = G.sect, task = PEAK_TASK[peak], book = CRAFT[task].book(), rec = book[id];
   if (S.jobs[peak] || !canAfford(rec.cost) || (rec.lv && S.peaks[peak].lv < rec.lv)) return;
   pay(rec.cost);
+  S.jobs[peak] = { id, work: 0, days: rec.days, dao: null };
+  const crew = assignCrew(peak); // 峰主和门下弟子自行前来
   const lead = leadCrafter(task);
   const dao = lead ? lead.dao : null;
-  S.jobs[peak] = { id, work: 0, days: rec.days, dao };
-  sectLog({ liandan: '炼丹峰开炉炼制「', lianqi: '炼器峰开始炼制「', dianji: '典籍峰开始书写「' }[peak] + sectItemName(id, dao, book) + '」' + (lead ? '（主' + (task === 'fu' ? '笔' : '炼') + '：' + lead.name + '）' : ''), '#ffcd75');
+  S.jobs[peak].dao = dao;
+  sectLog({ liandan: '炼丹峰开炉炼制「', lianqi: '炼器峰开始炼制「', dianji: '典籍峰开始书写「' }[peak] + sectItemName(id, dao, book) + '」' + (crew.length ? '，' + crew.map((q) => q.name).join('、') + ' 放下手头的事前来' + (task === 'fu' ? '制符' : task === 'alchemy' ? '炼丹' : '炼器') + '（主' + (task === 'fu' ? '笔' : '炼') + '：' + lead.name + '）' : '，但门中没有人手可派'), '#ffcd75');
   sfx('build');
 }
 function upgradePeak(id) {
@@ -1227,6 +1269,7 @@ function sectFestival() {
 const OLD_DAO = { jin: 'geng', mu: 'yi', shui: 'gui', huo: 'bing', tu: 'wu', lei: 'zhen', yin: 'taiyin', feng: 'jueyin' };
 function migrateSect(S) {
   S.treasures = S.treasures || {};
+  for (const p of S.people) if (p.task === 'alchemy' || p.task === 'forge' || p.task === 'fu') p.task = 'cult'; // 炼丹炼器制符改成开炉时自动派人
   S.market = S.market || { stock: [], auto: {}, keep: 100, refreshAt: 0 };
   S.bounties = S.bounties || [];
   S.masters = S.masters || {};
@@ -1290,11 +1333,12 @@ MODES.sect = {
     spiritvein: { name: '灵石矿脉', res: 'lingshi', amount: 20, sprite: 'spiritvein' },
   },
 
-  buildList: ['lingtian', 'lumberyard', 'kuangdong', 'lsmine', 'fangshi', 'julingzhen', 'dongfu', 'zhenyan'],
+  buildList: ['lingtian', 'caiyao', 'lumberyard', 'kuangdong', 'lsmine', 'fangshi', 'julingzhen', 'dongfu', 'zhenyan'],
   buildings: {
     core: { name: '宗门香鼎', size: 2, hp: 2000, upgrade: { lingshi: 120, wood: 60, ore: 20 }, desc: '宗门气运所系。升级后可多收 2 名弟子' },
     lingtian: { name: '灵田', hp: 100, cost: { wood: 15, lingshi: 10 }, sprite: 's_field', produce: { res: 'herb', amount: 1, interval: 7 }, desc: '种植灵草，持续产出灵草' },
     lumberyard: { name: '伐木场', hp: 100, cost: { lingshi: 10 }, sprite: 's_lumber', chore: 'lingpine', carry: 6, workTime: 3, desc: '杂役去附近砍灵松，背回来才入账（每趟 6 木材）。升级加杂役、加速度' },
+    caiyao: { name: '采药房', hp: 100, cost: { wood: 20, lingshi: 10 }, sprite: 's_herbhut', chore: 'herb', carry: 4, workTime: 2.5, desc: '药童去附近采野生灵草，背回来才入账（每趟 4 灵草），也能防止灵草长满山。升级加药童、加速度' },
     kuangdong: { name: '矿洞', hp: 100, cost: { wood: 25 }, sprite: 's_mine', chore: 'orevein', carry: 3, workTime: 4, desc: '杂役去附近挖玄铁矿，背回来才入账（每趟 3 玄铁）。升级加杂役、加速度' },
     lsmine: { name: '灵石矿', hp: 100, cost: { wood: 30, ore: 10 }, sprite: 's_lsmine', chore: 'spiritvein', carry: 3, workTime: 5, locked: true, desc: '杂役去开采灵石矿脉（多在群山脚下），每趟 3 灵石。升级加杂役、加速度' },
     fangshi: { name: '坊市', hp: 200, cost: { lingshi: 80, wood: 60 }, sprite: 's_market', limit: 1, desc: '与天下修士交易，买卖资源、真气、丹药、符箓；可以设置每月自动出售本门产出。升级后卖价更高、买价更低、货更多（只能建一座）' },
@@ -1383,7 +1427,7 @@ MODES.sect = {
       }
       G.members = S.people.filter((q) => !q.away);
       sectGuideTick();
-      sectChoreTick(dt);
+      choreTick(dt);
       sectDuelTick(dt);
       sectAmbient(dt);
       sectTrainCasts(dt);
@@ -1426,7 +1470,7 @@ MODES.sect = {
       if (b.type === 'julingzhen') return '3.5 格内修炼速度 +' + (25 * b.level) + '%';
       if (b.type === 'zhenyan') return '宗门防御 +30%';
       if (b.type === 'dongfu') return '门下名额 +2';
-      if (b.def.chore) { const n = G.def.nodes[b.def.chore]; return '庶务杂役 ' + choreCount(b) + ' 人，速度 ×' + choreSpeed(b).toFixed(1) + '，每趟背回 ' + b.def.carry + ' ' + RES_INFO[n.res].name + (b.idle ? '　（' + CHORE_RANGE + ' 格内没有' + n.name + '了）' : '') + '。升级：' + (b.level < 5 ? '杂役 ' + CHORE_WORKERS[b.level + 1] + ' 人、速度 ×' + (1 + 0.1 * b.level).toFixed(1) : '已满级'); }
+      if (b.def.chore) return '庶务' + choreInfo(b);
       return null;
     },
     drawUnder(ctx) {

@@ -30,6 +30,7 @@ function setupMode(mode) {
 }
 
 function startGame(mode, opt) {
+  if (MODES[mode].custom) { startCustomGame(mode, opt); return; } // 公路求生：横版，不用地图引擎
   if (MODES[mode].applyOpt) MODES[mode].applyOpt(opt); // 难度等开局选项
   setupMode(mode);
   G.opt = opt || {}; // 开局选项（丧尸模式：初始营地）
@@ -39,6 +40,18 @@ function startGame(mode, opt) {
   if (G.def.hooks.init) G.def.hooks.init();
   finishGameSetup();
   showBanner('第 1 天 · ' + G.def.name, (G.introNote ? G.introNote + '　' : '') + G.def.intro, 7);
+}
+
+// 自带画面的模式（公路求生）：开局先选车
+function startCustomGame(mode, opt) {
+  if (!opt || !opt.veh) { gotoScene('rcar'); return; }
+  setupMode(mode);
+  G.opt = opt;
+  G.cam = { x: 0, y: 0, zoom: 1 };
+  if (mode === 'road') rdNewGame(opt.veh);
+  G.state = 'play';
+  gotoScene('game');
+  showBanner(G.def.name + ' · ' + RD_VEHICLES[opt.veh].name, G.def.intro, 6);
 }
 
 function finishGameSetup() {
@@ -232,6 +245,7 @@ function victory(title, text) {
 function update(dt) {
   const hooks = G.def.hooks;
   G.clock += dt;
+  if (G.def.custom) { hooks.update(dt); return; } // 公路求生
   flushFlow();
   if (G.phase === 'day') {
     G.timer -= dt;

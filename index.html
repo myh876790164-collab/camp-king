@@ -4,6 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <title>Camp King</title>
+  <meta name="theme-color" content="#1a1c2c">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/favicon-32.png">
+  <!-- iPhone / iPad：添加到主屏幕后像 App 一样全屏打开 -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="营地之王">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <style>
     html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1c2c; }
     #wrap { position: fixed; inset: 0; overflow: hidden; }
@@ -20,6 +29,7 @@
   <script src="js/pathfinding.js"></script>
   <script src="js/walls.js"></script>
   <script src="js/entities.js"></script>
+  <script src="js/chores.js"></script>
   <script src="js/tech.js"></script>
   <script src="js/city.js"></script>
   <script src="js/interior.js"></script>
@@ -42,12 +52,23 @@
   <script src="js/sectwork.js"></script>
   <script src="js/sectmarket.js"></script>
   <script src="js/modes/sect.js"></script>
+  <script src="js/roaddata.js"></script>
+  <script src="js/roaddraw.js"></script>
+  <script src="js/roadui.js"></script>
+  <script src="js/modes/road.js"></script>
   <script src="js/render.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/minimap.js"></script>
   <script src="js/scenes.js"></script>
   <script src="js/save.js"></script>
+  <script src="js/backup.js"></script>
   <script src="js/input.js"></script>
   <script src="js/main.js"></script>
+  <script>
+    // 离线支持（只在网址打开时启用；双击本地文件打开时浏览器不支持，也不需要）
+    if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(() => {}));
+    }
+  </script>
 </body>
 </html>

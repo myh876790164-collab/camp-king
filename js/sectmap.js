@@ -174,10 +174,13 @@ function sectScatter(type, count, prefer) {
 // 每月：资源点慢慢长回来
 function sectRegrow() {
   const want = { lingpine: 6, herb: 4, orevein: 1, spiritvein: 0.4 };
+  const cap = { lingpine: 220, herb: 60, orevein: 40, spiritvein: 25 }; // 长满就不再长，免得铺满整座山
   for (const type in want) {
     let k = want[type] * ((type === 'lingpine' || type === 'herb') && G.mods.regrow ? G.mods.regrow : 1); // 青帝沃土：草木再生翻倍
     if (k < 1) { if (Math.random() > k) continue; k = 1; }
     const list = G.nodes.filter((n) => n && n.type === type);
+    k = Math.min(k, cap[type] - list.length);
+    if (k <= 0) continue;
     for (let i = 0, tries = 0; i < k && tries < 60; tries++) {
       let x, y;
       if (list.length && Math.random() < 0.8) { const n = pick(list); x = n.x + randInt(-1, 1); y = n.y + randInt(-1, 1); }
@@ -185,6 +188,12 @@ function sectRegrow() {
       if (type === 'spiritvein' && Math.min(x, y, SECT_W - 1 - x, SECT_H - 1 - y) >= 5) continue;
       if (sectPlaceNode(type, x, y)) i++;
     }
+  }
+  // 药童打理的药圃：每座采药房附近每月长 2 丛（不受全山上限限制，附近最多 10 丛）
+  for (const h of G.buildings.filter((b) => b.type === 'caiyao')) {
+    const near = G.nodes.filter((n) => n && n.type === 'herb' && Math.abs(n.x - h.x) <= 6 && Math.abs(n.y - h.y) <= 6).length;
+    let k = Math.min(Math.round(2 * (G.mods.regrow || 1)), 10 - near);
+    for (let t = 0; k > 0 && t < 40; t++) if (sectPlaceNode('herb', h.x + randInt(-6, 6), h.y + randInt(-6, 6))) k--;
   }
 }
 

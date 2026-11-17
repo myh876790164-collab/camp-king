@@ -14,6 +14,7 @@ function saveInfo(mode) {
     const t = new Date(d.time);
     const pad = (n) => String(n).padStart(2, '0');
     let dayText = '第 ' + d.day + ' 天';
+    if (d.custom && MODES[mode] && MODES[mode].hooks.dayText) dayText = MODES[mode].hooks.dayText(d.extra);
     if (d.extra && d.extra.sect) { const t = Math.floor(d.extra.sect.t || 0); dayText = d.extra.sect.name + ' · 第 ' + (Math.floor(t / 360) + 1) + ' 年 ' + (Math.floor((t % 360) / 30) + 1) + ' 月'; } // 修仙门派用宗门历法
     return { day: d.day, dayText, when: t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate()) + ' ' + pad(t.getHours()) + ':' + pad(t.getMinutes()) };
   } catch (e) { return null; }
@@ -22,6 +23,11 @@ function saveInfo(mode) {
 function saveGame() {
   if (G.phase !== 'day' || G.state === 'over') return false;
   const hooks = G.def.hooks;
+  if (G.def.custom) { // 公路求生：整份状态由模式自己打包
+    const ok2 = Store.set(saveKey(G.mode), JSON.stringify({ v: SAVE_VERSION, mode: G.mode, time: Date.now(), day: 1, custom: true, extra: hooks.save() }));
+    if (!ok2) showBanner('保存失败', '浏览器不允许本地存储（可能是无痕模式）', 3, '#ef7d57');
+    return ok2;
+  }
   const data = {
     v: SAVE_VERSION, mode: G.mode, time: Date.now(),
     day: G.day, timer: G.timer, res: G.res, kills: G.kills, goldAcc: G.goldAcc,
@@ -42,6 +48,15 @@ function loadGame(mode) {
   try { d = JSON.parse(Store.get(saveKey(mode))); } catch (e) { d = null; }
   if (!d || d.v !== SAVE_VERSION || (MODES[mode].saveCheck && !MODES[mode].saveCheck(d))) {
     showBanner('存档损坏或版本不兼容', '旧版本的存档无法读取，请开始新游戏', 3, '#ef7d57');
+    return;
+  }
+  if (MODES[mode].custom) {
+    setupMode(mode);
+    G.cam = { x: 0, y: 0, zoom: 1 };
+    MODES[mode].hooks.load(d.extra);
+    G.state = 'play';
+    gotoScene('game');
+    showBanner('读取存档', MODES[mode].hooks.dayText(d.extra), 3, '#a7f070');
     return;
   }
   if (MODES[mode].applyOpt) MODES[mode].applyOpt(d.extra && d.extra.opt); // 读档：恢复难度

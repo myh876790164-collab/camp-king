@@ -517,4 +517,5 @@ function initSprites() {
   initAbilitySprites(); // 晶核图标（js/abilities.js）
   initMerchantSprites(); // 商人和图纸建筑（js/merchant.js）
   initSectSprites(); // 修仙门派（js/sectmap.js）
+  initRoadSprites(); // 公路求生（js/roaddraw.js）
 }

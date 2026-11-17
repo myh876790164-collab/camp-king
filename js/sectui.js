@@ -89,9 +89,8 @@ function personStatus(p) {
   if (p.at !== loc) return '正前往' + sectLocName(loc);
   if (p.task === 'cult') return '在' + sectLocName(loc) + '闭关（速度 ×' + cultSpeed(p).toFixed(2) + '）';
   if (p.task === 'gather') { const d = DAOS[p.manual], r = d.rate(); return r > 0 ? '在' + sectLocName(loc) + '采集' + d.qiName + '（时机 ×' + (+r.toFixed(2)) + '）' : '在' + sectLocName(loc) + '等待时机：' + d.how; }
-  if (p.task === 'alchemy') return G.sect.jobs.liandan ? '在炼丹峰看守丹炉' : '炼丹峰炉中无丹（点炼丹峰选丹方开炉）';
-  if (p.task === 'forge') return G.sect.jobs.lianqi ? '在炼器峰锻造法器' : '炼器峰没有活计（点炼器峰选图谱）';
-  if (p.task === 'fu') return G.sect.jobs.dianji ? '在典籍峰书写符箓' : '典籍峰没有符方（点典籍峰选符方）';
+  if (p.job && G.sect.jobs[p.job]) return '在' + sectLocName(p.job) + { liandan: '炼丹', lianqi: '炼器', dianji: '书写符箓' }[p.job] + '（完工后回去' + TASKS[workTaskBase(p)].name + '）';
+  if (p.task === 'gather' && !p.manual) return '还没修习功法，采不了气，先在' + sectLocName(loc) + '闭关修炼';
   return TASKS[p.task].name + '中（' + sectLocName(loc) + '）';
 }
 function progressText(p) {
@@ -108,26 +107,69 @@ function sectViewList(c) {
   cLine(c, S.name + '　声望 ' + Math.floor(S.fame) + '　门下弟子 ' + discipleCount() + '/' + sectCapacity() + '　每月月俸 ' + S.people.filter((q) => !q.head).reduce((s, q) => s + STIPEND[q.realm], 0) + ' 灵石', 13, '#ffcd75', true);
   if (S.cands.length) cButtons(c, [{ label: '开山收徒：' + S.cands.length + ' 位少年在山门外等候 ▶', color: '#1f5e3a', onClick: () => openSect('recruit') }], 34);
   else cLine(c, '每年正月开山收徒（还有 ' + (12 - sectCal().month + 1) + ' 个月）', 12, '#94b0c2');
-  const people = S.people.slice().sort((a, b) => (b.head - a.head) || b.realm - a.realm || b.age - a.age);
-  for (const p of people) {
-    const y = c.y, h = 62, ready = p.realm < REALM_CAP && realmNeed(p).ready && !p.away;
-    drawButton(ctx, c.x, y, c.w, h, '', () => openSect('person', { pid: p.id }), { color: ready ? '#3a3a1e' : '#262b44', active: ready });
-    ctx.fillStyle = REALM_ROBE[p.realm]; ctx.fillRect(c.x + 6, y + 6, 6, h - 12);
-    const ttl = p.head ? '【掌门】' : masterTitleOf(p) ? '【' + masterTitleOf(p) + '】' : '';
-    drawText(ctx, ttl + p.name, c.x + 20, y + 15, 14, ttl ? '#ffcd75' : '#f4f4f4');
-    ctx.font = 'bold 14px ' + FONT;
-    const nx = c.x + 28 + ctx.measureText(ttl + p.name).width;
-    const lleft = lifeLeft(p);
-    drawText(ctx, REALMS[p.realm] + '期 · ' + profText(p) + ' · ' + p.age + '/' + lifeMax(p) + '岁 · 战力 ' + personPower(p), nx, y + 15, 12, lleft <= lifeMax(p) * 0.1 ? '#ef7d57' : '#c8d6e5', 'left', false);
-    const did = p.dao || p.manual;
-    drawText(ctx, daoShort(p), c.x + 20, y + 35, 12, did ? DAOS[did].color : '#566c86', 'left', false);
-    drawText(ctx, progressText(p), c.x + 120, y + 35, 12, ready ? '#a7f070' : '#73eff7', 'left', false);
-    drawText(ctx, personStatus(p), c.x + 20, y + 52, 11, p.hurt > 0 ? '#ef7d57' : '#94b0c2', 'left', false);
-    if (ready) drawText(ctx, '可突破！', c.x + c.w - 10, y + 15, 13, '#a7f070', 'right');
-    else if (!p.head) drawText(ctx, '忠诚 ' + p.loy, c.x + c.w - 10, y + 15, 11, p.loy < 30 ? '#ef7d57' : '#94b0c2', 'right', false);
-    c.y += h + 6;
+  // 按师承分组：掌门、峰主各一组，门下弟子收在师父名下（点一下展开 / 收起）
+  G.sectOpen = G.sectOpen || {};
+  const isReady = (p) => p.realm < REALM_CAP && realmNeed(p).ready && !p.away;
+  const teachesOf = (p) => MENTOR_ROLES.filter((r) => roleHolder(r) === p).flatMap((r) => studentsOf(r));
+  const sortP = (a, b) => b.realm - a.realm || b.age - a.age;
+  // 谁算“顶层”：没拜师、或师父那个位子空着的人；其余的人都挂在师父名下
+  const hasLiveMentor = (p) => p.mentor && roleHolder(p.mentor) && roleHolder(p.mentor) !== p;
+  const reach = new Set(), mark = (p) => { if (reach.has(p)) return; reach.add(p); teachesOf(p).forEach(mark); };
+  const tops = S.people.filter((p) => !hasLiveMentor(p));
+  tops.forEach(mark);
+  for (const p of S.people) if (!reach.has(p)) { tops.push(p); mark(p); } // 保险：万一有循环，也不让人从名录里消失
+  const shown = new Set();
+  const tree = (p, depth) => {
+    if (shown.has(p)) return;
+    shown.add(p);
+    personRow(c, p, depth);
+    const st = teachesOf(p).filter((q) => !shown.has(q)).sort(sortP);
+    if (!st.length) return;
+    const all = []; const walk = (q) => { all.push(q); teachesOf(q).forEach((x) => { if (!all.includes(x)) walk(x); }); }; st.forEach(walk);
+    const open = !!G.sectOpen[p.id], nReady = all.filter(isReady).length;
+    const ind = 18 * (depth + 1);
+    cButtonsAt(c, ind, [{ label: (open ? '▼ 收起' : '▶ 展开') + '　' + p.name + ' 门下弟子 ' + st.length + ' 人' + (all.length > st.length ? '（含再传 ' + (all.length - st.length) + ' 人）' : '') + (nReady && !open ? '　· ' + nReady + ' 人可突破！' : ''), color: nReady && !open ? '#3a3a1e' : '#29366f', onClick: () => { G.sectOpen[p.id] = !open; } }]);
+    if (open) for (const q of st) tree(q, depth + 1);
+  };
+  const head = tops.find((p) => p.head);
+  if (head) tree(head, 0);
+  for (const p of tops.filter((q) => !q.head && (teachesOf(q).length || MENTOR_ROLES.some((r) => roleHolder(r) === q))).sort(sortP)) tree(p, 0);
+  const loose = tops.filter((q) => !shown.has(q)).sort(sortP);
+  if (loose.length) {
+    cHead(c, '未拜师（' + loose.length + ' 人）——在人物页可以拜掌门或峰主为师');
+    for (const p of loose) tree(p, 0);
   }
 }
+// 一行弟子卡片（depth = 缩进层级）
+function personRow(c, p, depth) {
+  const ctx = c.ctx, ind = 18 * depth, x = c.x + ind, w = c.w - ind;
+  const y = c.y, h = 62, ready = p.realm < REALM_CAP && realmNeed(p).ready && !p.away;
+  if (depth) { ctx.fillStyle = '#566c86'; ctx.fillRect(x - 10, y - 4, 2, h + 4); ctx.fillRect(x - 10, y + h / 2, 8, 2); } // 师承连线
+  drawButton(ctx, x, y, w, h, '', () => openSect('person', { pid: p.id }), { color: ready ? '#3a3a1e' : '#262b44', active: ready });
+  ctx.fillStyle = REALM_ROBE[p.realm]; ctx.fillRect(x + 6, y + 6, 6, h - 12);
+  const ttl = p.head ? '【掌门】' : masterTitleOf(p) ? '【' + masterTitleOf(p) + '】' : '';
+  drawText(ctx, ttl + p.name, x + 20, y + 15, 14, ttl ? '#ffcd75' : '#f4f4f4');
+  ctx.font = 'bold 14px ' + FONT;
+  const nx = x + 28 + ctx.measureText(ttl + p.name).width;
+  const lleft = lifeLeft(p);
+  // 手机屏幕窄：放不下就依次省掉 职业、战力，免得和右边的“忠诚”叠在一起
+  const rightW = ready ? 70 : p.head ? 0 : 56;
+  const parts = [REALMS[p.realm] + '期', profText(p), p.age + '/' + lifeMax(p) + '岁', '战力 ' + personPower(p)];
+  ctx.font = '12px ' + FONT;
+  let info = parts.join(' · ');
+  if (ctx.measureText(info).width > x + w - 14 - rightW - nx) info = [parts[0], parts[2], parts[3]].join(' · ');
+  if (ctx.measureText(info).width > x + w - 14 - rightW - nx) info = [parts[0], parts[2]].join(' · ');
+  drawText(ctx, info, nx, y + 15, 12, lleft <= lifeMax(p) * 0.1 ? '#ef7d57' : '#c8d6e5', 'left', false);
+  const did = p.dao || p.manual;
+  drawText(ctx, daoShort(p), x + 20, y + 35, 12, did ? DAOS[did].color : '#566c86', 'left', false);
+  drawText(ctx, progressText(p), x + 120, y + 35, 12, ready ? '#a7f070' : '#73eff7', 'left', false);
+  drawText(ctx, personStatus(p), x + 20, y + 52, 11, p.hurt > 0 ? '#ef7d57' : '#94b0c2', 'left', false);
+  if (ready) drawText(ctx, '可突破！', x + w - 10, y + 15, 13, '#a7f070', 'right');
+  else if (!p.head) drawText(ctx, '忠诚 ' + p.loy, x + w - 10, y + 15, 11, p.loy < 30 ? '#ef7d57' : '#94b0c2', 'right', false);
+  c.y += h + 6;
+}
+// 带缩进的一排按钮
+function cButtonsAt(c, ind, items) { const x0 = c.x, w0 = c.w; c.x += ind; c.w -= ind; cButtons(c, items, 28); c.x = x0; c.w = w0; }
 
 // ---------- 收徒 ----------
 function sectViewRecruit(c) {
@@ -371,7 +413,9 @@ function sectViewPeak(c, id) {
     const job = S.jobs[id], book = CRAFT[task].book(), crafters = S.people.filter((q) => !q.away && q.task === task);
     const word = { alchemy: ['丹炉', '炼丹', '丹方', '炼'], forge: ['锻炉', '炼器', '图谱', '炼'], fu: ['符案', '制符', '符方', '笔'] }[task];
     cHead(c, word[0]);
-    cLine(c, word[1] + '弟子：' + (crafters.length ? crafters.map((q) => q.name + (q.dao ? '（' + DAOS[q.dao].name + '）' : '')).join('、') : '无（在弟子面板把差事设为「' + TASKS[task].name + '」）'), 12, crafters.length ? '#c8d6e5' : '#ef7d57');
+    const crew = job ? G.sect.people.filter((q) => q.job === id) : craftCrew(id);
+    cLine(c, '开炉后，' + PEAK_MASTER[id].title + '和门下弟子会放下手头的事自行前来，完工后各自回到原来的差事；这座峰还没有峰主和徒弟时，会请门中这门技艺最好的两人来帮忙。', 11, '#94b0c2');
+    cLine(c, (job ? '正在' + word[1] + '：' : '开炉时会来：') + (crew.length ? crew.map((q) => q.name + (q.dao ? '（' + DAOS[q.dao].name + '）' : '')).join('、') : '无人可派（都外出或受伤了）'), 12, crew.length ? '#c8d6e5' : '#ef7d57');
     const lead = leadCrafter(task);
     cLine(c, '成品会带上主' + word[3] + '弟子的道途属性' + (lead ? '：现在由 ' + lead.name + '（' + (lead.dao ? DAOS[lead.dao].name : '无道途 → 无属性') + '）主' + word[3] : '（主' + word[3] + '弟子要先到场）'), 12, '#94b0c2');
     if (job) {

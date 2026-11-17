@@ -13,9 +13,14 @@ function roleHolder(role) {
 }
 function mentorCap(role) { const h = roleHolder(role); return h ? 1 + h.realm + (role === 'head' ? 1 : 0) : 0; } // 境界越高，能带的徒弟越多
 function studentsOf(role) { return G.sect.people.filter((q) => q.mentor === role); }
+// 师父的师父……一路往上，会不会绕回到 p 自己（避免两位峰主互相拜师）
+function mentorChainHas(h, p) {
+  for (let k = 0; h && h.mentor && k < 12; k++) { h = roleHolder(h.mentor); if (h === p) return true; }
+  return false;
+}
 function canApprentice(p, role) {
   const h = roleHolder(role);
-  return !!h && h !== p && !p.head && !p.mentor && studentsOf(role).length < mentorCap(role);
+  return !!h && h !== p && !p.head && !p.mentor && studentsOf(role).length < mentorCap(role) && !mentorChainHas(h, p);
 }
 function apprentice(p, role) {
   if (!canApprentice(p, role)) return;
@@ -36,7 +41,7 @@ function mentorValidate() {
   for (const role of MENTOR_ROLES) {
     const h = roleHolder(role);
     const st = studentsOf(role).sort((a, b) => (a.mentorSince || 0) - (b.mentorSince || 0));
-    for (const q of st) if (q === h || q.head) q.mentor = null;
+    for (const q of st) if (q === h || q.head || mentorChainHas(h, q)) q.mentor = null; // 自己拜自己、掌门、循环师承都解除
     const left = studentsOf(role).sort((a, b) => (a.mentorSince || 0) - (b.mentorSince || 0)), cap = mentorCap(role);
     for (const q of left.slice(cap)) { q.mentor = null; sectLog(q.name + ' 的师承转到新任' + roleTitle(role) + '名下，但名额不够，只好暂时出师', '#94b0c2', q); }
   }

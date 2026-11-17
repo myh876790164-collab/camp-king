@@ -2,106 +2,16 @@
 //  修仙门派：庶务杂役（资源建筑）、挑战掌门之位、峰主推举
 // =============================================
 
-// ---------- 庶务杂役 ----------
-// 资源建筑（def.chore = 要采的资源点类型）自带杂役：出门找最近的资源点 → 采集 → 背回建筑交货
-const CHORE_WORKERS = [0, 1, 1, 2, 2, 3];      // 各等级的杂役人数
-const CHORE_RANGE = 12;                         // 最远去几格外找资源点
-function choreCount(b) { return CHORE_WORKERS[Math.min(5, b.level)] || 1; }
-function choreSpeed(b) { return 1 + 0.1 * (b.level - 1); } // 每级采集、走路快 10%
-function sectChoreTick(dt) {
-  for (const b of G.buildings) {
-    const def = b.def;
-    if (!def.chore) continue;
-    b.workers = b.workers || [];
-    while (b.workers.length < choreCount(b)) b.workers.push({ x: b.cx, y: b.cy + 6, st: 'home', t: rand(0.2, 1.5), carry: 0, face: 1, id: Math.random() * 100 });
-    if (b.workers.length > choreCount(b)) b.workers.length = choreCount(b);
-    let anyWork = false;
-    for (const w of b.workers) {
-      const sp = 1.6 * T * choreSpeed(b);
-      const walk = (tx, ty) => { const dx = tx - w.x, dy = ty - w.y, d = Math.hypot(dx, dy); if (Math.abs(dx) > 0.5) w.face = dx > 0 ? 1 : -1; if (d <= sp * dt) { w.x = tx; w.y = ty; return true; } w.x += dx / d * sp * dt; w.y += dy / d * sp * dt; return false; };
-      w.moving = false;
-      if (w.st === 'home') { // 在建筑门口歇一会儿，然后出门
-        w.t -= dt;
-        if (w.t > 0) continue;
-        const n = findChoreNode(b, w);
-        if (!n) { w.t = 2; continue; }
-        // 站位在选定时就固定（站在资源点靠近建筑的那一侧），不能跟着朝向变，否则会在树前来回晃
-        const side = b.cx < (n.x + 0.5) * T ? -1 : 1;
-        w.node = n; w.tx = (n.x + 0.5) * T + 7 * side; w.ty = (n.y + 0.85) * T; w.st = 'go';
-      } else if (w.st === 'go') {
-        const n = w.node;
-        if (!n || G.nodes[idx(n.x, n.y)] !== n) { w.st = 'home'; w.t = 0.3; continue; }
-        w.moving = true;
-        if (walk(w.tx, w.ty)) { w.st = 'work'; w.t = def.workTime / choreSpeed(b); w.face = (n.x + 0.5) * T > w.x ? 1 : -1; }
-      } else if (w.st === 'work') {
-        const n = w.node;
-        if (!n || G.nodes[idx(n.x, n.y)] !== n) { w.st = 'home'; w.t = 0.3; continue; }
-        w.t -= dt; anyWork = true;
-        if (Math.floor(w.t * 3) !== Math.floor((w.t + dt) * 3)) n.shakeUntil = G.time + 0.12; // 一下一下地砍、凿
-        if (w.t <= 0) {
-          const take = Math.min(Math.round(def.carry * (def.chore === 'lingpine' ? 1 : G.mods.mine || 1)), n.amount); // 移山：矿场每趟多背
-          n.amount -= take; w.carry = take;
-          if (n.amount <= 0) removeNode(n);
-          w.node = null; w.st = 'back';
-        }
-      } else if (w.st === 'back') {
-        w.moving = true;
-        if (walk(b.cx, b.cy + 6)) {
-          const res = G.def.nodes[def.chore].res;
-          G.res[res] += w.carry;
-          addFloat(b.cx, b.cy - 10, '+' + w.carry + ' ' + RES_INFO[res].name, RES_INFO[res].color);
-          w.carry = 0; w.st = 'home'; w.t = 0.6;
-        }
-      }
-      if (w.st !== 'home') anyWork = true;
-    }
-    b.idle = !anyWork && !findChoreNode(b, null);
-  }
-}
-// 最近的资源点（别的杂役已经盯上的尽量不抢）
-function findChoreNode(b, me) {
-  const type = b.def.chore, bx = Math.floor(b.cx / T), by = Math.floor(b.cy / T);
-  const taken = new Set();
-  for (const o of G.buildings) for (const w of o.workers || []) if (w !== me && w.node) taken.add(w.node);
-  let best = null, bd = 1e9;
-  for (let y = Math.max(0, by - CHORE_RANGE); y <= Math.min(MAP_H - 1, by + CHORE_RANGE); y++) {
-    for (let x = Math.max(0, bx - CHORE_RANGE); x <= Math.min(MAP_W - 1, bx + CHORE_RANGE); x++) {
-      const n = G.nodes[idx(x, y)];
-      if (!n || n.type !== type) continue;
-      const d = Math.hypot(x - bx, y - by) + (taken.has(n) ? 6 : 0);
-      if (d < bd && Math.hypot(x - bx, y - by) <= CHORE_RANGE) { bd = d; best = n; }
-    }
-  }
-  return best;
-}
-// 杂役小人：斗笠短褂，干活时挥工具，回程背着货
-function drawChoreWorkers(ctx) {
-  for (const b of G.buildings) {
-    if (!b.def.chore) continue;
-    const res = G.def.nodes[b.def.chore].res;
-    for (const w of b.workers || []) {
-      const x = Math.round(w.x), y = Math.round(w.y), f = w.face < 0 ? -1 : 1;
-      const bob = w.moving ? -Math.abs(Math.sin(G.time * 10 + w.id)) : 0;
-      const P = (a, c, ww, hh, col) => { ctx.fillStyle = col; ctx.fillRect(x + (f > 0 ? a : -a - ww), y + c + bob, ww, hh); };
-      drawShadow(ctx, x, y + 0.5, 8, 0.7);
-      const step = w.moving ? Math.sin(G.time * 12 + w.id) : 0;
-      P(-2 + step, -2, 1.6, 2, '#3a2a22'); P(0.5 - step, -2, 1.6, 2, '#3a2a22');
-      P(-2.5, -7.5, 5, 5.5, '#8f6a42'); P(-2.5, -5, 5, 1, '#5a3e28');
-      P(-2, -11, 4, 3.5, '#f2d0a9');
-      P(-4, -12, 8, 1.5, '#c9a86a'); P(-2, -13.5, 4, 1.5, '#b08a50'); // 斗笠
-      if (w.st === 'work') { // 挥工具
-        const sw = Math.sin(G.time * 14 + w.id);
-        ctx.save(); ctx.translate(x + 3 * f, y - 7 + bob); ctx.rotate(f * (-0.9 + sw * 0.9));
-        ctx.fillStyle = '#6e4a2e'; ctx.fillRect(-0.5, -6, 1, 6); ctx.fillStyle = '#c8d6e5'; ctx.fillRect(-1.5, -7, 3, 1.5);
-        ctx.restore();
-      }
-      if (w.carry > 0) { // 背着货
-        const col = res === 'wood' ? '#a8794f' : res === 'ore' ? '#94b0c2' : '#73eff7';
-        P(-4.5, -10, 3, 5, col); P(-4.5, -10, 3, 1, '#1a1c2c');
-      }
-    }
-  }
-}
+// 采药房：竹篱小屋，门口晒着药草
+SPR.s_herbhut = bigSprite(16, 16, (P, O, g) => {
+  O(8, 14, 7, 1.8, 'rgba(10,10,25,0.35)');
+  P(3, 7, 10, 7, '#a8794f'); P(3, 7, 10, 1, '#c49a64'); P(6.5, 9.5, 3, 4.5, '#3a2a22');
+  g.fillStyle = '#5f8a4a'; g.beginPath(); g.moveTo(1.5, 7.5); g.lineTo(8, 2); g.lineTo(14.5, 7.5); g.fill(); // 茅草顶
+  g.fillStyle = '#7aa85a'; g.beginPath(); g.moveTo(3, 7); g.lineTo(8, 3); g.lineTo(8, 7); g.fill();
+  O(13, 12.5, 2.4, 1.2, '#c49a64'); P(11.5, 11, 3, 1, '#38b764'); P(12, 10.4, 1, 1, '#a7f070'); P(13.5, 10.6, 1, 1, '#ef7d57'); // 药篓
+  P(1, 11, 1, 3, '#8f6a42'); P(1, 10.5, 2.5, 0.6, '#a7f070'); // 晾药架
+});
+// 庶务杂役的逻辑在 js/chores.js（经典模式也用）
 
 // ---------- 峰主推举 ----------
 // 技艺 = 属性 + 职业 + 平时干这份差事攒下的经验（p.xp）

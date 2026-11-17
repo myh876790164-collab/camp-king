@@ -59,8 +59,8 @@ MODES.classic = {
       chain: 3, light: 2.5, locked: true, desc: '闪电在敌人之间弹射',
     },
     spikes: { name: '尖刺陷阱', hp: 80, cost: { wood: 15, stone: 5 }, trap: 14, passable: true, locked: true, desc: '不挡路，踩上去持续受伤' },
-    lumber: { name: '伐木屋', hp: 100, cost: { wood: 20 }, gather: 'tree', radius: 3, interval: 2, amount: 1, desc: '自动砍伐 3 格内的树木' },
-    quarry: { name: '采石场', hp: 100, cost: { wood: 30 }, gather: 'rock', radius: 3, interval: 2.5, amount: 1, desc: '自动开采 3 格内的石头' },
+    lumber: { name: '伐木屋', hp: 100, cost: { wood: 20 }, chore: 'tree', carry: 4, workTime: 3, desc: '伐木工去最近的树木砍柴，背回来才入账（每趟 4 木材）；附近砍光了会去更远的地方。升级加人手、加速度' },
+    quarry: { name: '采石场', hp: 100, cost: { wood: 30 }, chore: 'rock', carry: 3, workTime: 3.5, desc: '石匠去最近的石头开采，背回来才入账（每趟 3 石材）；附近采光了会去更远的地方。升级加人手、加速度' },
     market: { name: '市场', hp: 120, cost: { wood: 60, stone: 20 }, produce: { res: 'gold', amount: 1, interval: 4 }, locked: true, desc: '持续产出金币' },
   },
 
@@ -86,5 +86,9 @@ MODES.classic = {
   // 每夜怪物数量 = (baseCount + perNight×(夜数-1)) × growth^(夜数-1)
   wave: { baseCount: 10, perNight: 8, growth: 1.1, hpPerNight: 0.3, dmgPerNight: 0.1, bossEvery: 5 },
   perks: GENERIC_PERKS.concat(CLASSIC_SYNERGY),
-  hooks: {},
+  hooks: {
+    update(dt) { choreTick(dt); }, // 伐木工、石匠出门干活
+    drawWorld(ctx) { drawChoreWorkers(ctx); },
+    buildingInfo(b) { return b.def.chore ? choreInfo(b) : null; },
+  },
 };

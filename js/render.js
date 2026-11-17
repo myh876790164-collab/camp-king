@@ -42,6 +42,7 @@ function render() {
   ctx.fillStyle = '#1a1c2c';
   ctx.fillRect(0, 0, G.canvas.width, G.canvas.height);
   if (G.scene !== 'game') { drawScene(ctx); return; }
+  if (G.def.custom) { G.def.hooks.render(ctx); return; } // 公路求生：自己画
   // 丧尸模式：在建筑里面时画室内地图
   if (G.inside && G.def.hooks.renderInside) {
     G.def.hooks.renderInside(ctx);

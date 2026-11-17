@@ -15,6 +15,7 @@ function drawScene(ctx) {
   else if (G.scene === 'load') drawLoadScreen(ctx);
   else if (G.scene === 'settings') drawSettings(ctx);
   else if (G.scene === 'zcamp') drawCampSelect(ctx);
+  else if (G.scene === 'rcar') rdDrawCarSelect(ctx);
   drawConfirm(ctx);
 }
 
@@ -106,7 +107,7 @@ function drawModeSelect(ctx) {
     const lastAlone = cols === 2 && i === MODE_ORDER.length - 1 && MODE_ORDER.length % 2 === 1; // 最后一张单独一行时居中
     const x = lastAlone ? (sw - cw) / 2 : x0 + (i % cols) * (cw + gap), y = y0 + Math.floor(i / cols) * (ch + gap);
     // 丧尸模式先选初始营地
-    const go = () => (id === 'zombie' ? gotoScene('zcamp') : startGame(id));
+    const go = () => (id === 'zombie' ? gotoScene('zcamp') : id === 'road' ? gotoScene('rcar') : startGame(id));
     drawButton(ctx, x, y, cw, ch, '', () => {
       if (hasSave(id)) askConfirm('「' + m.name + '」已有存档，开始新游戏会覆盖它（存档会在下次天亮时被替换）。继续吗？', go);
       else go();
@@ -169,6 +170,10 @@ function drawSettings(ctx) {
   const darkNames = { 0.6: '偏亮', 1: '标准', 1.3: '偏暗' };
   row('夜晚亮度', darkNames[s.dark] || '标准', () => { s.dark = s.dark === 0.6 ? 1 : s.dark === 1 ? 1.3 : 0.6; saveSettings(); });
   y += 10;
+  const hw = (pw - 10) / 2;
+  drawButton(ctx, px, y, hw, 44, '导出存档备份', backupExport, { color: '#1f5e3a', size: 14 });
+  drawButton(ctx, px + hw + 10, y, hw, 44, '导入存档备份', backupImport, { color: '#29366f', size: 14 });
+  y += 54;
   drawButton(ctx, px, y, pw, 44, '清除所有存档', () => askConfirm('确定清除全部 ' + MODE_ORDER.length + ' 个模式的存档吗？无法恢复。', () => MODE_ORDER.forEach(deleteSave)), { color: '#5d275d', size: 14 });
   y += 64;
   const tips = [
