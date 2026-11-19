@@ -10,6 +10,7 @@ function rdFxText(p) {
     out.push('伤害 ' + f.dmg + (f.count ? '×' + f.count : ''), '射速 ' + f.rate + '/秒', f.range < 20 ? '近战' : '射程 ' + f.range);
     if (f.ammo && f.ammo !== 'none' && f.use) out.push('耗' + RD_RES[f.ammo].name + ' ' + f.use + '/发'); else if (f.ammo === 'none') out.push('不耗弹药');
     if (f.splash) out.push('爆炸'); if (f.pierce) out.push(f.pierce >= 99 ? '全穿透' : '穿透'); if (f.burn) out.push('燃烧'); if (f.slow) out.push('减速'); if (f.chain) out.push('连锁闪电'); if (f.pull) out.push('吸附'); if (f.noAir) out.push('打不到飞行怪');
+    if (f.turret) out.unshift('自瞄炮塔·360°'); if (f.homing) out.push('追踪'); if (f.airBonus) out.push('对空+' + pct(f.airBonus));
     return out.join(' · ');
   }
   const L = {
@@ -68,7 +69,16 @@ function rdDrawUI(ctx) {
     if (portrait) iy += th + 4;
   }
   // ---- 状态条 ----
-  const bx = 8, by = portrait ? Math.round(RDV.gy * RDV.S / G.dpr + 36) : iy + 2, bw = portrait ? Math.min(170, (sw - 24) / 2) : 132;
+  // 油门踏板：放在车辆正下方（手机竖屏时状态条挪到踏板下面）
+  const bh = 48, yb = sh - bh - 6;
+  const roadY = Math.round(RDV.gy * RDV.S / G.dpr);
+  const carFront = rdToScreen(RDV.ax, RDV.gy).x, carC = carFront - rdVeh().len * RDV.S / G.dpr / 2;
+  let pedTop = roadY + 24, pedH = Math.min(132, (portrait ? yb - 150 : yb - 10) - pedTop), pedX;
+  if (pedH >= 86) pedX = carC - pedH * 0.34; // 车正下方
+  else { pedH = Math.min(120, yb - 10 - Math.max(topH + 40, roadY - 80)); pedTop = yb - 10 - pedH; pedX = carFront + 18; } // 横屏手机下面放不下：放在车头前面
+  const pedW = Math.round(pedH * 0.68);
+  const ped = { x: Math.round(Math.max(8, Math.min(sw - pedW - 8, pedX))), y: pedTop, w: pedW, h: pedH };
+  const bx = 8, by = portrait ? ped.y + ped.h + 10 : iy + 2, bw = portrait ? Math.min(170, (sw - 24) / 2) : 132;
   const me = R.me, maxHp = rdMaxHp();
   const bars = [
     ['生命', me.hp / maxHp, '#b13e53', Math.round(me.hp)], ['饱食', me.food / 100, '#a7f070', Math.round(me.food)], ['水分', me.water / 100, '#41a6f6', Math.round(me.water)],
@@ -89,11 +99,10 @@ function rdDrawUI(ctx) {
   const doing = rdDoingText();
   if (doing) drawText(ctx, doing, bx, by + (portrait ? Math.ceil(bars.length / 2) : bars.length) * 16 + 8, 11, '#c8d6e5', 'left', false);
   // ---- 底部按钮 ----
-  const bh = 48, yb = sh - bh - 6;
   ctx.fillStyle = 'rgba(26,28,44,0.85)'; ctx.fillRect(0, yb - 6, sw, bh + 12); addButton(0, yb - 6, sw, bh + 12, null);
   const outside = me.loc === 'out' || me.loc === 'site';
+  rdDrawPedal(ctx, ped, R.driving, outside);
   const btns = [
-    { l: R.driving ? '停车' : '出发', c: R.driving ? '#b13e53' : '#1f5e3a', f: () => rdToggleDrive(), dim: outside },
     { l: R.view === 'in' ? (rdVeh().tent ? '公路' : '车外') : (rdVeh().tent ? '营地' : '车内'), f: () => { R.view = R.view === 'in' ? 'out' : 'in'; } },
     { l: '改装', f: () => rdOpenPanel('garage') },
     { l: '仓库', f: () => rdOpenPanel('inv'), badge: R.inv.length },
@@ -162,6 +171,38 @@ function rdDrawUI(ctx) {
   if (G.state === 'dialog') drawDialog(ctx);
   if (G.state === 'over') drawEndOverlay(ctx, false);
   if (G.state === 'paused') drawPauseMenu(ctx); else drawConfirm(ctx);
+}
+// 像素风油门踏板（出发 / 停车）：停着时踏板抬起、写「出发」；开车时踏板被踩下去、写「停车」
+function rdDrawPedal(ctx, b, driving, dim) {
+  const labH = 26;
+  const u = Math.max(2, Math.floor(b.w / 18)); // 一个像素块的大小
+  const cols = Math.floor(b.w / u), rows = Math.floor((b.h - labH - 4) / u), ox = b.x + Math.floor((b.w - cols * u) / 2);
+  const P = (gx, gy, gw, gh, c) => { ctx.fillStyle = c; ctx.fillRect(ox + gx * u, b.y + gy * u, gw * u, gh * u); };
+  const press = driving ? Math.max(2, Math.floor(rows * 0.14)) : 0; // 踩下去：踏板变矮（往里倾斜）
+  ctx.globalAlpha = dim ? 0.45 : 1;
+  // 地板上的底座 + 铰链
+  P(0, rows - 2, cols, 2, '#262b44'); P(0, rows - 2, cols, 1, '#3b4458');
+  P(2, rows - 3, cols - 4, 1, '#94b0c2'); P(3, rows - 3, 1, 1, '#c8d6e5');
+  // 踏板（圆角的长条橡胶块）
+  const top = press, bot = rows - 3, x0 = 2, w = cols - 4;
+  for (let r = top; r < bot; r++) {
+    const k = r - top, last = bot - 1 - r, inset = k === 0 || last === 0 ? 2 : k === 1 || last === 1 ? 1 : 0;
+    P(x0 + inset - 1, r, w - inset * 2 + 2, 1, '#0d0d14'); // 黑边
+    let c = '#2a2a33';
+    if (k > 1 && last > 1 && k % 3 === 0) c = '#4c4c5c'; // 防滑横纹
+    P(x0 + inset, r, w - inset * 2, 1, c);
+    if (c !== '#2a2a33') P(x0 + inset, r, 2, 1, '#6a6a7c'); // 横纹左侧高光
+  }
+  P(x0 + 2, top, w - 4, 1, driving ? '#566c86' : '#8a8a9c'); // 顶部反光（踩下去时变暗）
+  // 底部金属铭牌
+  P(x0 + 2, bot - 3, w - 4, 2, '#9aa3ad'); P(x0 + 2, bot - 3, w - 4, 1, '#c8d6e5');
+  // 文字标签
+  const ly = b.y + rows * u + 4;
+  ctx.fillStyle = driving ? '#b13e53' : '#1f5e3a'; ctx.fillRect(b.x, ly, b.w, labH);
+  ctx.strokeStyle = '#ffcd75'; ctx.lineWidth = 2; ctx.strokeRect(b.x + 1, ly + 1, b.w - 2, labH - 2);
+  drawText(ctx, driving ? '停车' : '出发', b.x + b.w / 2, ly + labH / 2, 16, '#f4f4f4', 'center');
+  ctx.globalAlpha = 1;
+  addButton(b.x - 6, b.y - 6, b.w + 12, b.h + 10, dim ? null : () => { sfx('click'); rdToggleDrive(); });
 }
 function rdDoingText() {
   const R = G.road, me = R.me, a = me.act;
