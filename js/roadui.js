@@ -72,8 +72,14 @@ function rdDrawUI(ctx) {
     if (st.radar) t += '（危险' + (nx.danger < 0.2 ? '低' : nx.danger < 0.4 ? '中' : '高') + (S.slots.length ? '，可能有' + S.slots.slice(0, 3).map((k) => RD_SLOTS[k].name).join('/') : '') + '）';
     drawText(ctx, t, 8, iy, 11, '#73eff7', 'left', false); iy += 16;
   }
-  // ---- 状态条 ----
+  // ---- 聊天室滚动条 ----
   const portrait = sw < sh;
+  if (playing) {
+    const tw = portrait ? sw - 16 : Math.min(360, sw * 0.42);
+    const th = rcTicker(ctx, portrait ? 8 : sw - tw - 8, portrait ? iy : topH + 4, tw);
+    if (portrait) iy += th + 4;
+  }
+  // ---- 状态条 ----
   const bx = 8, by = portrait ? Math.round(RDV.gy * RDV.S / G.dpr + 36) : iy + 2, bw = portrait ? Math.min(170, (sw - 24) / 2) : 132;
   const me = R.me, maxHp = rdMaxHp();
   const bars = [
@@ -106,6 +112,7 @@ function rdDrawUI(ctx) {
     { l: '制作', f: () => rdOpenPanel('craft'), badge: R.craftQ.length },
     { l: '研究', f: () => rdOpenPanel('research') },
     { l: '日志', f: () => rdOpenPanel('log') },
+    { l: '聊天', f: () => rdOpenPanel('chat'), badge: R.chat ? R.chat.unread : 0 },
   ];
   const gap = 5, w = Math.min(86, (sw - 12 - gap * (btns.length - 1)) / btns.length);
   let x0 = (sw - (w * btns.length + gap * (btns.length - 1))) / 2;
@@ -198,7 +205,7 @@ function rdDrawPanel(ctx) {
   ctx.fillStyle = 'rgba(10,10,30,0.6)'; ctx.fillRect(0, 0, sw, sh); addButton(0, 0, sw, sh, null);
   const pw = Math.min(640, sw - 12), ph = sh - 16, px = (sw - pw) / 2, py = 8;
   drawPanel(ctx, px, py, pw, ph);
-  const tabs = R.panel === 'trade' ? [['trade', R.trade ? R.trade.name : '交易']] : [['garage', '改装'], ['inv', '仓库'], ['craft', '制作'], ['research', '研究'], ['log', '日志']];
+  const tabs = R.panel === 'trade' ? [['trade', R.trade ? R.trade.name : '交易']] : [['garage', '改装'], ['inv', '仓库'], ['craft', '制作'], ['research', '研究'], ['log', '日志'], ['chat', '聊天']];
   const tw = Math.min(90, (pw - 60) / tabs.length);
   tabs.forEach(([k, l], i) => drawButton(ctx, px + 8 + i * (tw + 4), py + 8, tw, 32, l, () => { R.panel = k; R.pick = null; if (G.scroll) G.scroll.rpanel = 0; }, { active: R.panel === k || (R.panel === 'pick' && k === 'garage'), color: R.panel === k ? '#29366f' : '#333c57', size: 13 }));
   drawButton(ctx, px + pw - 44, py + 8, 36, 32, '✕', () => { G.state = 'play'; R.pick = null; }, { size: 14 });
@@ -212,6 +219,7 @@ function rdDrawPanel(ctx) {
   else if (R.panel === 'research') rdPanelResearch(c);
   else if (R.panel === 'log') rdPanelLog(c);
   else if (R.panel === 'trade') rdPanelTrade(c);
+  else if (R.panel === 'chat') rcPanel(c);
   endScroll(ctx, c.y + 10);
 }
 function rdLine(c, t, size, color, bold) { wrapText(c.ctx, t, c.w, size || 13).forEach((ln) => { drawText(c.ctx, ln, c.x, c.y + (size || 13) / 2 + 2, size || 13, color || '#c8d6e5', 'left', !!bold); c.y += (size || 13) + 5; }); }
@@ -466,6 +474,7 @@ function rdKey(key) {
   else if (key === 'c') rdOpenPanel('craft');
   else if (key === 'r') rdOpenPanel('research');
   else if (key === 'l') rdOpenPanel('log');
+  else if (key === 't') rdOpenPanel('chat');
   else return false;
   return true;
 }

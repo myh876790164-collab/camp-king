@@ -293,6 +293,7 @@ function rdUpdate(dt) {
   R.evT -= dh;
   if (R.evT <= 0) { R.evT = 10 + Math.random() * 10; rdRandomEvent(); if (G.state !== 'play') return; }
   rdEncounterTick(dh, st);
+  rcTick(dt);
   rdCombat(dt, st);
   rdFxTick(dt);
   // ---- 每天零点自动存档 ----
@@ -480,7 +481,7 @@ function rdRollPart(S, s) {
   if (!pick.length) pick = pool;
   return pick.length ? pick[Math.floor(Math.random() * pick.length)] : null;
 }
-function rdFound(p) { if (p.tier >= 4) rdR().me.mood = Math.min(100, rdR().me.mood + 6); if (p.tier >= 5) showBanner('稀有发现！', '【' + RD_TIER_NAME[p.tier] + '】' + p.name, 4, RD_TIER_COLOR[p.tier]); }
+function rdFound(p) { if (p.tier >= 4) rdR().me.mood = Math.min(100, rdR().me.mood + 6); if (p.tier >= 5) { showBanner('稀有发现！', '【' + RD_TIER_NAME[p.tier] + '】' + p.name, 4, RD_TIER_COLOR[p.tier]); rcPlayerRare(p); } }
 
 // ---------- 路障 ----------
 function rdCheckObstacles(st) {
@@ -1082,6 +1083,7 @@ function rdRandomEvent() {
     const w = [{ type: 'dust', name: '沙尘暴', d: '车速变慢，太阳能变弱' }, { type: 'rad', name: '辐射风暴', d: '辐射猛增，尽量待在车里' }, { type: 'storm', name: '暴雨', d: '雨水收集翻倍，太阳能变弱' }][Math.floor(Math.random() * 3)];
     R.weather = Object.assign({ left: 4 + Math.random() * 6 }, w);
     rdLog(w.name + '来了：' + w.d, '#ef7d57');
+    rcWeather(w.type);
     showBanner(w.name, w.d, 4, '#ef7d57');
   } else if (ev === 'wreck') {
     rdDialog('路边的废车', '一辆翻倒的车横在路边，看起来还没被人拆过。', [
@@ -1159,6 +1161,7 @@ function rdLoadData(d) {
   Object.assign(G.res, d.res);
   const R = G.road;
   R.mons = []; R.proj = []; R.fx = []; R.parts = []; R.floats = [];
+  if (R.chat) R.chat._real = 0;
   if (R.me.loc === 'out' || R.me.loc === 'site') { R.me.loc = 'in'; R.me.ix = 0.6; }
   R.me.act = null;
   R.powered = undefined;
