@@ -55,11 +55,15 @@ function rcLine(p, ev, ctx) {
   }
   const A = RC_ARCH[p.arch].lines;
   let t;
-  if (ev === 'idle' && Math.random() < 0.3) t = rcR(RC_JOB_IDLE[p.job].split('|'));
+  const r = Math.random();
+  if (ev === 'idle') {
+    // 闲聊：一半是用游戏内容拼出来的动态台词，其余是职业闲聊和性格台词
+    if (r < 0.5) t = rcDynText('idle', p);
+    else if (r < 0.65) t = rcR(RC_JOB_IDLE[p.job].split('|'));
+    else t = rcR(A.idle.split('|'));
+  } else if (RC_DYN[ev] && r < 0.2) t = rcDynText(ev, p);
   else { const pool = A[ev].split('|'); t = pool[rcR(p.lines[ev])]; }
-  t = rcFill(t, p, ctx);
-  if (Math.random() < p.ticRate) t += /^[！…。～？]/.test(p.tic) ? p.tic : ' ' + p.tic;
-  return t;
+  return rcFill(t, p, ctx);
 }
 function rcTagOf(p) { return p.vip ? (p.fakeTag || p.tag) : ''; }
 function rcColorOf(p) { return p.vip ? p.color : '#c8d6e5'; }
@@ -115,15 +119,15 @@ function rcEvent(ev, ctx, opt) {
   const C = rcEnsure();
   ctx = ctx || {};
   opt = opt || {};
-  let d = 1.2 + Math.random() * 1.5;
-  const n = opt.count || (3 + Math.floor(Math.random() * 4));
+  let d = 2 + Math.random() * 2;
+  const n = opt.count || (2 + Math.floor(Math.random() * 3));
   const used = {};
   for (let i = 0; i < n; i++) {
     const p = rcPickSpeaker((x) => !used[x.id] && x.name !== ctx.who);
     if (!p) continue;
     used[p.id] = true;
     rcQueue(p, ev, ctx, d);
-    d += 1.2 + Math.random() * 2.8;
+    d += 3 + Math.random() * 5;
   }
   // 重要角色也来插一句
   const vipChance = opt.vipChance != null ? opt.vipChance : 0.55;
@@ -136,7 +140,7 @@ function rcWeather(type) {
   if (!RC_EVENTS[ev]) return;
   rcEnsure();
   rcSys(RC_WEATHER_SYS[ev], 0.3);
-  rcEvent(ev);
+  rcEvent(ev, {}, { count: 2 + Math.floor(Math.random() * 3), vipChance: 0.3 });
 }
 // 你开出了好东西（全服公告）
 function rcPlayerRare(p) {
@@ -229,19 +233,19 @@ function rcTick(dt) {
   }
   // 闲聊
   if (C.clk >= C.nextIdle) {
-    C.nextIdle = C.clk + 2 + Math.random() * 4.5;
-    const p = Math.random() < 0.2 ? rcVip() : rcPickSpeaker();
+    C.nextIdle = C.clk + 12 + Math.random() * 16; // 平均 20 秒一条闲聊
+    const p = Math.random() < 0.08 ? rcVip() : rcPickSpeaker();
     if (p) rcQueue(p, 'idle', {}, 0);
-    // 偶尔两个人接话
-    if (p && Math.random() < 0.18) { const q = rcPickSpeaker(); if (q) rcQueue(q, null, {}, 1.5 + Math.random() * 2, { text: rcR(['@' + p.name + ' 说得对', '@' + p.name + ' 同感', '@' + p.name + ' 哈哈哈', '@' + p.name + ' 你在哪个位置？', '@' + p.name + ' +1', '@' + p.name + ' 别这样，会好的', '@' + p.name + ' 真的假的', '@' + p.name + ' 带我一个']) }); }
+    // 偶尔有人接话
+    if (p && Math.random() < 0.12) { const q = rcPickSpeaker(); if (q) rcQueue(q, null, {}, 3 + Math.random() * 4, { text: '@' + p.name + ' ' + rcR(RC_REPLY) }); }
   }
-  // 世界事件
-  if (C.clk >= C.nextEv) { C.nextEv = C.clk + 35 + Math.random() * 50; rcWorldEvent(); }
+  // 世界事件（平均两分半一次）
+  if (C.clk >= C.nextEv) { C.nextEv = C.clk + 150 + Math.random() * 120; rcWorldEvent(); }
   // 天亮 / 入夜
   const h = rdHour();
   if (C.lastH != null) {
-    if (C.lastH < 6 && h >= 6) { rcSys('【系统】第 ' + rdDay() + ' 天。频道存活 ' + rcAlive() + ' / ' + rcPeople().total + ' 人。', 0); rcEvent('dawn'); }
-    if (C.lastH < 20 && h >= 20) { rcSys('【系统】夜幕降临，夜间怪物活跃度上升。', 0); rcEvent('night'); }
+    if (C.lastH < 6 && h >= 6) { rcSys('【系统】第 ' + rdDay() + ' 天。频道存活 ' + rcAlive() + ' / ' + rcPeople().total + ' 人。', 0); if (Math.random() < 0.6) rcEvent('dawn', {}, { count: 1 + Math.floor(Math.random() * 2), vipChance: 0.1 }); }
+    if (C.lastH < 20 && h >= 20) { rcSys('【系统】夜幕降临，夜间怪物活跃度上升。', 0); if (Math.random() < 0.6) rcEvent('night', {}, { count: 1 + Math.floor(Math.random() * 2), vipChance: 0.1 }); }
   }
   C.lastH = h;
   // 勒索没理会 = 拒绝
@@ -253,7 +257,7 @@ function rcTick(dt) {
 // ---------- 你在频道里发言 ----------
 const RC_MY_LINES = {
   hello: ['大家好，我是{me}，刚上路，请多关照！', '有人吗？新人报到！', '大家好！我开着一辆小破车，在往前开', '各位好，{me}，还活着'],
-  brag: ['刚开出了{item}，运气爆棚！', '看我的新装备：{item}！', '我已经开了 {n} 公里了！', '今天欧气不错，{item}到手'],
+  brag: ['刚开出了{item}，运气爆棚！', '看我的新装备：{item}！', '我已经开了 {n} 公里了！', '今天运气不错，{item}到手'],
 };
 function rcSend(kind) {
   const C = rcEnsure(), R = rdR();
@@ -492,8 +496,9 @@ function rcAudit() {
   for (const p of P.list) {
     let cnt = 0;
     for (const ev in RC_EVENTS) {
+      if (!p.lines[ev]) continue;
       const pool = RC_ARCH[p.arch].lines[ev].split('|');
-      for (const i of p.lines[ev]) { const t = pool[i] + ' ' + p.tic + '|' + p.job + p.car + p.home; seen[t] = (seen[t] || 0) + 1; total++; cnt++; }
+      for (const i of p.lines[ev]) { const t = pool[i]; seen[t] = (seen[t] || 0) + 1; total++; cnt++; }
     }
     per.push(cnt);
   }

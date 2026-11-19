@@ -293,7 +293,7 @@ function rdUpdate(dt) {
   R.evT -= dh;
   if (R.evT <= 0) { R.evT = 10 + Math.random() * 10; rdRandomEvent(); if (G.state !== 'play') return; }
   rdEncounterTick(dh, st);
-  rcTick(dt);
+  rcTick(dt / (G.speed || 1)); // 聊天按现实时间刷新，加速时不会刷屏
   rdCombat(dt, st);
   rdFxTick(dt);
   // ---- 每天零点自动存档 ----

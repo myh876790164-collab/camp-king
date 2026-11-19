@@ -2,8 +2,9 @@
 
 ## 关于用户
 - 说中文，几乎没有编程经验：解释要用大白话；所有回复用中文。
-- 游戏上传到 **GitHub** 发布（不是直接传 Netlify，别记错）；Windows 离线版用 `tools/make-local.ps1` 打包到 `../bonfire-camp-local/`。
-- 每次改完要提醒：上传到 GitHub、说明新增了哪些文件；需要时重新打包离线版。
+- 游戏上传到 **GitHub** 发布（不是直接传 Netlify，别记错）。
+- 目前只做线上版：改完**不要**再运行 `tools/make-local.ps1` 打包离线版，也不用提醒打包（用户以后另说再恢复）。
+- 每次改完要提醒：上传到 GitHub、说明新增了哪些文件。
 
 ## 技术结构
 - 纯 HTML5 Canvas + 普通 `<script>`（没有构建步骤、没有模块），所有界面都画在 canvas 上。加载顺序见 `index.html`。

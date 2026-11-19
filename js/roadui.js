@@ -40,27 +40,17 @@ function rdDrawUI(ctx) {
   const R = G.road, sw = G.sw, sh = G.sh, st = R.st || rdStats();
   ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
   const playing = G.state === 'play';
-  // ---- 顶栏：资源 ----
-  const items = [['fuel', Math.floor(G.res.fuel) + (st.fuelKm > 0 || st.tank > 0 ? '/' + st.tank : '')], ['scrap', Math.floor(G.res.scrap)], ['food', Math.floor(G.res.food)], ['water', Math.floor(G.res.water)], ['med', Math.floor(G.res.med)], ['ammo', Math.floor(G.res.ammo)], ['power', Math.floor(G.res.power) + '/' + st.battery]];
-  if (G.res.alien > 0) items.push(['alien', Math.floor(G.res.alien)]);
-  ctx.font = 'bold 12px ' + FONT;
-  let x = 8, y = 6, rowH = 20;
-  const maxX = sw - 104;
-  const lines = [[]];
-  for (const it of items) { const w = 16 + ctx.measureText(it[1]).width + 12; if (x + w > maxX && lines[lines.length - 1].length) { lines.push([]); x = 8; } lines[lines.length - 1].push({ it, x, w }); x += w; }
-  const topH = 6 + lines.length * rowH + 4;
-  ctx.fillStyle = 'rgba(26,28,44,0.85)'; ctx.fillRect(0, 0, sw, topH); addButton(0, 0, sw, topH, null);
-  lines.forEach((ln, r) => ln.forEach(({ it, x: ix }) => {
-    const c = RD_RES[it[0]].color, yy = 6 + r * rowH;
-    ctx.fillStyle = '#1a1c2c'; ctx.fillRect(ix, yy + 2, 12, 12); ctx.fillStyle = c; ctx.fillRect(ix + 2, yy + 4, 8, 8);
-    drawText(ctx, it[1], ix + 16, yy + 9, 12, it[0] === 'fuel' && G.res.fuel < st.tank * 0.15 && st.fuelKm > 0 ? '#ef7d57' : '#f4f4f4');
-  }));
-  // 名称提示（第一次玩时看得懂）
+  // ---- 左上角：仪表盘（车速、里程、油量、电量、弹药、警示灯；点它打开仓库看所有资源） ----
+  const portrait = sw < sh;
+  const tickW = portrait ? sw - 16 : Math.min(360, sw * 0.42);
+  const dashH = 84, dashW = Math.floor(portrait ? sw - 16 - 92 : Math.min(380, sw - tickW - 24));
+  rdDrawDash(ctx, 8, 6, dashW, dashH);
+  const topH = 6 + dashH + 2;
   drawButton(ctx, sw - 46, 4, 40, 30, '‖', () => { G.state = 'paused'; }, { size: 15 });
   drawButton(ctx, sw - 94, 4, 44, 30, '×' + G.speed, () => { nextSpeed(); }, { size: 13 });
   // ---- 信息行 ----
   const h = Math.floor(rdHour()), mi = Math.floor((rdHour() % 1) * 60);
-  let info = '第' + rdDay() + '天 ' + String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0') + (rdIsNight() ? ' ☾' : ' ☀') + ' · ' + rdBiomeAt(R.km).name + ' · ' + Math.floor(R.km) + ' 公里 · ' + Math.round(R.speedNow) + ' km/h';
+  let info = '第' + rdDay() + '天 ' + String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0') + (rdIsNight() ? ' ☾' : ' ☀') + ' · ' + rdBiomeAt(R.km).name;
   if (R.weather) info += ' · ' + R.weather.name;
   drawText(ctx, info, 8, topH + 12, 12, '#ffcd75', 'left');
   // 前方建筑（瞭望台 / 雷达 / 车载电脑）
@@ -73,10 +63,8 @@ function rdDrawUI(ctx) {
     drawText(ctx, t, 8, iy, 11, '#73eff7', 'left', false); iy += 16;
   }
   // ---- 聊天室滚动条 ----
-  const portrait = sw < sh;
   if (playing) {
-    const tw = portrait ? sw - 16 : Math.min(360, sw * 0.42);
-    const th = rcTicker(ctx, portrait ? 8 : sw - tw - 8, portrait ? iy : topH + 4, tw);
+    const th = rcTicker(ctx, portrait ? 8 : sw - tickW - 8, portrait ? iy : 40, tickW);
     if (portrait) iy += th + 4;
   }
   // ---- 状态条 ----
@@ -342,7 +330,22 @@ function rdPanelPick(c) {
 }
 function rdPanelInv(c) {
   const R = G.road, ctx = c.ctx, st = rdStats();
-  rdLine(c, '货舱 ' + rdCargoUsed() + '/' + st.cargo + '（废料、食物、水、药、弹药、晶体占货舱）· 油箱 ' + Math.floor(G.res.fuel) + '/' + st.tank + ' · 电池 ' + Math.floor(G.res.power) + '/' + st.battery, 12, '#c8d6e5');
+  // 物资一览（像素图标）
+  rdHead(c, '物资　货舱 ' + rdCargoUsed() + '/' + st.cargo);
+  const keys = ['fuel', 'power', 'scrap', 'food', 'water', 'med', 'ammo', 'alien'];
+  const cols = c.w < 420 ? 2 : 4, gap = 6, cw = (c.w - gap * (cols - 1)) / cols, chh = 40;
+  keys.forEach((k, i) => {
+    const cx = c.x + (i % cols) * (cw + gap), cy = c.y + Math.floor(i / cols) * (chh + gap);
+    const cap = k === 'fuel' ? st.tank : k === 'power' ? st.battery : 0;
+    const low = (k === 'food' || k === 'water') ? G.res[k] < 3 : k === 'med' ? G.res[k] < 1 : cap ? G.res[k] < cap * 0.15 : false;
+    ctx.fillStyle = low ? 'rgba(177,62,83,0.35)' : 'rgba(38,43,68,0.9)'; ctx.fillRect(cx, cy, cw, chh);
+    rdIcon(ctx, k, cx + 6, cy + 8, 24);
+    drawText(ctx, RD_RES[k].name, cx + 38, cy + 12, 11, '#94b0c2', 'left', false);
+    drawText(ctx, Math.floor(G.res[k] || 0) + (cap ? ' / ' + cap : ''), cx + 38, cy + 28, 14, low ? '#ef7d57' : '#f4f4f4', 'left');
+  });
+  c.y += Math.ceil(keys.length / cols) * (chh + gap) + 2;
+  rdLine(c, '废料、食物、水、药、弹药、晶体占货舱；燃油在油箱里，电在电池里', 11, '#94b0c2');
+  rdHead(c, '零件');
   rdLine(c, '拆解零件可以换废料；工作台等级 ≥ 零件品阶时，拆解还能学会它的图纸（工作台等级：' + (st.craft || '没有工作台') + '）', 11, '#94b0c2');
   if (!R.inv.length) { rdLine(c, '仓库是空的。', 13, '#566c86'); return; }
   const order = ['weapon', ...RD_EXT_ORDER, 'hand', 'suit', 'in'];
