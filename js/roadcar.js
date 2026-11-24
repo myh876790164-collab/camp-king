@@ -26,6 +26,7 @@ const RDC_PAL = {
   crate: ['#b08a5e', '#8c6a44', '#6a4e30', '#4a3420'],              // 木箱
   canvas: ['#dcc690', '#bca06a', '#98804e', '#725a36', '#4e3c24'],  // 帐篷帆布
   fire: ['#fff8d8', '#ffd860', '#f08a30', '#c03a1c', '#6a1e10'],    // 火焰：白 → 黄 → 橙 → 红
+  brick: ['#dca088', '#bc705c', '#985040', '#6e352a', '#4a221c'],   // 皮卡：晒褪色的砖红
 };
 const RDC_CACHE = {};            // 缓存好的车身图片
 let RDC_ANIM = { fr: -1, ph: 0 }; // 动画帧计数（轮子转动相位）
@@ -143,6 +144,7 @@ const RDC_CARS = {
   garbage: { build: () => rdcBuildGarbage(), wheels: [-20, -112, -138], r: 12, dustX: -150, driver: [-24, -61], glint: [-30, -63], len: 172, heavy: true,
     bob: [0, 0, -1, -1, -2, -2, -1, 0], beacons: [[-30, -77], [-153, -97]], stack: [-48, -101], roof: -29 },
   // 电单车：骑手每帧画（rider），轮子是细辐条（bike），车尾天线上挂一块布条（flag）
+  pickup: { build: () => rdcBuildPickup(), wheels: [-22, -104], r: 11, dustX: -128, driver: [-58, -62], glint: [-62, -62], len: 136, bob: [0, 0, -1, -1], roof: -22, spots: [[-82, -83], [-74, -83]] },
   ebike: { build: () => rdcBuildBike(), wheels: [-12, -52], r: 9, dustX: -62, len: 70, bob: [0, -1, -1, 0], bike: true, rider: true, flag: [-68, -64] },
 };
 function rdcBuildCourier() {
@@ -407,6 +409,86 @@ function rdcStackSmoke(g, x, y, fr, fast) {
     rdcBlob(g, px - 1, py - 1, Math.max(1, s - 2), age < 2 ? '#56493e' : '#7a6e62');
   }
   g.globalAlpha = 1;
+}
+
+// ---------- 皮卡：单排座越野皮卡（长车头 + 驾驶室 + 后斗），全部原创 ----------
+// 车长约 132（前轮 x = -22，后轮 -104，轮半径 11）；驾驶室顶 -67，后斗围栏 -48
+// 末日改装：后斗里焊了两个炮座（武器挂点 1、2 就架在上面）、驾驶室后面防滚架 + 两盏探照灯、
+// 车头钢管防撞架、进气管（涉水喉）顺着 A 柱爬上车顶、斗侧焊补丁、斗里绑着油桶
+function rdcBuildPickup() {
+  const P = RDC_PAL, B = rdcPaper(160, 112, 142, 100);
+  const K = P.brick, M = P.metal, D = P.dark;
+  const FX = -22, RX = -104, WR = 11;
+  // —— 车架大梁
+  rdcBox(B, -126, -27, 120, 6, [D[0], D[1], D[2]], 6);
+  // —— 后斗里面（先画，后面被斗壁挡住下半截）：炮座、油桶
+  for (const px of [-88, -116]) {
+    rdcBox(B, px - 2, -58, 5, 30, [M[1], M[2], M[3]], 2);                  // 立柱
+    rdcBox(B, px - 6, -59, 13, 3, [M[0], M[1], M[2]], 2); rdcRivet(B, px - 5, -58); rdcRivet(B, px + 4, -58); // 转盘
+    rdcLine(B, px - 6, -50, px - 2, -56, M[3], 2); rdcLine(B, px + 7, -50, px + 3, -56, M[3], 2); // 斜撑
+  }
+  for (const [x, c] of [[-109, ['#c05a3a', '#9a4028', '#6e2c1c']], [-102, ['#7a8050', '#5c6238', '#424626']]]) { // 两个油桶
+    rdcBox(B, x, -57, 7, 12, c, 1, 0, 1); rdcRect(B, x + 1, -58, 3, 1, M[2], 2); rdcRect(B, x, -52, 7, 1, c[2], 1);
+  }
+  // —— 后斗外壁：腰线（一道折痕：上亮下暗）、斗围栏包边 + 绑货孔、尾门
+  rdcBox(B, -131, -48, 56, 28, K, 1, 0.05, 1);
+  rdcBox(B, -132, -50, 58, 3, [M[0], M[1], M[2]], 2);
+  for (let x = -128; x < -78; x += 9) rdcRect(B, x, -49, 3, 1, D[2], 6);
+  rdcBox(B, -132, -48, 4, 28, [K[2], K[3], K[4]], 1); rdcRect(B, -131, -40, 2, 3, M[2], 2); // 尾门侧边 + 把手
+  // —— 驾驶室：后窗柱、圆角车顶、斜风挡
+  rdcPoly(B, [[-76, -20], [-76, -62], [-72, -67], [-47, -67], [-41, -61], [-33, -48], [-33, -20]], K, 1, 0.02, 1);
+  rdcRect(B, -73, -67, 25, 1, K[0], 1); for (let x = -73; x < -48; x += 2) rdcPix(B, x, -66, K[0], 1);
+  // 侧窗（前面一小块三角窗）+ 反光
+  rdcPoly(B, [[-71, -63], [-48, -63], [-42, -57], [-37, -49], [-71, -49]], P.glass, 3, 0.05, 1);
+  rdcRect(B, -72, -48, 36, 1, K[0], 1); rdcRect(B, -72, -64, 25, 1, K[3], 1);
+  rdcRect(B, -47, -62, 1, 13, K[3], 1);
+  for (let k = 0; k < 5; k++) rdcLine(B, -64 + k * 3, -62, -68 + k * 3, -55, P.glass[0], 3);
+  // —— 车头：长引擎盖，前脸微微往后斜
+  rdcPoly(B, [[-34, -48], [-5, -45], [-1, -43], [0, -32], [-1, -21], [-34, -20]], K, 1, 0.1, 1);
+  rdcLine(B, -33, -48, -5, -45, K[0], 1); rdcLine(B, -33, -47, -6, -44, K[0], 1);
+  rdcLine(B, -33, -46, -34, -24, K[3], 1); // 引擎盖和驾驶室之间的缝
+  // 整车一道腰线折痕（从车头到车尾）
+  for (let x = -130; x < -1; x++) { if (rdcMat(B, x, -38) === 1) rdcPix(B, x, -38, K[0], 1); if (rdcMat(B, x, -37) === 1) rdcPix(B, x, -37, K[3], 1); }
+  // 车门缝、门把手、后视镜
+  rdcSeamC(B, -73, -62, -27, K); rdcSeamC(B, -37, -47, -27, K);
+  rdcRect(B, -69, -45, 5, 2, M[2], 2); rdcRect(B, -69, -45, 5, 1, M[0], 2);
+  rdcLine(B, -38, -51, -34, -54, M[3], 2); rdcBox(B, -35, -59, 4, 6, [M[2], M[3]], 2); rdcPix(B, -34, -58, P.glass[1], 3);
+  // 大灯、转向灯、格栅、保险杠、尾灯
+  rdcBox(B, -3, -42, 3, 5, [P.light[0], P.light[1], P.light[2]], 4); rdcPix(B, -2, -41, '#ffffff', 4);
+  rdcRect(B, -3, -36, 3, 2, P.light[2], 4);
+  for (let y = -33; y < -27; y += 2) rdcRect(B, -2, y, 2, 1, D[1], 6);
+  rdcBox(B, -5, -28, 8, 5, [M[1], M[2], M[3]], 2);
+  rdcBox(B, -133, -46, 3, 7, P.tail, 4); rdcPix(B, -132, -45, '#ffc0a0', 4);
+  rdcBox(B, -134, -27, 10, 4, [M[1], M[2], M[3]], 2); // 后保险杠
+  // 侧踏板、排气管
+  rdcBox(B, -90, -19, 56, 3, [M[0], M[2], M[3]], 2); for (let x = -88; x < -36; x += 4) rdcPix(B, x, -19, M[3], 2);
+  rdcBox(B, -128, -21, 6, 3, [M[2], M[3]], 2); rdcPix(B, -129, -20, D[2], 6);
+  // 末日改装：斗侧补丁、门上一块焊的护板
+  rdcPatchPlate(B, -124, -45, 13, 8); rdcPatchPlate(B, -66, -36, 10, 8);
+  // —— 轮拱（挖进车身，带翼子板外扩）+ 挡泥皮
+  rdcArch(B, FX, FX, WR, K, false); rdcArch(B, RX, RX, WR, K, false);
+  rdcBox(B, RX - 15, -16, 2, 9, [P.tire[1], P.tire[3]], 5); rdcBox(B, FX - 15, -17, 2, 8, [P.tire[1], P.tire[3]], 5);
+  // 车尘、锈、泥点
+  rdcWeather(B, 17, 0.02, -40);
+  // —— 锈之后画的钢管件（自己带锈点）：防滚架 + 探照灯底座、车头防撞架、涉水喉
+  rdcBox(B, -80, -80, 3, 32, [M[0], M[1], M[2]], 2); rdcBox(B, -86, -80, 18, 3, [M[0], M[1], M[2]], 2);
+  rdcLine(B, -79, -78, -70, -67, M[2], 2); rdcLine(B, -78, -78, -69, -67, M[3], 2); // 斜撑到车顶
+  for (const sx of [-82, -74]) rdcRect(B, sx - 1, -81, 3, 1, M[3], 2);
+  rdcBox(B, 2, -48, 3, 26, [M[0], M[1], M[2]], 2); rdcRect(B, -2, -46, 5, 2, M[2], 2); rdcRect(B, -2, -32, 5, 2, M[2], 2);
+  rdcLine(B, 3, -47, -2, -41, M[2], 2); rdcLine(B, 3, -33, -2, -39, M[2], 2); // 防撞架的交叉斜杆
+  rdcBox(B, -32, -46, 3, 12, [M[1], M[2], M[3]], 2); rdcLine(B, -31, -46, -41, -66, M[2], 2); rdcLine(B, -30, -46, -40, -66, M[3], 2); // 涉水喉
+  rdcBox(B, -43, -71, 5, 5, [M[1], M[2], M[3]], 2); rdcRect(B, -39, -70, 2, 3, D[2], 6);
+  for (const [x, y, k] of [[3, -44, 1], [4, -36, 2], [-79, -70, 1], [-79, -58, 2], [-84, -79, 1], [-31, -40, 2]]) rdcPix(B, x, y, P.rust[k], 2);
+  rdcOutline(B);
+  return rdcToCanvas(B);
+}
+// 防滚架上的探照灯：白天暗着，晚上开车时亮，前面一道光束
+function rdcSpot(g, x, y, lit) {
+  const P = RDC_PAL;
+  g.fillStyle = P.out; g.fillRect(x - 3, y - 3, 7, 6);
+  g.fillStyle = P.metal[2]; g.fillRect(x - 2, y - 2, 5, 4); g.fillStyle = P.metal[1]; g.fillRect(x - 2, y - 2, 5, 1);
+  g.fillStyle = lit ? P.light[0] : '#c8c0a0'; g.fillRect(x + 2, y - 2, 2, 4);
+  if (lit) { const gr = g.createLinearGradient(x + 4, 0, x + 70, 0); gr.addColorStop(0, 'rgba(255,240,190,0.35)'); gr.addColorStop(1, 'rgba(255,240,190,0)'); g.fillStyle = gr; g.beginPath(); g.moveTo(x + 4, y - 2); g.lineTo(x + 70, y - 12); g.lineTo(x + 70, y + 14); g.lineTo(x + 4, y + 2); g.fill(); }
 }
 
 // ---------- 电单车：自己拼装的电动越野车（钢蓝车壳 + 大电池包 + 后货架木箱和折叠太阳能板），全部原创 ----------
@@ -695,6 +777,8 @@ function rdcDrawCar(g, x, y, o) {
   // 车身
   g.drawImage(car.cv, X - car.ox, Y - car.oy + bob);
   if (o.hit) { g.globalAlpha = baseA * 0.55; g.drawImage(car.white, X - car.ox, Y - car.oy + bob); g.globalAlpha = baseA; }
+  // 皮卡：防滚架上的探照灯（晚上开车时亮）
+  if (cf.spots) for (const s of cf.spots) rdcSpot(g, X + s[0], Y + s[1] + bob, R.driving && rdDaylight() < 0.5);
   // 电单车：骑手、布条
   if (cf.rider && o.driver) rdcRider(g, X, Y + bob, fr, o.moving, o.fast);
   if (cf.flag) rdcFlag(g, X + cf.flag[0], Y + cf.flag[1] + bob, fr, o.moving);

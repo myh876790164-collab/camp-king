@@ -558,6 +558,7 @@ function rdWeapons() {
 function rdMountPos(i) { // 武器在车上的位置（相对车头，像素）
   const v = rdVeh(), L = v.len;
   const xs = [-L * 0.45, -L * 0.75, -L * 0.25, -L * 0.6, -L * 0.15];
+  if (G.road.veh === 'pickup' && i < 2) return { x: [-L * 0.667, -L * 0.88][i], y: -26 }; // 皮卡：前两门架在后斗的炮座上
   return { x: xs[i % xs.length], y: -(v.tent ? 18 : L > 50 ? 30 : 26) };
 }
 function rdCombat(dt, st) {

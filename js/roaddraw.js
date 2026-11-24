@@ -528,7 +528,7 @@ function rdDrawVehicle(g, x0, y0, opt) {
   // 武器
   const ws = rdWeapons();
   ws.forEach((w) => {
-    const mp = rdMountPos(w.i), gx = x + mp.x, gy = y + mp.y + (R.veh === 'pickup' && w.i < 2 ? 10 : 0) + (R.veh === 'garbage' ? -2 : 0);
+    const mp = rdMountPos(w.i), gx = x + mp.x, gy = y + mp.y + (R.veh === 'pickup' && w.i < 2 ? 6 : 0) + (R.veh === 'garbage' ? -2 : 0);
     if (w.p.fx.turret) rdDrawTurret(g, gx, gy, w.p, 'w' + w.i, w.i);
     else rdDrawGun(g, gx, gy, w.p, (R.aim && R.aim['w' + w.i]) || 0);
   });
