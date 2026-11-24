@@ -22,7 +22,32 @@ const RDI_PAL = {
 function rdiRoomKey(w, kind, floor, trailer, lit) { return [w, kind, floor, trailer ? 1 : 0, lit ? 1 : 0, rdiVeh()].join('|'); }
 // 当前车型（车内外壳颜色、车型专属的内部细节跟着它变）
 function rdiVeh() { return (G.road && G.road.veh) || 'courier'; }
-function rdiSkin() { const v = rdiVeh(); return v === 'garbage' ? RDC_PAL.olive : v === 'pickup' ? RDC_PAL.brick : RDC_PAL.cream; }
+function rdiSkin() { const v = rdiVeh(); return v === 'garbage' ? RDC_PAL.olive : v === 'pickup' ? RDC_PAL.brick : v === 'icecream' ? RDC_PAL.rose : RDC_PAL.cream; }
+// 冰淇淋车车厢：墙下半截是粉 / 薄荷竖条纹的护墙板 + 镀铬扶手条
+function rdiIceRoom(B, FW, FH) {
+  const P = RDC_PAL, Q = RD_Q, top = FH - 15 * Q;
+  for (let y = top; y < FH; y++) for (let x = 0; x < FW; x++) {
+    const s = x % 18, ramp = s < 9 ? P.rose : P.mint, t = 0.25 + (y - top) / (FH - top) * 0.5 + (s === 0 || s === 9 ? 0.3 : 0);
+    rdcPix(B, x, y, rdcRampAt(ramp, Math.max(0, Math.min(1, t)), x, y), 1);
+  }
+  rdcBox(B, 0, top - 4, FW, 4, [P.metal[0], P.metal[0], P.metal[1], P.metal[2]], 2);
+  for (let x = 6; x < FW; x += 40) rdcRivet(B, x, top - 3);
+}
+// 冰淇淋车地板：褪色的黑白格地砖
+function rdiIceFloor(B, FW, FH) {
+  for (let y = FH; y < FH + 4; y++) for (let x = 0; x < FW; x++) {
+    const c = ((Math.floor((x + (y - FH) * 2) / 8)) & 1) ? ['#d8ccb4', '#c4b89e', '#b0a488', '#9a8e74'] : ['#4a403a', '#3c332e', '#30282a', '#262022'];
+    rdcPix(B, x, y, c[y - FH], 1);
+  }
+}
+// 车厢顶上的小甜筒（车外那个大甜筒的剖面图版本）
+function rdiIceCone(B, x) {
+  const Wf = RDC_PAL.waffle;
+  rdcPoly(B, [[x - 6, -24], [x + 6, -24], [x + 1, -13], [x - 1, -13]], Wf, 1, 0, 1);
+  for (let y = -24; y < -13; y++) for (let xx = x - 6; xx <= x + 6; xx++) if (rdcMat(B, xx, y) === 1 && ((xx + y) % 4 + 4) % 4 === 0) rdcPix(B, xx, y, Wf[3], 1);
+  for (let y = -32; y <= -22; y++) for (let xx = x - 7; xx <= x + 7; xx++) { const d = Math.hypot(xx - x, (y + 27) * 1.2); if (d <= 7) rdcPix(B, xx, y, d < 3 ? '#f8d8d4' : d < 5.5 ? '#eab4b4' : '#cc8c90', 1); }
+  rdcBox(B, x - 1, -36, 3, 3, ['#e05050', '#7a1a1a'], 4);
+}
 // 皮卡车厢（后斗上加了个罩子）：下半截是后斗内壁（砖红铁皮、横向加强棱、围栏包边、绑货孔）+ 后轮的轮包鼓起来
 function rdiPickupRoom(B, FW, FH) {
   const P = RDC_PAL, K = P.brick, M = P.metal, Q = RD_Q, top = FH - 16 * Q;
@@ -58,7 +83,8 @@ function rdiGarbageFloor(B, FW, FH) {
 function rdiBuildRoom(w, kind, floor, trailer, lit) {
   const Q = RD_Q, P = RDC_PAL, IP = RDI_PAL;
   const FW = w * Q, FH = 50 * Q; // 房间内部：宽 FW，高 FH（天花板 y = 0，地面 y = FH）
-  const B = rdcPaper(FW + 20, FH + 36, 10, 13);
+  const ice = !trailer && rdiVeh() === 'icecream';
+  const B = rdcPaper(FW + 20, FH + 36 + (ice ? 26 : 0), 10, 13 + (ice ? 26 : 0));
   const skin = trailer ? P.metal : rdiSkin(), garbage = !trailer && rdiVeh() === 'garbage', pickup = !trailer && rdiVeh() === 'pickup';
   // —— 外壳切面（上、左、右）：车漆 → 保温棉 → 内衬
   rdcBox(B, -9, -12, FW + 18, 4, skin, 1);
@@ -98,6 +124,7 @@ function rdiBuildRoom(w, kind, floor, trailer, lit) {
   }
   if (garbage) rdiGarbageRoom(B, FW, FH);
   if (pickup) rdiPickupRoom(B, FW, FH);
+  if (ice) rdiIceRoom(B, FW, FH);
   rdiGrime(B, FW, FH, kind);
   // —— 天花板：暗色顶棚 + 横梁 + 灯具
   rdcBox(B, 0, 0, FW, 6, [RDC_PAL.dark[0], RDC_PAL.dark[1], RDC_PAL.dark[2]], 6);
@@ -115,11 +142,13 @@ function rdiBuildRoom(w, kind, floor, trailer, lit) {
     rdcPix(B, x, y, rdcRampAt(F, Math.max(0, Math.min(1, t)), x, y), floor === 'wood' ? 1 : 2);
   }
   if (garbage && floor !== 'wood') rdiGarbageFloor(B, FW, FH);
+  if (ice && floor !== 'wood') rdiIceFloor(B, FW, FH);
   rdcBox(B, -9, FH + 4, FW + 18, 8, [RDC_PAL.dark[0], RDC_PAL.dark[1], RDC_PAL.dark[2]], 6);
   for (let x = 4; x < FW; x += 26) rdcRivet(B, x, FH + 7);
   rdcBox(B, -9, FH + 12, FW + 18, 4, skin, 1);
   // 外壳做旧（只锈外壳，不锈墙）
   rdiWeatherShell(B, FW, FH);
+  if (ice) rdiIceCone(B, Math.round(FW * 0.4));
   rdcOutline(B);
   return rdcToCanvas(B);
 }

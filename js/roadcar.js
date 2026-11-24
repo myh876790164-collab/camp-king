@@ -27,6 +27,9 @@ const RDC_PAL = {
   canvas: ['#dcc690', '#bca06a', '#98804e', '#725a36', '#4e3c24'],  // 帐篷帆布
   fire: ['#fff8d8', '#ffd860', '#f08a30', '#c03a1c', '#6a1e10'],    // 火焰：白 → 黄 → 橙 → 红
   brick: ['#dca088', '#bc705c', '#985040', '#6e352a', '#4a221c'],   // 皮卡：晒褪色的砖红
+  rose: ['#f2d4c8', '#dcaaa4', '#b88488', '#8a5c64', '#5e3c44'],    // 冰淇淋车：晒褪色的粉
+  mint: ['#c4e4d0', '#94c4b0', '#68988a', '#466c62'],               // 薄荷绿条纹
+  waffle: ['#f0c888', '#d4a05c', '#a87438', '#7a4e24'],             // 蛋筒
 };
 const RDC_CACHE = {};            // 缓存好的车身图片
 let RDC_ANIM = { fr: -1, ph: 0 }; // 动画帧计数（轮子转动相位）
@@ -145,6 +148,8 @@ const RDC_CARS = {
     bob: [0, 0, -1, -1, -2, -2, -1, 0], beacons: [[-30, -77], [-153, -97]], stack: [-48, -101], roof: -29 },
   // 电单车：骑手每帧画（rider），轮子是细辐条（bike），车尾天线上挂一块布条（flag）
   pickup: { build: () => rdcBuildPickup(), wheels: [-22, -104], r: 11, dustX: -128, driver: [-58, -62], glint: [-62, -62], len: 136, bob: [0, 0, -1, -1], roof: -22, spots: [[-82, -83], [-74, -83]] },
+  icecream: { build: () => rdcBuildIcecream(), wheels: [-24, -102], r: 11, dustX: -115, driver: [-30, -67], glint: [-34, -70], len: 142, bob: [0, 0, -1, -1], roof: -27,
+    bulbs: { x0: -134, x1: -46, y: -84 }, horn: [-50, -94] },
   ebike: { build: () => rdcBuildBike(), wheels: [-12, -52], r: 9, dustX: -62, len: 70, bob: [0, -1, -1, 0], bike: true, rider: true, flag: [-68, -64] },
 };
 function rdcBuildCourier() {
@@ -491,6 +496,96 @@ function rdcSpot(g, x, y, lit) {
   if (lit) { const gr = g.createLinearGradient(x + 4, 0, x + 70, 0); gr.addColorStop(0, 'rgba(255,240,190,0.35)'); gr.addColorStop(1, 'rgba(255,240,190,0)'); g.fillStyle = gr; g.beginPath(); g.moveTo(x + 4, y - 2); g.lineTo(x + 70, y - 12); g.lineTo(x + 70, y + 14); g.lineTo(x + 4, y + 2); g.fill(); }
 }
 
+// ---------- 冰淇淋车：方头步入式厢车（大售货窗 + 卷帘遮阳棚 + 车顶大甜筒 + 喇叭），全部原创 ----------
+// 车长约 138（和快递车一样，前轮 -24，后轮 -102，轮半径 11）；厢顶 -80，甜筒顶约 -112
+// 末日改装：售货窗一半焊了铁丝网、甜筒裂了用铁皮箍着、车尾窗钉了木板、侧面补丁
+function rdcBuildIcecream() {
+  const P = RDC_PAL, B = rdcPaper(160, 140, 146, 128);
+  const K = P.rose, Mt = P.mint, M = P.metal, D = P.dark, Wf = P.waffle;
+  const FX = -24, RX = -102, WR = 11;
+  rdcBox(B, -132, -25, 126, 7, [D[0], D[1], D[2]], 6); // 大梁
+  // —— 车身：后上角圆、前面是斜风挡 + 短车鼻
+  rdcPoly(B, [[-138, -74], [-135, -79], [-131, -81], [-44, -81], [-38, -79], [-16, -58], [-6, -55], [-2, -52], [0, -44], [0, -20], [-138, -20]], K, 1, 0.02, 1);
+  rdcRect(B, -130, -81, 85, 1, K[0], 1); for (let x = -130; x < -46; x += 2) rdcPix(B, x, -80, K[0], 1);
+  // 顶上一圈「融化的奶油」：米白色的波浪滴落边
+  for (let x = -136; x < -40; x++) { const d = 3 + Math.round(Math.abs(Math.sin(x * 0.45)) * 2 + (rdcHash(x, 0, 41) < 0.12 ? 3 : 0)); for (let y = -79; y < -79 + d; y++) if (rdcMat(B, x, y) === 1) rdcPix(B, x, y, y === -79 + d - 1 ? P.cream[2] : P.cream[(y + 79) > 1 ? 1 : 0], 1); }
+  // 薄荷绿腰带（波浪上沿）+ 下面一条细线
+  for (let x = -137; x < -1; x++) { const top = -40 + Math.round(Math.sin(x * 0.3) * 1.5); for (let y = top; y < -33; y++) if (rdcMat(B, x, y) === 1) rdcPix(B, x, y, rdcRampAt(Mt, (y - top) / 8, x, y), 7); }
+  rdcLine(B, -137, -30, -2, -30, Mt[1], 7);
+  // —— 风挡 + 侧窗 + 车门
+  rdcPoly(B, [[-38, -77], [-18, -58], [-14, -58], [-14, -52], [-38, -52]], P.glass, 3, 0.05, 1);
+  rdcRect(B, -39, -51, 26, 1, K[0], 1); rdcRect(B, -26, -73, 1, 21, K[3], 1);
+  for (let k = 0; k < 4; k++) rdcLine(B, -36 + k * 3, -72, -39 + k * 3, -66, P.glass[0], 3);
+  rdcSeamC(B, -41, -78, -22, K); rdcSeamC(B, -13, -56, -24, K);
+  rdcRect(B, -36, -46, 5, 2, M[2], 2); rdcRect(B, -36, -46, 5, 1, M[0], 2);
+  // —— 售货窗：深色窗洞（里面能看到冷柜的盖子和一排甜筒）、外翻的窗板、台面、一半焊铁丝网
+  rdcBox(B, -110, -70, 40, 22, ['#3a2a26', '#2c201c', '#20160f'], 6, 0, 1);
+  rdcBox(B, -108, -56, 36, 5, [M[0], M[1], M[2]], 2);                          // 冷柜不锈钢盖子
+  for (let k = 0; k < 6; k++) { const x = -106 + k * 6; rdcPoly(B, [[x, -62], [x + 3, -62], [x + 1.5, -57]], [Wf[1], Wf[2]], 1); rdcBox(B, x - 1, -65, 5, 3, [['#f0b0b0', '#d88888'], ['#c4e4d0', '#88b8a0'], ['#f2e4c0', '#d0c098']][k % 3], 1); } // 架子上的甜筒
+  rdcBox(B, -112, -48, 44, 3, [M[0], M[1], M[2]], 2); rdcRect(B, -110, -45, 2, 4, M[3], 2); rdcRect(B, -71, -45, 2, 4, M[3], 2); // 台面 + 支架
+  for (let y = -70; y < -48; y++) for (let x = -90; x < -70; x++) if ((x + 90) % 4 === 1 || (y + 70) % 4 === 1) rdcPix(B, x, y, (y + 70) % 4 === 1 ? M[2] : M[3], 2);
+  for (const [x, y] of [[-91, -71], [-71, -71], [-91, -49], [-71, -49]]) rdcRivet(B, x, y);
+  // 菜单板（褪色的彩色圆点 + 价格横线）
+  rdcBox(B, -64, -70, 14, 18, ['#4a3a36', '#3a2c28'], 6); rdcRect(B, -65, -71, 16, 1, M[2], 2);
+  for (let k = 0; k < 4; k++) { rdcRect(B, -62, -67 + k * 4, 2, 2, ['#e8a0a0', '#a8d8c0', '#f0d890', '#c0a0d0'][k], 4); rdcRect(B, -58, -66 + k * 4, 6, 1, P.cream[2], 4); }
+  // 车尾小窗：钉了木板
+  rdcBox(B, -134, -68, 14, 12, ['#3a2a26', '#20160f'], 6);
+  for (const [y, dy] of [[-67, 2], [-62, -1]]) rdcLine(B, -135, y, -119, y + dy, P.crate[1], 1);
+  for (const [y, dy] of [[-66, 2], [-61, -1]]) rdcLine(B, -135, y, -119, y + dy, P.crate[3], 1);
+  // 车鼻：大灯、转向灯、格栅、保险杠；尾灯、后保险杠
+  rdcBox(B, -3, -43, 3, 5, [P.light[0], P.light[1], P.light[2]], 4); rdcPix(B, -2, -42, '#ffffff', 4);
+  rdcRect(B, -3, -37, 3, 2, P.light[2], 4);
+  for (let y = -33; y < -25; y += 2) rdcRect(B, -2, y, 2, 1, D[1], 6);
+  rdcBox(B, -6, -24, 9, 6, [M[0], M[1], M[2], M[3]], 2);
+  rdcBox(B, -140, -46, 3, 6, P.tail, 4); rdcPix(B, -139, -45, '#ffc0a0', 4);
+  rdcBox(B, -141, -22, 12, 4, [M[0], M[1], M[2]], 2);
+  // 长杆后视镜
+  rdcLine(B, -14, -52, -6, -58, M[3], 2); rdcBox(B, -7, -66, 4, 11, [M[2], M[3]], 2); rdcPix(B, -6, -64, P.glass[1], 3);
+  // 补丁
+  rdcPatchPlate(B, -128, -48, 11, 8); rdcPatchPlate(B, -58, -44, 9, 7);
+  // —— 车顶：大喇叭（放音乐）+ 灯泡支架
+  rdcBox(B, -52, -86, 4, 5, [M[1], M[2], M[3]], 2);
+  rdcPoly(B, [[-52, -91], [-46, -95], [-44, -95], [-44, -85], [-46, -85], [-52, -89]], [M[0], M[1], M[2], M[3]], 2);
+  rdcRect(B, -44, -95, 1, 10, D[2], 6);
+  // —— 轮拱 + 挡泥皮
+  rdcArch(B, FX, FX, WR, K, false); rdcArch(B, RX, RX, WR, K, false);
+  rdcBox(B, RX - 15, -16, 2, 9, [P.tire[1], P.tire[3]], 5); rdcBox(B, FX - 15, -17, 2, 8, [P.tire[1], P.tire[3]], 5);
+  rdcWeather(B, 29, -0.03, -40);
+  { const w0 = rdcHex(P.cream[0]); for (let i = 0; i < B.c.length; i++) if (B.c[i] === w0 && B.m[i] === 1 && rdcHash(i, 1, 7) < 0.5) B.c[i] = rdcHex(K[0]); }
+  // —— 车顶大甜筒（锈后画）：蛋筒（格子纹）+ 两个球（粉 + 薄荷，上面一颗樱桃）；裂了一道，用铁皮箍着
+  const cx = -90;
+  rdcPoly(B, [[cx - 9, -96], [cx + 9, -96], [cx + 1, -81], [cx - 1, -81]], Wf, 1, 0, 1);
+  for (let y = -96; y < -81; y++) for (let x = cx - 9; x <= cx + 9; x++) if (rdcMat(B, x, y) === 1 && (((x + y) % 5 + 5) % 5 === 0 || ((x - y) % 5 + 5) % 5 === 0)) rdcPix(B, x, y, Wf[3], 1);
+  const ball = (bx, by, r, ramp) => { for (let y = -r; y <= r; y++) for (let x = -r - 1; x <= r + 1; x++) { const d = Math.hypot(x * 0.9, y); if (d > r) continue; const lit = (-x - y) / (d || 1); rdcPix(B, bx + x, by + y, rdcRampAt(ramp, Math.max(0, Math.min(1, 0.45 - lit * 0.35 + d / r * 0.25)), x, y), 1); } };
+  ball(cx, -99, 9, ['#f8d8d4', '#eab4b4', '#cc8c90', '#9a6068']);
+  for (let x = cx - 9; x <= cx + 9; x++) { const d = 1 + Math.round(Math.abs(Math.sin(x * 0.8)) * 2); for (let y = -96; y < -96 + d; y++) rdcPix(B, x, y, '#cc8c90', 1); } // 球底下垂的奶油
+  ball(cx + 1, -110, 7, ['#d8f0e0', '#a8d4c0', '#78a898', '#4e766a']);
+  rdcBox(B, cx, -120, 4, 4, ['#e05050', '#b02a2a', '#7a1a1a'], 4); rdcPix(B, cx + 1, -119, '#ffb0a0', 4); rdcLine(B, cx + 2, -120, cx + 4, -123, '#6a8a3a', 2);
+  rdcLine(B, cx - 3, -104, cx + 2, -94, '#7a4e48', 1); rdcLine(B, cx - 2, -104, cx + 3, -94, '#9a6068', 1); // 裂缝
+  rdcBox(B, cx - 9, -102, 18, 2, [M[1], M[3]], 2); rdcRivet(B, cx - 7, -102); rdcRivet(B, cx + 6, -102); // 箍着的铁皮
+  rdcBox(B, cx - 3, -83, 6, 3, [M[1], M[2]], 2); // 甜筒底座
+  rdcOutline(B);
+  return rdcToCanvas(B);
+}
+// 车顶边上一排灯泡：3 帧一轮「跑马灯」；不开时是暗的
+function rdcBulbs(g, X, Y, b, fr, on) {
+  for (let x = b.x0, k = 0; x <= b.x1; x += 6, k++) {
+    const lit = on && (k + fr) % 3 === 0;
+    g.fillStyle = RDC_PAL.out; g.fillRect(X + x - 1, Y + b.y - 1, 4, 4);
+    g.fillStyle = lit ? '#fff4c0' : on ? '#e0a050' : '#8a6a50'; g.fillRect(X + x, Y + b.y, 2, 2);
+    if (lit) { g.globalAlpha = 0.35; g.fillStyle = '#ffd880'; g.fillRect(X + x - 2, Y + b.y - 2, 6, 6); g.globalAlpha = 1; }
+  }
+}
+// 喇叭放音乐：飘出的音符（往后上方飘、变淡）
+function rdcHornNotes(g, x, y, fr) {
+  for (let k = 0; k < 3; k++) {
+    const t = ((fr + k * 4) % 12) / 12, nx = Math.round(x + 4 - t * 14 + Math.sin(t * 9) * 2), ny = Math.round(y - 2 - t * 16);
+    g.globalAlpha = 1 - t; g.fillStyle = RDC_PAL.out; g.fillRect(nx - 1, ny + 3, 4, 4); g.fillRect(nx + 2, ny - 2, 2, 6);
+    g.fillStyle = ['#f8d8a0', '#c4e4d0', '#f2c0c0'][k]; g.fillRect(nx, ny + 4, 2, 2); g.fillRect(nx + 2, ny - 1, 1, 6); g.fillRect(nx + 2, ny - 1, 3, 1);
+  }
+  g.globalAlpha = 1;
+}
+
 // ---------- 电单车：自己拼装的电动越野车（钢蓝车壳 + 大电池包 + 后货架木箱和折叠太阳能板），全部原创 ----------
 // 车长约 70（前轮 x = -12，后轮 -52，轮半径 9）；骑手 1.8 米 ≈ 42 精细像素，和货车比例一致
 function rdcLine2(B, x0, y0, x1, y1, c1, c2, mat) { rdcLine(B, x0, y0, x1, y1, c1, mat); rdcLine(B, x0, y0 + 1, x1, y1 + 1, c2, mat); }
@@ -777,6 +872,9 @@ function rdcDrawCar(g, x, y, o) {
   // 车身
   g.drawImage(car.cv, X - car.ox, Y - car.oy + bob);
   if (o.hit) { g.globalAlpha = baseA * 0.55; g.drawImage(car.white, X - car.ox, Y - car.oy + bob); g.globalAlpha = baseA; }
+  // 冰淇淋车：车顶跑马灯（开车或晚上亮）、喇叭飘音符（开车时）
+  if (cf.bulbs) rdcBulbs(g, X, Y + bob, cf.bulbs, fr, R.driving || rdDaylight() < 0.5);
+  if (cf.horn && o.moving && o.dust) rdcHornNotes(g, X + cf.horn[0], Y + cf.horn[1] + bob, fr);
   // 皮卡：防滚架上的探照灯（晚上开车时亮）
   if (cf.spots) for (const s of cf.spots) rdcSpot(g, X + s[0], Y + s[1] + bob, R.driving && rdDaylight() < 0.5);
   // 电单车：骑手、布条
