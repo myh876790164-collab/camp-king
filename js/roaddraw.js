@@ -879,16 +879,17 @@ function rdDrawInterior(g) {
   // 家具
   const items = R.inner.map((it, i) => ({ it, i, p: RD_PARTS[it.id] }));
   // 家具先「自动精细化」（js/roadin.js 的 rdiFine），以后再逐个手绘
-  for (const o of items) if ((o.p.layer || 'floor') === 'wall') { const iw = (o.p.w || 1) * RD_CELL; rdiFine(g, rdCellX(lay, ox, o.it.cell, 'wall'), ceil + 6, [-iw - 3, -14, iw + 6, 48], (gg, ax, ay) => rdDrawItem(gg, o, ax, ay, true, lay)); }
-  for (const o of items) if ((o.p.layer || 'floor') !== 'wall') { const iw = (o.p.w || 1) * RD_CELL; rdiFine(g, rdCellX(lay, ox, o.it.cell, 'floor'), floorY, [-iw - 3, -46, iw + 6, 50], (gg, ax, ay) => rdDrawItem(gg, o, ax, ay, false, lay)); }
+  for (const o of items) if ((o.p.layer || 'floor') === 'wall') { const iw = (o.p.w || 1) * RD_CELL; rdiFine(g, rdCellX(lay, ox, o.it.cell, 'wall'), ceil + 6, [-iw - 3, -14, iw + 6, 48], (gg, ax, ay) => rdDrawItem(gg, o, ax, ay, true, lay), 'wall'); }
+  for (const o of items) if ((o.p.layer || 'floor') !== 'wall') { const iw = (o.p.w || 1) * RD_CELL; rdiFine(g, rdCellX(lay, ox, o.it.cell, 'floor'), floorY, [-iw - 3, -46, iw + 6, 50], (gg, ax, ay) => rdDrawItem(gg, o, ax, ay, false, lay), 'floor'); }
   // 宠物
   if (R.pet && R.me.loc !== 'out' && R.me.loc !== 'site') {
     const px = rdCellX(lay, ox, Math.floor(R.pet.ix), 'floor') - (R.pet.ix % 1) * RD_CELL;
     const PB = [-12, -18, 24, 20];
-    if (R.pet.sleep) { rdiFine(g, px, floorY, PB, (gg, ax, ay) => rdDrawPet(gg, ax, ay, R.pet.type, false, 1)); rdZzz(g, px + 3, floorY - 8); } else rdiFine(g, px, floorY, PB, (gg, ax, ay) => rdDrawPet(gg, ax, ay, R.pet.type, R.pet.walking, R.pet.face));
+    if (R.pet.sleep) { rdiFine(g, px, floorY, PB, (gg, ax, ay) => rdDrawPet(gg, ax, ay, R.pet.type, false, 1), 'floor'); rdZzz(g, px + 3, floorY - 8); } else rdiFine(g, px, floorY, PB, (gg, ax, ay) => rdDrawPet(gg, ax, ay, R.pet.type, R.pet.walking, R.pet.face), 'floor');
   }
   // 主角
   rdDrawMeInside(g, lay, ox, floorY, ceil);
+  rdiGradeScreen(g, vw, vh);
   // 没开空间核心但外面看着一样大：提示
   g.setTransform(RD_Q, 0, 0, RD_Q, 0, 0);
   // 夜里稍暗
@@ -1056,7 +1057,7 @@ function rdDrawMeInside(g, lay, ox, floorY, ceil) {
   const face = a && !me.walking && a.it ? 1 : me.face;
   if (a && a.type === 'shower' && !me.walking) g.globalAlpha = 0.6;
   const showerA = g.globalAlpha; g.globalAlpha = 1;
-  rdiFine(g, px, y, [-16, -30, 32, 34], (gg, ax, ay) => { gg.globalAlpha = showerA; rdDrawPerson(gg, ax, ay, { pose, face, hold, curl: extra === 'curl' }); });
+  rdiFine(g, px, y, [-16, -30, 32, 34], (gg, ax, ay) => { gg.globalAlpha = showerA; rdDrawPerson(gg, ax, ay, { pose, face, hold, curl: extra === 'curl' }); }, 'floor');
   g.globalAlpha = 1;
   // 活动特效
   if (a && !me.walking) {

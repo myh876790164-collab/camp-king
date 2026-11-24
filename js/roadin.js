@@ -9,12 +9,12 @@
 
 const RDI_CACHE = {};
 const RDI_PAL = {
-  foam: ['#f0d080', '#d8b058', '#b08a40'],             // 保温棉
-  steel: ['#b8ac9c', '#948878', '#766a5c', '#584e44', '#3e362e'], // 车厢内壁铁皮（暖灰）
-  ply: ['#d8a870', '#c08f58', '#a07448', '#7c5636', '#5a3c26'],   // 胶合板
-  paper: ['#f2deb0', '#e2c890', '#c8aa70', '#a08450'],             // 墙纸
-  plate: ['#a8a090', '#888072', '#6a6258', '#4a443c'],             // 花纹钢板地面
-  wood: ['#c89058', '#a87444', '#86582e', '#5e3c1e'],              // 木地板
+  foam: ['#a89880', '#8a7a64', '#6a5c4a'],             // 保温层（旧了发灰的玻璃棉）
+  steel: ['#9a8e7e', '#7e7264', '#665a4e', '#4c433a', '#352e28'], // 车厢内壁铁皮（暖灰、旧）
+  ply: ['#b08a5e', '#97734c', '#7c5c3c', '#5e4430', '#45311f'],   // 胶合板（旧、发暗）
+  paper: ['#c8b48e', '#b09c78', '#968260', '#7a684c'],             // 墙纸（褪色）
+  plate: ['#968e80', '#787064', '#5c564c', '#403a34'],             // 花纹钢板地面
+  wood: ['#a87a4c', '#8a603a', '#6c4a2c', '#4c321e'],              // 木地板
 };
 
 // ---------- 车厢房间（缓存成图片） ----------
@@ -42,7 +42,7 @@ function rdiBuildRoom(w, kind, floor, trailer, lit) {
     let t = 0.15 + (y / FH) * 0.55; // 上亮下暗
     if (kind === 'steel') { const m = x % 6; t += m === 0 ? -0.2 : m === 4 ? 0.18 : m === 5 ? 0.3 : 0; } // 竖向瓦楞
     if (kind === 'ply') { const n = rdcNoise2(x / 14, y / 2.2, 3 + Math.floor(x / 78)); t += (n - 0.5) * 0.35; } // 木纹
-    if (kind === 'paper') { const px = x % 12, py = y % 12; if ((Math.abs(px - 6) + Math.abs(py - 6)) === 4) t += 0.4; if (px === 6 && py === 6) t += 0.6; } // 菱形花纹
+    if (kind === 'paper') { const px = x % 12, py = y % 12; if ((Math.abs(px - 6) + Math.abs(py - 6)) === 4 && ((x + y) & 1)) t += 0.25; } // 褪色的菱形花纹
     // 靠天花板、地面、两边的地方暗一点（阴影）
     if (y < 4) t += 0.25; if (y > FH - 5) t += 0.2; if (x < 3 || x > FW - 4) t += 0.2;
     rdcPix(B, x, y, rdcRampAt(RAMP, Math.max(0, Math.min(1, t)), x, y), 1);
@@ -58,15 +58,16 @@ function rdiBuildRoom(w, kind, floor, trailer, lit) {
   if (kind === 'steel') {
     const ty = FH - 54;
     rdcBox(B, 0, ty, FW, 5, [P.metal[0], P.metal[1], P.metal[2], P.metal[3]], 2);
-    for (let x = 3; x < FW - 3; x += 6) rdcRect(B, x, ty + 1, 3, 3, D_SLOT(), 6);
+    for (let x = 3; x < FW - 3; x += 6) rdcRect(B, x, ty + 1, 3, 3, RDC_PAL.dark[2], 6);
     for (let k = 0; k < FW / 9; k++) { const x = Math.floor(rdcHash(k, 1, 8) * FW), y0 = Math.floor(rdcHash(k, 2, 8) * FH * 0.7), len = 3 + Math.floor(rdcHash(k, 3, 8) * 10); for (let j = 0; j < len; j++) if (rdcMat(B, x, y0 + j) === 1) rdcPix(B, x, y0 + j, j < 2 ? P.rust[1] : P.rust[2], 1); }
   }
+  rdiGrime(B, FW, FH, kind);
   // —— 天花板：暗色顶棚 + 横梁 + 灯具
   rdcBox(B, 0, 0, FW, 6, [RDC_PAL.dark[0], RDC_PAL.dark[1], RDC_PAL.dark[2]], 6);
   for (let x = 6; x < FW; x += 39) rdcBox(B, x, 0, 4, 7, [P.metal[2], P.metal[3]], 2);
   for (let k = 20 * Q; k < FW - 10 * Q; k += 40 * Q) {
     rdcBox(B, k, 6, 18, 3, [P.metal[1], P.metal[2]], 2);
-    rdcRect(B, k + 1, 9, 16, 1, lit ? P.light[0] : P.metal[3], 4); rdcRect(B, k + 2, 10, 14, 1, lit ? P.light[1] : P.metal[3], 4);
+    rdcRect(B, k + 1, 9, 16, 1, lit ? '#f0e2b8' : P.metal[3], 4); rdcRect(B, k + 2, 10, 14, 1, lit ? '#c8b088' : P.metal[3], 4);
   }
   // —— 地板：表面 + 厚度（看得见的切面）
   const F = floor === 'wood' ? IP.wood : IP.plate;
@@ -80,13 +81,43 @@ function rdiBuildRoom(w, kind, floor, trailer, lit) {
   for (let x = 4; x < FW; x += 26) rdcRivet(B, x, FH + 7);
   rdcBox(B, -9, FH + 12, FW + 18, 4, skin, 1);
   // 外壳做旧（只锈外壳，不锈墙）
-  rdcWeatherShell(B, FW, FH);
+  rdiWeatherShell(B, FW, FH);
   rdcOutline(B);
   return rdcToCanvas(B);
 }
-function D_SLOT() { return RDC_PAL.dark[2]; }
+// 墙面做旧：大片水渍/污渍（边缘一圈深色）、墙角积灰、墙纸剥落露出底下的木板、零散划痕
+function rdiGrime(B, FW, FH, kind) {
+  const mix = (c, h, k) => { const r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255, t = rdcHex(h), tr = (t >> 16) & 255, tg = (t >> 8) & 255, tb = t & 255; return (Math.round(r + (tr - r) * k) << 16) | (Math.round(g + (tg - g) * k) << 8) | Math.round(b + (tb - b) * k); };
+  for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) {
+    const i = (y + B.oy) * B.w + x + B.ox; if (B.m[i] !== 1 || B.c[i] < 0) continue;
+    let c = B.c[i];
+    const n = rdcNoise2(x / 22, y / 16, 41) * 0.7 + rdcNoise2(x / 6, y / 6, 42) * 0.3;
+    if (n > 0.66) c = mix(c, '#3a2a1c', Math.min(0.22, (n - 0.66) * 1.2));     // 污渍
+    if (n > 0.71 && n < 0.73) c = mix(c, '#2a1c12', 0.25);                    // 水渍的边
+    const low = y / FH; if (low > 0.7) c = mix(c, '#2e2218', (low - 0.7) * 0.9); // 墙根积灰
+    if (y < 14) c = mix(c, '#1e140e', (14 - y) / 14 * 0.35);                  // 顶棚下的阴影
+    if (kind === 'paper') {                                                   // 墙纸剥落
+      const pe = rdcNoise2(x / 9, y / 7, 43);
+      if (pe > 0.86) c = rdcHex(rdcRampAt(RDI_PAL.ply, 0.55 + rdcHash(x, y, 44) * 0.3, x, y));
+      else if (pe > 0.84) c = mix(c, '#efe0c0', 0.35);                         // 翘起来的纸边
+    }
+    if (rdcHash(x, y, 45) < 0.004) { for (let k = 0; k < 4; k++) { const j = i + k * (B.w + 1); if (B.m[j] === 1) B.c[j] = mix(B.c[j], '#d8c8a8', 0.25); } } // 划痕
+    B.c[i] = c;
+  }
+}
+// 整个车内：暖色调 + 四周暗角（让画面统一、不那么「干净」）
+function rdiGradeScreen(g, vw, vh) {
+  const Q = RD_Q, W = vw * Q, H = vh * Q;
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0);
+  g.globalCompositeOperation = 'multiply'; g.fillStyle = '#ecd8bc'; g.fillRect(0, 0, W, H);
+  g.globalCompositeOperation = 'source-over';
+  const r = Math.max(W, H) * 0.75, gr = g.createRadialGradient(W / 2, H * 0.55, r * 0.35, W / 2, H * 0.55, r);
+  gr.addColorStop(0, 'rgba(20,12,8,0)'); gr.addColorStop(1, 'rgba(20,12,8,0.45)');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  g.restore();
+}
 // 外壳切面上的锈和泥点
-function rdcWeatherShell(B, FW, FH) {
+function rdiWeatherShell(B, FW, FH) {
   for (let y = -12; y < FH + 16; y++) for (let x = -9; x < FW + 9; x++) {
     const inside = x >= 0 && x < FW && y >= 0 && y < FH + 12;
     if (inside || rdcMat(B, x, y) !== 1) continue;
@@ -181,14 +212,14 @@ function rdiWindow(g, x, y, w, h, R, day, b, seed) {
 // 窗帘：布料竖褶（亮暗相间）+ 窗帘杆
 function rdiCurtain(g, x, y, w, h) {
   const Q = RD_Q, X = Math.round(x * Q), Y = Math.round(y * Q);
-  const C = ['#e86a6a', '#c84a50', '#9c3240', '#6e2230'];
+  const C = ['#a8604c', '#8a4a3a', '#6c382c', '#4e261e'];
   g.save(); g.setTransform(1, 0, 0, 1, 0, 0);
   g.fillStyle = RDC_PAL.metal[2]; g.fillRect(X - 3, Y - 3, w * Q + 6, 2);
   for (const side of [0, 1]) {
     const cx = side ? X + w * Q - 9 : X;
     for (let k = 0; k < 9; k++) { g.fillStyle = C[[1, 0, 1, 2, 3, 2, 1, 0, 2][k]]; g.fillRect(cx + k, Y - 1, 1, h * Q + 2 - (k % 3)); }
     g.fillStyle = RDC_PAL.out; g.fillRect(cx - 1, Y - 1, 1, h * Q + 2); g.fillRect(cx + 9, Y - 1, 1, h * Q + 2);
-    g.fillStyle = '#ffcd75'; g.fillRect(cx + 1, Y + Math.round(h * Q * 0.55), 7, 2); // 绑带
+    g.fillStyle = '#b89660'; g.fillRect(cx + 1, Y + Math.round(h * Q * 0.55), 7, 2); // 绑带
   }
   g.restore();
 }
@@ -257,7 +288,7 @@ function rdiBuildCab(w) {
   // 前保险杠 + 大灯（在前脸下面）
   rdcBox(B, FW + 2, FH, 8, 8, [M[1], M[2], M[3]], 2);
   rdcBox(B, FW + 5, FH - 9, 3, 6, [P.light[0], P.light[1], P.light[2]], 4);
-  rdcWeatherShell(B, FW, FH);
+  rdiWeatherShell(B, FW, FH);
   rdcOutline(B);
   return rdcToCanvas(B);
 }
@@ -278,7 +309,8 @@ function rdiHitch(g, x, floorY, ceil) {
 // ---------- 自动精细化：把用世界像素画的东西放大 3 倍，圆滑斜边、加明暗、深褐描边 ----------
 const RDI_FINE = { cv: null, g: null, cache: new Map() };
 // x, y：锚点（世界像素）；box：[x0, y0, w, h] 相对锚点的范围；draw(gg, ax, ay) 在小画布上以 (ax, ay) 为锚点画
-function rdiFine(g, x, y, box, draw) {
+// shadow：'wall' 挂在墙上的（往右下投影到墙上）/ 'floor' 放在地上的（脚下一圈接触阴影 + 墙上淡淡的影子）
+function rdiFine(g, x, y, box, draw, shadow) {
   const Q = RD_Q, [x0, y0, bw, bh] = box, sw = bw + 2, sh = bh + 2;
   x = Math.round(x); y = Math.round(y);
   if (!RDI_FINE.cv || RDI_FINE.cv.width < sw || RDI_FINE.cv.height < sh) { RDI_FINE.cv = createCanvas(Math.max(sw, 80), Math.max(sh, 64)); RDI_FINE.g = RDI_FINE.cv.getContext('2d'); }
@@ -296,17 +328,42 @@ function rdiFine(g, x, y, box, draw) {
     if (RDI_FINE.cache.size > 400) RDI_FINE.cache.clear();
     RDI_FINE.cache.set(h, out);
   }
+  const X = (x + x0 - 1) * Q, Y = (y + y0 - 1) * Q;
   g.save(); g.setTransform(1, 0, 0, 1, 0, 0);
-  g.drawImage(out, (x + x0 - 1) * Q, (y + y0 - 1) * Q);
+  if (shadow && out.shadow) {
+    g.globalAlpha = shadow === 'wall' ? 0.45 : 0.22;
+    g.drawImage(out.shadow, X + (shadow === 'wall' ? 3 : 5), Y + (shadow === 'wall' ? 4 : -2));
+    if (shadow === 'floor' && out.foot) { // 脚下的接触阴影
+      const [fx0, fx1] = out.foot, fy = y * Q;
+      g.globalAlpha = 0.35; g.fillStyle = '#140c08'; g.fillRect(X + fx0 - 2, fy - 1, fx1 - fx0 + 6, 3);
+      g.globalAlpha = 0.18; g.fillRect(X + fx0 - 5, fy - 2, fx1 - fx0 + 12, 5);
+    }
+    g.globalAlpha = 1;
+  }
+  g.drawImage(out, X, Y);
   g.restore();
 }
-function rdiUpscale(u, sw, sh) {
+// 写实调色：去掉卡通的高饱和，偏暖、发灰；纯白变成旧的米白；纯黑变成深褐
+function rdiGrade(v) {
+  const a = v >>> 24; if (!a) return v;
+  let r = v & 255, gg = (v >> 8) & 255, b = (v >> 16) & 255;
+  const L = r * 0.3 + gg * 0.55 + b * 0.15;
+  r = L + (r - L) * 0.5; gg = L + (gg - L) * 0.5; b = L + (b - L) * 0.45;
+  r = r * 1.04 + 6; gg = gg * 0.97 + 3; b = b * 0.82;
+  const top = 212; if (L > 170) { const k = top / Math.max(top, L * 1.02); r *= k; gg *= k; b *= k; }
+  r *= 0.93; gg *= 0.93; b *= 0.93;
+  const c = (n) => Math.max(14, Math.min(255, Math.round(n)));
+  return ((a << 24) | (c(b) << 16) | (c(gg) << 8) | c(r)) >>> 0;
+}
+function rdiUpscale(u0, sw, sh) {
   const Q = 3, W = sw * Q, H = sh * Q, o = new Uint32Array(W * H);
+  const u = new Uint32Array(u0.length);
+  for (let i = 0; i < u0.length; i++) u[i] = (u0[i] >>> 24) >= 200 ? rdiGrade(u0[i]) : u0[i];
   const at = (x, y) => (x < 0 || y < 0 || x >= sw || y >= sh) ? 0 : u[y * sw + x];
   // Scale3x：斜边变圆滑
   for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) {
     const E = u[y * sw + x], A = at(x - 1, y - 1), Bq = at(x, y - 1), C = at(x + 1, y - 1), D = at(x - 1, y), F = at(x + 1, y), Gq = at(x - 1, y + 1), Hq = at(x, y + 1), I = at(x + 1, y + 1);
-    let e = [E, E, E, E, E, E, E, E, E];
+    const e = [E, E, E, E, E, E, E, E, E];
     if (Bq !== Hq && D !== F) {
       e[0] = D === Bq ? D : E;
       e[1] = (D === Bq && E !== C) || (Bq === F && E !== A) ? Bq : E;
@@ -319,33 +376,53 @@ function rdiUpscale(u, sw, sh) {
     }
     for (let k = 0; k < 9; k++) o[(y * Q + ((k / 3) | 0)) * W + x * Q + (k % 3)] = e[k];
   }
-  // 明暗：每块颜色的顶边亮、底边两行暗、右边稍暗（像素是 ABGR 存的）
   const solid = (v) => (v >>> 24) >= 200;
   const mixTo = (v, r, g2, b, k) => { const vr = v & 255, vg = (v >> 8) & 255, vb = (v >> 16) & 255; return ((255 << 24) | (Math.round(vb + (b - vb) * k) << 16) | (Math.round(vg + (g2 - vg) * k) << 8) | Math.round(vr + (r - vr) * k)) >>> 0; };
+  const DK = [26, 16, 10], LT = [236, 220, 190];
+  // 物体的上下范围（越往下越脏、越暗）
+  let minY = H, maxY = 0, fx0 = W, fx1 = -1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (solid(o[y * W + x])) { if (y < minY) minY = y; if (y > maxY) maxY = y; }
+  for (let x = 0; x < W; x++) for (let y = maxY - 2; y <= maxY; y++) if (y >= 0 && solid(o[y * W + x])) { if (x < fx0) fx0 = x; if (x > fx1) fx1 = x; }
   const res = o.slice();
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const i = y * W + x, v = o[i];
     if (!solid(v)) continue;
     const lum = ((v & 255) + ((v >> 8) & 255) + ((v >> 16) & 255)) / 3;
-    if (lum < 40) continue; // 很暗的小细节（眼睛、缝）不加光影
     const up = y > 0 ? o[i - W] : 0, dn = y < H - 1 ? o[i + W] : 0, dn2 = y < H - 2 ? o[i + 2 * W] : 0, rt = x < W - 1 ? o[i + 1] : 0, lf = x > 0 ? o[i - 1] : 0;
     let nv = v;
-    if (up !== v) nv = mixTo(v, 255, 244, 220, 0.24);
-    else if (dn !== v) nv = mixTo(v, 36, 22, 15, 0.28);
-    else if (dn2 !== v) nv = mixTo(v, 36, 22, 15, 0.12);
-    else if (rt !== v) nv = mixTo(v, 36, 22, 15, 0.12);
-    else if (lf !== v) nv = mixTo(v, 255, 244, 220, 0.08);
-    if (((x * 7 + y * 13) % 29) === 0 && lum > 60) nv = mixTo(nv, 36, 22, 15, 0.12); // 零散的脏点
+    if (lum >= 36) {
+      // 边缘：顶边一道细亮边（有的地方磨掉了），底边两行暗，右边稍暗
+      const hh = rdcHash(x, y, 31);
+      if (up !== v) nv = hh < 0.75 ? mixTo(v, LT[0], LT[1], LT[2], 0.16) : mixTo(v, DK[0], DK[1], DK[2], 0.1);
+      else if (dn !== v) nv = mixTo(v, DK[0], DK[1], DK[2], 0.3);
+      else if (dn2 !== v) nv = mixTo(v, DK[0], DK[1], DK[2], 0.14);
+      else if (rt !== v) nv = mixTo(v, DK[0], DK[1], DK[2], 0.14);
+      else if (lf !== v) nv = mixTo(v, LT[0], LT[1], LT[2], 0.06);
+      // 颗粒质感 + 越往下越脏
+      const grain = (rdcHash(x, y, 33) - 0.5) * 0.12;
+      nv = grain > 0 ? mixTo(nv, LT[0], LT[1], LT[2], grain * 0.6) : mixTo(nv, DK[0], DK[1], DK[2], -grain);
+      const low = maxY > minY ? (y - minY) / (maxY - minY) : 0;
+      if (low > 0.55) nv = mixTo(nv, 70, 52, 36, (low - 0.55) * 0.35);
+      // 污渍、锈点（成片，不是均匀撒）
+      const st = rdcNoise2(x / 5, y / 4, 34);
+      if (st > 0.78) nv = mixTo(nv, 92, 58, 30, (st - 0.78) * 1.2);
+    }
     res[i] = nv;
   }
-  // 深褐描边（朝上的边用浅褐）
-  const O1 = (255 << 24 | 0x0f << 16 | 0x16 << 8 | 0x24) >>> 0, O2 = (255 << 24 | 0x26 << 16 | 0x3b << 8 | 0x5c) >>> 0;
+  // 描边：用旁边颜色加深（不是一圈统一的黑褐色），更像写实的轮廓
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const i = y * W + x; if (o[i] >>> 24) continue;
-    const dn = y < H - 1 && solid(o[i + W]), up = y > 0 && solid(o[i - W]), sd = (x > 0 && solid(o[i - 1])) || (x < W - 1 && solid(o[i + 1]));
-    if (dn || up || sd) res[i] = dn && !up && !sd ? O2 : O1;
+    let nb = 0;
+    if (y < H - 1 && solid(o[i + W])) nb = res[i + W]; else if (y > 0 && solid(o[i - W])) nb = res[i - W]; else if (x > 0 && solid(o[i - 1])) nb = res[i - 1]; else if (x < W - 1 && solid(o[i + 1])) nb = res[i + 1];
+    if (nb) res[i] = mixTo(nb, DK[0], DK[1], DK[2], 0.68);
   }
   const cv = createCanvas(W, H), cg = cv.getContext('2d'), im = cg.createImageData(W, H);
   new Uint32Array(im.data.buffer).set(res); cg.putImageData(im, 0, 0);
+  // 影子：同样形状的深色剪影
+  const sc = createCanvas(W, H), sg = sc.getContext('2d'), sim = sg.createImageData(W, H), sd = new Uint32Array(sim.data.buffer);
+  const SH = (255 << 24 | 10 << 16 | 14 << 8 | 22) >>> 0;
+  for (let i = 0; i < res.length; i++) if (res[i] >>> 24 >= 200) sd[i] = SH;
+  sg.putImageData(sim, 0, 0);
+  cv.shadow = sc; cv.foot = fx1 >= fx0 ? [fx0, fx1] : null;
   return cv;
 }

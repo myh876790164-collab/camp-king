@@ -3,3 +3,6 @@ Thumbs.db
 desktop.ini
 .DS_Store
 *.tmp
+
+# 自动任务运行标记
+tasks/.running
