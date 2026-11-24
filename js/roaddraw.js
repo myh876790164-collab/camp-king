@@ -470,7 +470,7 @@ function rdDrawVehicle(g, x0, y0, opt) {
   const hit = R.hitT > 0;
   let fineBob = 0;
   if (fine) {
-    fineBob = rdcDrawCar(g, x, y, { moving, wheels: fineWheels, hit, driver: R.me.loc === 'drive', dust: opt.world && !hover, ground: rdBiomeAt(R.km).ground, fast: R.speedNow > 60 });
+    fineBob = rdcDrawCar(g, x, y, { moving, wheels: fineWheels, hit, driver: R.me.loc === 'drive' || (v.tent && R.driving), dust: opt.world && !hover, ground: rdBiomeAt(R.km).ground, fast: R.speedNow > 60 });
     g.save(); g.translate(0, fineBob / RD_Q); // 车上的零件跟着车身一起颠
   } else if (R.veh === 'courier' || R.veh === 'icecream') {
     const ice = R.veh === 'icecream';
@@ -504,7 +504,7 @@ function rdDrawVehicle(g, x0, y0, opt) {
   if (hit && !fine) { g.globalAlpha = 0.5; g.fillStyle = '#f4f4f4'; g.fillRect(x - L, y - 34, L, 28); g.globalAlpha = stealth ? 0.7 : 1; }
   // 车窗里的人影（停车、人在车里时）
   if (R.me.loc === 'drive' && !v.tent && !fine) { const hx = R.veh === 'garbage' ? -12 : R.veh === 'pickup' ? -15 : -11; const AL = avLook(); P(hx, -22, 3, 3, AV_SKIN[AL.skin]); P(hx, -23, 3, 1, AL.hc); }
-  if (v.tent && (R.me.loc === 'drive' || R.driving)) rdDrawPerson(g, x - 10, y - 8, { pose: 'ride', face: 1 });
+  if (v.tent && !fine && (R.me.loc === 'drive' || R.driving)) rdDrawPerson(g, x - 10, y - 8, { pose: 'ride', face: 1 });
   if (v.tent && !R.driving && R.me.loc === 'in') rdDrawCamp(g, x - L - (tr ? 50 : 6), y);
   // 外装甲
   const ar = part('armor');
@@ -704,11 +704,13 @@ function rdDrawTrailer(g, x, y, p, hover, moving) {
   if (rdDaylight() < 0.5 && id !== 'trl3' && id !== 'trl5') { g.globalAlpha = 0.7; P(-L + 5, -2 - H, 6, 4, '#ffcd75'); g.globalAlpha = 1; }
 }
 // 电单车停车时：帐篷 + 篝火
+// x：营地右边（世界像素），帐篷在左、篝火在右；画成精细像素（js/roadcar.js 的 rdcTent / rdcCampfire）
 function rdDrawCamp(g, x, y) {
-  g.fillStyle = '#38b764'; g.beginPath(); g.moveTo(x - 28, y); g.lineTo(x - 16, y - 16); g.lineTo(x - 4, y); g.fill();
-  g.fillStyle = '#257179'; g.beginPath(); g.moveTo(x - 16, y - 16); g.lineTo(x - 13, y); g.lineTo(x - 4, y); g.fill();
-  g.fillStyle = '#1a1c2c'; g.fillRect(x - 18, y - 6, 4, 6);
-  const fh = 3 + Math.sin(G.time * 12) * 1.5; g.fillStyle = '#6e4a2e'; g.fillRect(x + 2, y - 1, 7, 1); g.fillStyle = '#ef7d57'; g.fillRect(x + 4, y - 1 - fh, 3, fh); g.fillStyle = '#ffcd75'; g.fillRect(x + 5, y - fh, 1, fh - 1);
+  const Q = RD_Q, night = rdDaylight() < 0.5, fr = Math.floor(G.time * 10);
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0);
+  rdcTent(g, Math.round((x - 34) * Q), Math.round(y * Q), 46, night);
+  rdcCampfire(g, Math.round((x - 8) * Q), Math.round(y * Q), fr, night, 0.8);
+  g.restore();
 }
 
 // ================= 人物 =================
@@ -897,10 +899,19 @@ function rdDrawInterior(g) {
 }
 function rdDrawCampRoom(g, left, right, floorY, day, b) {
   // 露营地：没有墙，地上是泥土，左边是帐篷
-  g.fillStyle = rdMix('#10121f', b.ground, day * 0.8); g.fillRect(left, floorY, right - left, 6);
-  g.fillStyle = '#38b764'; g.beginPath(); g.moveTo(left - 30, floorY); g.lineTo(left - 14, floorY - 22); g.lineTo(left + 2, floorY); g.fill();
-  g.fillStyle = '#1a1c2c'; g.fillRect(left - 16, floorY - 9, 5, 9);
-  const fh = 4 + Math.sin(G.time * 12) * 1.5; g.fillStyle = '#6e4a2e'; g.fillRect(right - 14, floorY - 1, 9, 2); g.fillStyle = '#ef7d57'; g.fillRect(right - 12, floorY - 1 - fh, 4, fh); g.fillStyle = '#ffcd75'; g.fillRect(right - 11, floorY - fh, 2, fh - 1);
+  const Q = RD_Q, gc = rdMix('#10121f', b.ground, day * 0.8), X0 = Math.round((left - 34) * Q), X1 = Math.round((right + 30) * Q), FY = Math.round(floorY * Q);
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0);
+  // 泥土地：上面一层亮边，零散的石子和草
+  g.fillStyle = gc; g.fillRect(X0, FY, X1 - X0, 18);
+  g.fillStyle = rdShade(gc, 0.15); g.fillRect(X0, FY, X1 - X0, 2);
+  for (let x = X0; x < X1; x += 2) { const h = rdcHash(x, 3, 51); if (h < 0.12) { g.fillStyle = rdShade(gc, -0.3); g.fillRect(x, FY + 3 + Math.floor(h * 100) % 12, 2, 1); } else if (h > 0.95) { g.fillStyle = rdMix('#10121f', '#8a8a4a', day * 0.8); g.fillRect(x, FY - 2, 1, 2); g.fillRect(x + 1, FY - 3, 1, 3); } }
+  const night = day < 0.5, fr = Math.floor(G.time * 10);
+  rdcTent(g, Math.round((left - 14) * Q), FY, 64, night);
+  // 坐的木头
+  const lx = Math.round((right + 16) * Q);
+  g.fillStyle = RDC_PAL.out; g.fillRect(lx - 1, FY - 9, 32, 10); g.fillStyle = '#6e4a2e'; g.fillRect(lx, FY - 8, 30, 8); g.fillStyle = '#8f6a42'; g.fillRect(lx, FY - 8, 30, 2); g.fillStyle = '#c49a64'; g.fillRect(lx + 26, FY - 7, 3, 6); g.fillStyle = '#8f6a42'; g.fillRect(lx + 27, FY - 5, 1, 2);
+  rdcCampfire(g, Math.round((right + 8) * Q), FY, fr, night, 1);
+  g.restore();
 }
 // 一件家具（x = 所在格的右边缘）
 function rdDrawItem(g, o, xr, base, wall, lay) {

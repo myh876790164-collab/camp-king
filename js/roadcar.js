@@ -21,6 +21,11 @@ const RDC_PAL = {
   olive: ['#c8c492', '#a2a26c', '#7c8050', '#585c3a', '#3c3f27'],  // 垃圾车：晒褪色的橄榄绿
   hazard: ['#f0b048', '#d08a2a', '#2e2016'],                        // 警示斜纹：琥珀黄 / 深褐
   beacon: ['#fff4c0', '#ffc040', '#e07a1a', '#8a4012'],             // 警示灯
+  bike: ['#b4ccd2', '#86a6b2', '#60808e', '#445e6a', '#2e3f48'],    // 电单车：晒褪色的钢蓝
+  leather: ['#7a5640', '#5e3e2c', '#44291c', '#2e1a12'],            // 坐垫皮革
+  crate: ['#b08a5e', '#8c6a44', '#6a4e30', '#4a3420'],              // 木箱
+  canvas: ['#dcc690', '#bca06a', '#98804e', '#725a36', '#4e3c24'],  // 帐篷帆布
+  fire: ['#fff8d8', '#ffd860', '#f08a30', '#c03a1c', '#6a1e10'],    // 火焰：白 → 黄 → 橙 → 红
 };
 const RDC_CACHE = {};            // 缓存好的车身图片
 let RDC_ANIM = { fr: -1, ph: 0 }; // 动画帧计数（轮子转动相位）
@@ -137,6 +142,8 @@ const RDC_CARS = {
   courier: { build: () => rdcBuildCourier(), wheels: [-24, -102], r: 11, dustX: -115, driver: [-23, -53], glint: [-30, -54], len: 142, bob: [0, 0, -1, -1] },
   garbage: { build: () => rdcBuildGarbage(), wheels: [-20, -112, -138], r: 12, dustX: -150, driver: [-24, -61], glint: [-30, -63], len: 172, heavy: true,
     bob: [0, 0, -1, -1, -2, -2, -1, 0], beacons: [[-30, -77], [-153, -97]], stack: [-48, -101], roof: -29 },
+  // 电单车：骑手每帧画（rider），轮子是细辐条（bike），车尾天线上挂一块布条（flag）
+  ebike: { build: () => rdcBuildBike(), wheels: [-12, -52], r: 9, dustX: -62, len: 70, bob: [0, -1, -1, 0], bike: true, rider: true, flag: [-68, -64] },
 };
 function rdcBuildCourier() {
   const P = RDC_PAL, B = rdcPaper(176, 124, 156, 112);
@@ -402,6 +409,200 @@ function rdcStackSmoke(g, x, y, fr, fast) {
   g.globalAlpha = 1;
 }
 
+// ---------- 电单车：自己拼装的电动越野车（钢蓝车壳 + 大电池包 + 后货架木箱和折叠太阳能板），全部原创 ----------
+// 车长约 70（前轮 x = -12，后轮 -52，轮半径 9）；骑手 1.8 米 ≈ 42 精细像素，和货车比例一致
+function rdcLine2(B, x0, y0, x1, y1, c1, c2, mat) { rdcLine(B, x0, y0, x1, y1, c1, mat); rdcLine(B, x0, y0 + 1, x1, y1 + 1, c2, mat); }
+function rdcBuildBike() {
+  const P = RDC_PAL, B = rdcPaper(92, 72, 80, 64);
+  const K = P.bike, M = P.metal, D = P.dark, L = P.leather, W = P.crate;
+  const FX = -12, RX = -52, WR = 9;
+  // —— 后摇臂（后轮轴 → 车架下方的转轴）+ 后减震（弹簧：金属和锈交替）
+  for (let k = 0; k < 3; k++) rdcLine(B, RX, -WR + k - 1, -32, -17 + k, k === 0 ? M[1] : k === 1 ? M[2] : M[3], 2);
+  for (let k = 0; k < 13; k++) { const x = -44 + Math.round(k * 4 / 13), y = -15 - k; rdcPix(B, x, y, k & 1 ? M[0] : P.rust[1], 2); rdcPix(B, x + 1, y, M[3], 2); }
+  rdcBox(B, -45, -30, 4, 3, [M[1], M[3]], 2);
+  // —— 车架主梁（转向头 → 后座下面）
+  rdcLine2(B, -21, -36, -27, -21, M[2], M[3], 2); rdcLine2(B, -22, -35, -46, -28, M[2], M[3], 2);
+  rdcLine2(B, -40, -28, -66, -31, M[2], M[3], 2); // 后货架的支撑
+  // —— 电池包：方盒 + 散热片 + 电量灯 + 黄色闪电贴纸
+  rdcBox(B, -44, -25, 22, 11, K, 1, 0.1, 1); rdcRect(B, -44, -25, 22, 1, K[0], 1);
+  for (let x = -42; x < -24; x += 3) for (let y = -22; y < -16; y++) rdcPix(B, x, y, K[4], 6);
+  rdcRect(B, -42, -24, 3, 1, '#7ad070', 4); rdcPix(B, -38, -24, '#3a6a3a', 4);
+  rdcRect(B, -29, -24, 3, 3, '#e0b040', 7); rdcPix(B, -28, -23, D[2], 7);
+  rdcRect(B, -44, -14, 22, 1, D[1], 6); for (const x of [-42, -26]) rdcRect(B, x, -13, 2, 3, M[3], 2); // 电池包下的托架
+  // 电线：从电池包绕到车头
+  for (let k = 0; k < 8; k++) rdcPix(B, -23 + Math.round(k / 3), -26 - k, k & 1 ? D[0] : D[2], 6);
+  // —— 油箱位置的车壳（电动车，这里是放控制器的壳）
+  rdcPoly(B, [[-40, -30], [-24, -37], [-18, -34], [-22, -26], [-40, -26]], K, 1, 0, 1);
+  rdcLine(B, -38, -30, -24, -36, K[0], 1);
+  rdcRect(B, -33, -30, 6, 1, K[3], 1); rdcRect(B, -32, -29, 4, 1, K[3], 1); // 壳上的通风口
+  // —— 坐垫（皮革，有缝线，破了一个口用胶带缠着）
+  rdcPoly(B, [[-56, -29], [-52, -32], [-36, -32], [-34, -30], [-38, -27], [-54, -27]], L, 1, 0, 1);
+  for (let x = -52; x < -38; x += 2) rdcPix(B, x, -30, L[2], 1);
+  rdcRect(B, -47, -32, 3, 5, '#8a8478', 1); rdcPix(B, -46, -31, '#a8a294', 1);
+  // —— 后货架 + 木箱 + 折叠太阳能板 + 挂着的小锅
+  rdcBox(B, -71, -33, 19, 2, [M[1], M[3]], 2);
+  rdcBox(B, -70, -47, 16, 14, W, 1, 0, 1);
+  for (const y of [-43, -38]) rdcRect(B, -70, y, 16, 1, W[3], 1);
+  for (const x of [-70, -55]) rdcRect(B, x, -47, 1, 14, W[3], 1);
+  for (const [x, y] of [[-69, -46], [-56, -46], [-69, -35], [-56, -35]]) rdcRivet(B, x, y);
+  rdcRect(B, -63, -47, 2, 14, '#8a3a2a', 7); rdcRect(B, -63, -47, 1, 14, '#a8503a', 7); // 绑带
+  rdcBox(B, -72, -51, 20, 4, [M[1], M[2]], 2);
+  for (let x = -71; x < -53; x++) for (let y = -50; y < -48; y++) rdcPix(B, x, y, ((x + 71) % 4 === 0) ? '#6a7aa0' : y === -50 ? '#3e5078' : '#2a3656', 3);
+  rdcBox(B, -76, -40, 6, 5, [M[1], M[2], M[3]], 2); rdcRect(B, -77, -40, 8, 1, M[3], 2); rdcLine(B, -76, -41, -73, -45, M[3], 2); // 小锅
+  // 天线（布条每帧画）
+  rdcLine(B, -66, -51, -68, -64, M[2], 2);
+  // —— 前叉：上面粗、下面镀铬
+  rdcLine2(B, -19, -38, -15, -24, M[2], M[3], 2); rdcLine2(B, -18, -38, -14, -24, M[1], M[2], 2);
+  rdcLine2(B, -15, -24, -12, -10, M[0], M[1], 2);
+  // —— 挡泥板（前后）
+  for (let a = -2.7; a < -0.45; a += 0.03) for (const rr of [WR + 2, WR + 3]) rdcPix(B, Math.round(FX + Math.cos(a) * rr), Math.round(-WR + Math.sin(a) * rr), rr === WR + 3 ? K[1] : K[3], 1);
+  for (let a = -3.0; a < -1.1; a += 0.03) for (const rr of [WR + 2, WR + 3]) rdcPix(B, Math.round(RX + Math.cos(a) * rr), Math.round(-WR + Math.sin(a) * rr), rr === WR + 3 ? K[1] : K[3], 1);
+  rdcBox(B, RX - 13, -10, 2, 8, [P.tire[1], P.tire[3]], 5); // 后挡泥皮
+  // —— 车头：小风挡（刮花了）、圆大灯、车把、后视镜、号码牌位置焊了块铁皮
+  rdcPoly(B, [[-21, -52], [-17, -52], [-14, -41], [-18, -41]], P.glass, 3, 0, 1); rdcLine(B, -19, -50, -17, -43, P.glass[0], 3);
+  rdcBox(B, -17, -41, 7, 7, [M[1], M[2], M[3]], 2); rdcBox(B, -14, -40, 4, 5, [P.light[0], P.light[1], P.light[2]], 4); rdcPix(B, -13, -39, '#ffffff', 4);
+  rdcLine2(B, -24, -43, -18, -42, M[3], D[1], 2); rdcRect(B, -26, -44, 3, 2, D[1], 6);
+  rdcLine(B, -20, -43, -22, -49, M[3], 2); rdcRect(B, -24, -51, 3, 2, M[2], 2); rdcPix(B, -23, -51, P.glass[1], 3);
+  rdcPatchPlate(B, -10, -33, 5, 6);
+  // 脚踏
+  rdcRect(B, -32, -15, 4, 2, M[2], 2); rdcPix(B, -32, -15, M[0], 2);
+  rdcWeather(B, 21, -0.02, -30);
+  rdcOutline(B);
+  return rdcToCanvas(B);
+}
+// 电单车的轮子：细轮胎 + 8 根转动的辐条；hub 为真时是后轮的轮毂电机（大轮毂）
+function rdcBikeWheel(g, cx, cy, r, ph, hub) {
+  const P = RDC_PAL, a0 = ph * Math.PI / 16;
+  for (let y = -r - 1; y <= r + 1; y++) for (let x = -r - 1; x <= r + 1; x++) {
+    const d = Math.hypot(x, y), lit = (-x - y) / (d || 1);
+    if (d > r + 0.5) continue;
+    let c = null;
+    if (d > r - 0.5) c = P.out;
+    else if (d > r - 2.5) c = rdcRampAt(P.tire, Math.max(0, Math.min(1, 0.4 - lit * 0.35)), x, y);
+    else if (d > r - 3.5) c = lit > 0.3 ? P.metal[0] : P.metal[2];
+    else if (d <= (hub ? 4.2 : 2.2)) c = d > (hub ? 3.2 : 1.2) ? P.metal[3] : P.metal[1];
+    if (c) { g.fillStyle = c; g.fillRect(cx + x, cy + y, 1, 1); }
+  }
+  g.fillStyle = P.metal[2];
+  for (let k = 0; k < 8; k++) { const a = a0 + k * Math.PI / 4, ca = Math.cos(a), sa = Math.sin(a); for (let t = hub ? 4.5 : 2.5; t < r - 3; t += 0.8) g.fillRect(Math.round(cx + ca * t - 0.5), Math.round(cy + sa * t - 0.5), 1, 1); }
+  g.fillStyle = P.tire[3];
+  for (let k = 0; k < 12; k++) { const a = a0 + k * Math.PI / 6; g.fillRect(Math.round(cx + Math.cos(a) * (r - 1.5) - 0.5), Math.round(cy + Math.sin(a) * (r - 1.5) - 0.5), 1, 1); }
+  if (!hub) { g.fillStyle = P.metal[1]; for (let k = 0; k < 6; k++) { const a = -a0 + k * Math.PI / 3; g.fillRect(Math.round(cx + Math.cos(a) * 3.5 - 0.5), Math.round(cy + Math.sin(a) * 3.5 - 0.5), 1, 1); } } // 刹车盘
+  else { g.fillStyle = '#7ad070'; g.fillRect(cx - 1, cy - 1, 1, 1); }
+}
+// 骑手（精细像素，每帧画）：前倾握把、围巾和长发往后飘（4 帧一轮）、胳膊 2 帧一换；停车时一只脚撑地
+// X, Y：车头 / 地面（精细像素）
+function rdcRider(g, X, Y, fr, moving, fast) {
+  const AL = avLook(), skin = AV_SKIN[AL.skin], hair = AL.hc, top = AL.tc, pants = AL.bc, scarf = avHas(AL, 'scarf') || '#a8604c';
+  const longHair = ['long', 'bob', 'braid', 'twintail', 'ponytail'].includes(AL.hair);
+  const f4 = fr & 3, arm = moving && (fr >> 1) & 1 ? 1 : 0, lean = moving ? (fast ? 2 : 1) : 0;
+  const Hp = [-41, -31], Sh = [-32 + lean, -49 + lean], Hd = [-23, -42], El = [-28 + lean, -43 + arm];
+  const hx = Sh[0] - 3, hy = Sh[1] - 12; // 头的左上角
+  const Kn = moving ? [-29, -27] : [-30, -24], Ft = moving ? [-31, -16] : [-27, -1];
+  const shirtD = rdShade(top, -0.3), pantsD = rdShade(pants, -0.3), skinD = rdShade(skin, -0.25);
+  const limb = (a, b, w, c) => { const n = Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1])); for (let i = 0; i <= n; i++) { const t = n ? i / n : 0; g.fillStyle = c; g.fillRect(Math.round(X + a[0] + (b[0] - a[0]) * t - w / 2), Math.round(Y + a[1] + (b[1] - a[1]) * t - w / 2), w, w); } };
+  const box = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(X + x, Y + y, w, h); };
+  // 飘动的东西：围巾 3 段、长发
+  const wave = [0, -1, 0, 1], tail = fast ? 12 : moving ? 9 : 4;
+  const flutter = (sx, sy, len, w, c, ph) => { for (let i = 0; i < len; i++) box(sx - i, sy + (moving ? wave[(f4 + ph + (i >> 2)) & 3] : Math.floor(i / 3)), 1, w, c); };
+  // 第一遍：深褐描边（每个部件放大 1 像素）
+  const O = RDC_PAL.out;
+  limb(Hp, Kn, 7, O); limb(Kn, Ft, 6, O); limb(Hp, Sh, 8, O); limb(Sh, El, 5, O); limb(El, Hd, 5, O);
+  box(hx - 1, hy - 2, 9, 12, O); box(hx + 7, hy + 3, 2, 3, O); box(Sh[0] - 10, Sh[1] - 1, 7, 11, O);
+  flutter(Sh[0] - 5, Sh[1] - 2, tail, 4, O, 0); if (longHair) flutter(Sh[0] - 5, Sh[1] - 9, tail - 2, 4, O, 1);
+  // 第二遍：上色
+  flutter(Sh[0] - 5, Sh[1] - 1, tail, 2, scarf, 0); flutter(Sh[0] - 5, Sh[1], tail - 1, 1, rdShade(scarf, -0.3), 0);
+  if (longHair) flutter(Sh[0] - 5, Sh[1] - 8, tail - 2, 2, hair, 1);
+  box(Sh[0] - 9, Sh[1], 5, 9, '#6e4a2e'); box(Sh[0] - 9, Sh[1], 5, 1, '#8f6a42'); box(Sh[0] - 9, Sh[1] + 4, 5, 1, '#4a3020'); // 背包
+  limb(Hp, Kn, 5, pants); limb([Hp[0], Hp[1] + 1], [Kn[0], Kn[1] + 1], 3, pantsD);
+  limb(Kn, Ft, 4, pants); box(Ft[0] - 2, Ft[1] - 2, 6, 3, '#2a2018'); box(Ft[0] - 2, Ft[1] - 2, 6, 1, '#4a3a2e'); // 靴子
+  limb(Hp, Sh, 6, top); limb([Hp[0] + 1, Hp[1] - 1], [Sh[0] + 2, Sh[1] + 1], 2, shirtD);
+  box(Sh[0] - 1, Sh[1] - 1, 4, 2, scarf); // 脖子上的围巾
+  limb(Sh, El, 3, top); limb(El, Hd, 3, top); box(Hd[0] - 1, Hd[1] - 1, 3, 3, skin); box(Hd[0] - 1, Hd[1] + 1, 3, 1, skinD);
+  // 头：脸、头发、护目镜
+  box(hx, hy, 7, 9, skin); box(hx, hy + 8, 7, 1, skinD); box(hx + 7, hy + 4, 1, 1, skin); box(hx + 5, hy + 7, 2, 1, skinD); // 脸、鼻子、嘴
+  box(hx, hy - 1, 6, 3, hair); box(hx, hy, 2, 6, hair); box(hx + 2, hy + 2, 1, 1, hair); // 头发（后脑勺在左）
+  box(hx, hy + 3, 4, 1, '#2a2018'); box(hx + 4, hy + 2, 3, 3, '#2a2018'); box(hx + 5, hy + 3, 2, 1, '#e0a040'); box(hx + 5, hy + 2, 1, 1, '#fff0c0'); // 推到眼前的护目镜
+}
+// 天线上的布条：4 帧飘一轮，停车时垂下来
+function rdcFlag(g, x, y, fr, moving) {
+  const w = [0, -1, -1, 0], f = fr & 3;
+  for (let i = 0; i < 9; i++) {
+    const dy = moving ? w[(f + (i >> 1)) & 3] : Math.floor(i * 0.9);
+    const dx = moving ? -i : -Math.floor(i / 3);
+    g.fillStyle = RDC_PAL.out; g.fillRect(x + dx, y + dy - 1, 1, 5);
+    g.fillStyle = i < 3 ? '#b85a3a' : i < 6 ? '#9a4630' : '#7a3424'; g.fillRect(x + dx, y + dy, 1, 3);
+  }
+}
+
+// ---------- 露营地：帆布帐篷（缓存）+ 篝火（每帧画）----------
+// 帐篷正面（A 字形）：H 是帐篷高（精细像素）；补丁、缝线、卷起来的门帘、门里的睡袋、拉绳和地钉
+function rdcBuildTent(H) {
+  const P = RDC_PAL, C = P.canvas, Wd = Math.round(H * 1.7), half = Wd >> 1;
+  const B = rdcPaper(Wd + 40, H + 16, half + 20, H + 10);
+  // 拉绳（从顶点到两边地钉）+ 地钉
+  rdcLine(B, 0, -H + 2, -half - 16, 0, '#a08860', 2); rdcLine(B, 0, -H + 2, half + 16, 0, '#a08860', 2);
+  for (const sx of [-1, 1]) { rdcRect(B, sx * (half + 16) - 1, -2, 2, 3, P.metal[2], 2); }
+  // 两片帆布：左边亮（受光）、右边暗
+  rdcPoly(B, [[0, -H], [-half, 0], [0, 0]], C, 1, 0, 0.7);
+  rdcPoly(B, [[0, -H], [half, 0], [0, 0]], [C[1], C[2], C[3], C[4]], 1, 0.1, 1);
+  // 横向缝线、补丁
+  for (const k of [0.35, 0.65]) { const y = Math.round(-H * k); for (let x = -half; x <= half; x++) if (rdcMat(B, x, y) === 1 && (x & 1)) rdcPix(B, x, y, C[3], 1); }
+  rdcBox(B, -Math.round(half * 0.7), -Math.round(H * 0.3), Math.round(half * 0.3), Math.round(H * 0.2), ['#8a9060', '#6e7448', '#525836'], 1);
+  rdcBox(B, Math.round(half * 0.35), -Math.round(H * 0.55), Math.round(half * 0.25), Math.round(H * 0.15), ['#a86a4a', '#8a5038'], 1);
+  // 门：深色三角洞 + 卷起来的门帘 + 里面露出的睡袋
+  const dh = Math.round(H * 0.62), dw = Math.round(half * 0.5);
+  rdcPoly(B, [[0, -dh], [-dw, 0], [dw, 0]], ['#3a2a1e', '#2a1e16', '#1e1610'], 6, 0, 1);
+  rdcBox(B, -dw + 2, -4, dw * 2 - 4, 4, ['#8a3a2a', '#6a2a1e'], 1);
+  rdcPoly(B, [[0, -dh], [-dw - 3, -Math.round(dh * 0.35)], [-dw + 1, -Math.round(dh * 0.3)]], [C[0], C[1]], 1);
+  rdcRect(B, -dw - 3, -Math.round(dh * 0.35), 3, 2, '#6a4a2a', 2);
+  // 顶上伸出的帐篷杆、地布边
+  rdcRect(B, -1, -H - 3, 2, 4, P.metal[2], 2); rdcPix(B, -1, -H - 3, P.metal[0], 2);
+  rdcRect(B, -half - 2, 0, Wd + 4, 1, '#5a4a36', 6);
+  rdcWeather(B, 31, -0.15, -20);
+  rdcOutline(B);
+  return rdcToCanvas(B);
+}
+// 帐篷：x = 帐篷中心，y = 地面（精细像素）；night 时门里透出灯光
+function rdcTent(g, x, y, H, night) {
+  const key = 'tent' + H;
+  if (!RDC_CACHE[key]) RDC_CACHE[key] = rdcBuildTent(H);
+  const t = RDC_CACHE[key];
+  if (night) { const gr = g.createRadialGradient(x, y - 8, 2, x, y - 8, H * 0.6); gr.addColorStop(0, 'rgba(255,200,110,0.35)'); gr.addColorStop(1, 'rgba(255,200,110,0)'); g.fillStyle = gr; g.fillRect(x - H, y - H, H * 2, H); }
+  g.drawImage(t.cv, x - t.ox, y - t.oy);
+  if (night) { g.globalAlpha = 0.55; g.fillStyle = '#ffc870'; g.fillRect(x - 3, y - Math.round(H * 0.4), 6, Math.round(H * 0.4) - 4); g.globalAlpha = 1; }
+}
+// 篝火：石头圈 + 交叉的柴 + 火焰（4 帧一轮，从里到外 白→黄→橙→红）+ 往上飘的火星和烟 + 三脚架吊锅
+// x = 火堆中心，y = 地面（精细像素），s = 大小（1 普通）
+function rdcCampfire(g, x, y, fr, night, s) {
+  const F = RDC_PAL.fire, f = fr & 3, box = (dx, dy, w, h, c) => { g.fillStyle = c; g.fillRect(x + dx, y + dy, w, h); };
+  s = s || 1;
+  // 地上的光
+  const gr = g.createRadialGradient(x, y - 6, 2, x, y - 6, (night ? 60 : 26) * s);
+  gr.addColorStop(0, night ? 'rgba(255,170,70,0.45)' : 'rgba(255,170,70,0.18)'); gr.addColorStop(1, 'rgba(255,140,50,0)');
+  g.fillStyle = gr; g.fillRect(x - 60 * s, y - 66 * s, 120 * s, 72 * s);
+  // 烟（往上、往左飘）
+  for (let a = 0; a < 5; a++) { const id = fr - a * 2, h = rdcHash(id, 1, 23); g.globalAlpha = 0.35 - a * 0.06; rdcBlob(g, Math.round(x - a * 3 - h * 2), Math.round(y - 22 * s - a * 6), 2 + (a >> 1), '#7a6e62'); }
+  g.globalAlpha = 1;
+  // 三脚架 + 吊锅
+  const TH = Math.round(36 * s), py = -Math.round(29 * s), sl = 13 * s / TH;
+  g.fillStyle = RDC_PAL.out; for (let k = 0; k < TH; k++) { g.fillRect(Math.round(x - 13 * s + k * sl) - 1, Math.round(y - k), 3, 1); g.fillRect(Math.round(x + 13 * s - k * sl) - 1, Math.round(y - k), 3, 1); }
+  g.fillStyle = '#6a5040'; for (let k = 0; k < TH; k++) { g.fillRect(Math.round(x - 13 * s + k * sl), Math.round(y - k), 1, 1); g.fillRect(Math.round(x + 13 * s - k * sl), Math.round(y - k), 1, 1); }
+  box(0, -TH, 1, TH + py, RDC_PAL.metal[3]); // 吊锅的链子
+  box(-5, py, 11, 7, RDC_PAL.out); box(-4, py + 1, 9, 5, RDC_PAL.metal[3]); box(-4, py + 1, 9, 1, RDC_PAL.metal[1]); box(-6, py + 1, 1, 2, RDC_PAL.out); box(6, py + 1, 1, 2, RDC_PAL.out);
+  if ((fr >> 1) & 1) box(-2 + ((fr >> 2) & 1) * 3, py - 2 - (fr & 1), 1, 1, '#d8d0c0'); // 锅里冒的热气
+  // 柴（交叉）
+  for (let k = 0; k < 14; k++) { box(-7 + k, -2 - (k >> 2), 2, 2, k & 2 ? '#5a3a22' : '#6e4a2e'); box(7 - k, -2 - (k >> 2), 2, 2, k & 2 ? '#4a2e1a' : '#5a3a22'); }
+  // 火焰：外红 → 橙 → 黄 → 白芯，高度每帧变
+  const hs = [[17, 13, 8, 4], [20, 15, 10, 5], [15, 11, 7, 3], [18, 14, 9, 4]][f].map((h) => Math.round(h * s));
+  const ws = [6, 5, 3, 1], sway = [0, 1, 0, -1][f];
+  for (let L = 0; L < 4; L++) for (let r = 0; r < hs[L]; r++) { const w = Math.max(1, Math.round(ws[L] * (1 - r / (hs[L] + 2)))); box(-w + (r > hs[L] / 2 ? sway : 0), -3 - r, w * 2, 1, F[3 - L]); }
+  // 火星：往上飘、闪
+  for (let k = 0; k < 4; k++) { const id = fr + k * 5, t = (id % 10) / 10, h = rdcHash(Math.floor(id / 10), k, 29); if (t < 0.85) box(Math.round((h - 0.5) * 12 + Math.sin(t * 6) * 2), -6 - Math.round(t * 26 * s), 1, 1, t < 0.4 ? F[1] : F[2]); }
+  // 石头圈
+  for (let k = 0; k < 7; k++) { const sx = -12 + k * 4; box(sx - 1, -3, 5, 4, RDC_PAL.out); box(sx, -2, 3, 3, k & 1 ? '#8a8070' : '#a09888'); box(sx, -2, 3, 1, '#c0b8a8'); }
+}
+
 // ---------- 轮子：静态部分（轮胎、轮毂的明暗）缓存，转动的花纹每帧画 ----------
 function rdcWheelDisc(r) {
   const key = 'wheel' + r;
@@ -488,12 +689,17 @@ function rdcDrawCar(g, x, y, o) {
   g.fillRect(X - cf.len + 2, Y - 1, cf.len - 6, 3); g.fillRect(X - cf.len - 4, Y, cf.len + 6, 2);
   g.globalAlpha = baseA;
   // 轮子（不跟车身颠）
-  if (o.wheels) for (const wx of cf.wheels) rdcDrawWheel(g, X + wx, Y - cf.r, cf.r, RDC_ANIM.ph);
+  if (o.wheels) cf.wheels.forEach((wx, i) => cf.bike ? rdcBikeWheel(g, X + wx, Y - cf.r, cf.r, RDC_ANIM.ph, i > 0) : rdcDrawWheel(g, X + wx, Y - cf.r, cf.r, RDC_ANIM.ph));
+  // 电单车停车时放下侧撑
+  if (cf.bike && !o.moving) { g.fillStyle = RDC_PAL.out; for (let k = 0; k < 14; k++) g.fillRect(X - 37 - Math.round(k * 0.35), Y - 14 + k, 3, 1); g.fillStyle = RDC_PAL.metal[2]; for (let k = 0; k < 13; k++) g.fillRect(X - 36 - Math.round(k * 0.35), Y - 14 + k, 1, 1); }
   // 车身
   g.drawImage(car.cv, X - car.ox, Y - car.oy + bob);
   if (o.hit) { g.globalAlpha = baseA * 0.55; g.drawImage(car.white, X - car.ox, Y - car.oy + bob); g.globalAlpha = baseA; }
+  // 电单车：骑手、布条
+  if (cf.rider && o.driver) rdcRider(g, X, Y + bob, fr, o.moving, o.fast);
+  if (cf.flag) rdcFlag(g, X + cf.flag[0], Y + cf.flag[1] + bob, fr, o.moving);
   // 司机：侧窗里的头（用玩家设置的发色肤色）
-  if (o.driver) {
+  if (o.driver && cf.driver) {
     const AL = avLook(), hx = X + cf.driver[0], hy = Y + cf.driver[1] + bob;
     g.fillStyle = RDC_PAL.out; g.fillRect(hx - 1, hy - 1, 9, 13);
     g.fillStyle = AV_SKIN[AL.skin]; g.fillRect(hx, hy + 3, 7, 7);
