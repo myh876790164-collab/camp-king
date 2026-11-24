@@ -520,7 +520,7 @@ function rdDrawVehicle(g, x0, y0, opt) {
   if (tk) { const n = Math.min(3, tk.tier); for (let k = 0; k < n; k++) { P(-L + 4 + k * 5, -12, 4, 5, tk.alien ? '#4b3378' : '#b13e53'); P(-L + 5 + k * 5, -13, 2, 1, '#333c57'); if (tk.alien) P(-L + 5 + k * 5, -10, 2, 1, '#73eff7'); } }
   // 车顶
   const rf = part('roof');
-  const roofY = R.veh === 'garbage' ? -34 : R.veh === 'pickup' ? -26 : v.tent ? -16 : fine ? -26 : -32;
+  const roofY = fine && rdcCarRoof(R.veh) ? rdcCarRoof(R.veh) : R.veh === 'garbage' ? -34 : R.veh === 'pickup' ? -26 : v.tent ? -16 : fine ? -26 : -32;
   if (rf) rdDrawRoof(g, x, y, L, rf, roofY);
   // 引擎特效：排气、火焰、光
   const en = part('engine');

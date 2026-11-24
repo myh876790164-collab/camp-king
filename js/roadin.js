@@ -19,12 +19,31 @@ const RDI_PAL = {
 
 // ---------- 车厢房间（缓存成图片） ----------
 // w：房间宽（世界像素）；kind：'steel' | 'ply' | 'paper'；floor：'plate' | 'wood'；skin：外壳车漆颜色（ramp）
-function rdiRoomKey(w, kind, floor, trailer, lit) { return [w, kind, floor, trailer ? 1 : 0, lit ? 1 : 0].join('|'); }
+function rdiRoomKey(w, kind, floor, trailer, lit) { return [w, kind, floor, trailer ? 1 : 0, lit ? 1 : 0, rdiVeh()].join('|'); }
+// 当前车型（车内外壳颜色、车型专属的内部细节跟着它变）
+function rdiVeh() { return (G.road && G.road.veh) || 'courier'; }
+function rdiSkin() { return rdiVeh() === 'garbage' ? RDC_PAL.olive : RDC_PAL.cream; }
+// 垃圾车车厢（压缩厢内部）：每格之间一根粗加强筋（和车外一致）、尾门那头刷警示斜纹 + 铰链、地上有排污格栅
+function rdiGarbageRoom(B, FW, FH) {
+  const P = RDC_PAL, M = P.metal, Hz = P.hazard, Q = RD_Q;
+  for (let x = RD_CELL * Q - 2; x < FW - 6; x += RD_CELL * Q) {
+    for (let y = 6; y < FH; y++) { rdcPix(B, x, y, M[1], 2); rdcPix(B, x + 1, y, M[2], 2); rdcPix(B, x + 2, y, M[2], 2); rdcPix(B, x + 3, y, M[3], 2); rdcPix(B, x + 4, y, RDC_PAL.dark[1], 6); }
+    for (let y = 14; y < FH - 4; y += 22) rdcRivet(B, x + 1, y);
+  }
+  // 尾门（左边）：竖着一条警示斜纹 + 两个大铰链
+  for (let y = 6; y < FH; y++) for (let x = 0; x < 9; x++) rdcPix(B, x, y, (((x + y) % 10) + 10) % 10 < 5 ? Hz[1] : Hz[2], 7);
+  rdcRect(B, 9, 6, 1, FH - 6, RDC_PAL.dark[2], 6);
+  for (const y of [16, FH - 30]) { rdcBox(B, 2, y, 11, 8, [M[0], M[1], M[2], M[3]], 2); rdcRivet(B, 4, y + 3); rdcRivet(B, 9, y + 3); }
+}
+function rdiGarbageFloor(B, FW, FH) {
+  const M = RDC_PAL.metal, D = RDC_PAL.dark;
+  for (let gx = 40; gx < FW - 30; gx += 160) { rdcRect(B, gx, FH + 1, 22, 3, D[2], 6); for (let x = gx + 1; x < gx + 22; x += 3) rdcRect(B, x, FH + 1, 1, 3, M[2], 2); }
+}
 function rdiBuildRoom(w, kind, floor, trailer, lit) {
   const Q = RD_Q, P = RDC_PAL, IP = RDI_PAL;
   const FW = w * Q, FH = 50 * Q; // 房间内部：宽 FW，高 FH（天花板 y = 0，地面 y = FH）
   const B = rdcPaper(FW + 20, FH + 36, 10, 13);
-  const skin = trailer ? P.metal : P.cream;
+  const skin = trailer ? P.metal : rdiSkin(), garbage = !trailer && rdiVeh() === 'garbage';
   // —— 外壳切面（上、左、右）：车漆 → 保温棉 → 内衬
   rdcBox(B, -9, -12, FW + 18, 4, skin, 1);
   rdcBox(B, -9, -8, FW + 18, 5, IP.foam, 1);
@@ -61,6 +80,7 @@ function rdiBuildRoom(w, kind, floor, trailer, lit) {
     for (let x = 3; x < FW - 3; x += 6) rdcRect(B, x, ty + 1, 3, 3, RDC_PAL.dark[2], 6);
     for (let k = 0; k < FW / 9; k++) { const x = Math.floor(rdcHash(k, 1, 8) * FW), y0 = Math.floor(rdcHash(k, 2, 8) * FH * 0.7), len = 3 + Math.floor(rdcHash(k, 3, 8) * 10); for (let j = 0; j < len; j++) if (rdcMat(B, x, y0 + j) === 1) rdcPix(B, x, y0 + j, j < 2 ? P.rust[1] : P.rust[2], 1); }
   }
+  if (garbage) rdiGarbageRoom(B, FW, FH);
   rdiGrime(B, FW, FH, kind);
   // —— 天花板：暗色顶棚 + 横梁 + 灯具
   rdcBox(B, 0, 0, FW, 6, [RDC_PAL.dark[0], RDC_PAL.dark[1], RDC_PAL.dark[2]], 6);
@@ -77,6 +97,7 @@ function rdiBuildRoom(w, kind, floor, trailer, lit) {
     else { const px = (x + (y - FH) * 2) % 8; if (px === 0 || px === 1) t -= 0.3; if (px === 2) t += 0.35; } // 花纹钢板的凸起
     rdcPix(B, x, y, rdcRampAt(F, Math.max(0, Math.min(1, t)), x, y), floor === 'wood' ? 1 : 2);
   }
+  if (garbage && floor !== 'wood') rdiGarbageFloor(B, FW, FH);
   rdcBox(B, -9, FH + 4, FW + 18, 8, [RDC_PAL.dark[0], RDC_PAL.dark[1], RDC_PAL.dark[2]], 6);
   for (let x = 4; x < FW; x += 26) rdcRivet(B, x, FH + 7);
   rdcBox(B, -9, FH + 12, FW + 18, 4, skin, 1);
@@ -227,7 +248,7 @@ function rdiCurtain(g, x, y, w, h) {
 // ---------- 驾驶室（平头货车，从侧面剖开） ----------
 function rdiCab(g, left, floorY, ceil, w, R, day, b) {
   const Q = RD_Q, P = RDC_PAL, X = Math.round(left * Q), FW = w * Q, top = (ceil + 6) * Q, fy = floorY * Q;
-  const key = 'cab' + w;
+  const key = 'cab' + w + rdiVeh();
   if (!RDI_CACHE[key]) RDI_CACHE[key] = rdiBuildCab(w);
   const im = RDI_CACHE[key];
   // 前窗外的风景（先画，驾驶室图里窗户是空的）
@@ -250,7 +271,7 @@ function rdiCab(g, left, floorY, ceil, w, R, day, b) {
   g.restore();
 }
 function rdiBuildCab(w) {
-  const Q = RD_Q, P = RDC_PAL, C = P.cream, M = P.metal, D = P.dark, FW = w * Q, FH = 44 * Q; // 驾驶室：顶在 y = 0，地面在 y = FH
+  const Q = RD_Q, P = RDC_PAL, C = rdiSkin(), M = P.metal, D = P.dark, FW = w * Q, FH = 44 * Q; // 驾驶室：顶在 y = 0，地面在 y = FH
   const B = rdcPaper(FW + 24, FH + 40, 10, 13);
   // 外壳：顶 + 前脸（微后倾）
   rdcPoly(B, [[-1, -12], [FW - 4, -12], [FW + 6, -6], [FW + 8, FH + 16], [-1, FH + 16], [-1, -1]], C, 1, 0, 1);
@@ -288,6 +309,10 @@ function rdiBuildCab(w) {
   // 前保险杠 + 大灯（在前脸下面）
   rdcBox(B, FW + 2, FH, 8, 8, [M[1], M[2], M[3]], 2);
   rdcBox(B, FW + 5, FH - 9, 3, 6, [P.light[0], P.light[1], P.light[2]], 4);
+  if (rdiVeh() === 'garbage') { // 垃圾车：车顶警示灯（底座 + 灯罩）
+    rdcBox(B, FW / 2 - 6, -15, 12, 3, [M[1], M[2], M[3]], 2);
+    rdcBox(B, FW / 2 - 4, -20, 8, 5, [P.beacon[1], P.beacon[2], P.beacon[3]], 4); rdcPix(B, FW / 2 - 2, -19, P.beacon[0], 4);
+  }
   rdiWeatherShell(B, FW, FH);
   rdcOutline(B);
   return rdcToCanvas(B);
