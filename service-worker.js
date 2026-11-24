@@ -3,7 +3,7 @@
 //  有网时总是先拿最新版本（不用再按 Ctrl+F5），没网时用存下来的版本
 //  存档不在这里，存档在浏览器本地存储（localStorage）里
 // =============================================
-const CACHE = 'campking-v8';
+const CACHE = 'campking-v9';
 
 // 安装：读 index.html，把里面引用的所有脚本一起存下来
 self.addEventListener('install', (e) => {

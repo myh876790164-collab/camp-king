@@ -861,16 +861,25 @@ function rdcDrawCar(g, x, y, o) {
   const baseA = g.globalAlpha;
   g.save();
   g.setTransform(1, 0, 0, 1, 0, 0);
-  // 阴影：车底一条暗影，两头淡
-  g.globalAlpha = baseA * 0.35; g.fillStyle = '#2a1a10';
-  g.fillRect(X - cf.len + 2, Y - 1, cf.len - 6, 3); g.fillRect(X - cf.len - 4, Y, cf.len + 6, 2);
+  // 地面：车身抬高（悬挂）或悬浮时，轮子、阴影、尘土还在地上（GY），车身在 Y
+  const GY = o.gy != null ? Math.round(o.gy * Q) : Y, lift = GY - Y;
+  // 阴影：车底一条暗影，两头淡（悬浮时更淡）
+  g.globalAlpha = baseA * (o.hover ? 0.2 : 0.35); g.fillStyle = '#2a1a10';
+  g.fillRect(X - cf.len + 2, GY - 1, cf.len - 6, 3); g.fillRect(X - cf.len - 4, GY, cf.len + 6, 2);
   g.globalAlpha = baseA;
-  // 轮子（不跟车身颠）
-  if (o.wheels) cf.wheels.forEach((wx, i) => cf.bike ? rdcBikeWheel(g, X + wx, Y - cf.r, cf.r, RDC_ANIM.ph, i > 0) : rdcDrawWheel(g, X + wx, Y - cf.r, cf.r, RDC_ANIM.ph));
+  // 反重力漂浮 / 履带 / 轮子（不跟车身颠）；抬高的悬挂露出减震（js/roadmods.js）
+  if (o.hover) rdmHover(g, X, Y + bob, GY, cf, o.chs, fr);
+  else if (o.wheels) {
+    if (lift > 0 && o.chs) rdmSuspension(g, X, GY, cf, o.chs, lift, fr);
+    if (o.tire === 'tire8') rdmTrack(g, X, GY, cf, RDC_ANIM.ph, key);
+    else cf.wheels.forEach((wx, i) => o.tire ? rdmWheel(g, X + wx, GY - cf.r, cf.r, RDC_ANIM.ph, o.tire, cf.bike, i > 0) : cf.bike ? rdcBikeWheel(g, X + wx, GY - cf.r, cf.r, RDC_ANIM.ph, i > 0) : rdcDrawWheel(g, X + wx, GY - cf.r, cf.r, RDC_ANIM.ph));
+  }
   // 电单车停车时放下侧撑
-  if (cf.bike && !o.moving) { g.fillStyle = RDC_PAL.out; for (let k = 0; k < 14; k++) g.fillRect(X - 37 - Math.round(k * 0.35), Y - 14 + k, 3, 1); g.fillStyle = RDC_PAL.metal[2]; for (let k = 0; k < 13; k++) g.fillRect(X - 36 - Math.round(k * 0.35), Y - 14 + k, 1, 1); }
-  // 车身
+  if (cf.bike && !o.moving && !o.hover) { g.fillStyle = RDC_PAL.out; for (let k = 0; k < 14; k++) g.fillRect(X - 37 - Math.round(k * 0.35), Y - 14 + k, 3, 1); g.fillStyle = RDC_PAL.metal[2]; for (let k = 0; k < 13; k++) g.fillRect(X - 36 - Math.round(k * 0.35), Y - 14 + k, 1, 1); }
+  // 车身 + 外装甲 + 前撞角
   g.drawImage(car.cv, X - car.ox, Y - car.oy + bob);
+  if (o.armor) rdmArmor(g, X, Y + bob, key, o.armor, fr);
+  if (o.ram) rdmRam(g, X, Y + bob, key, o.ram, fr);
   if (o.hit) { g.globalAlpha = baseA * 0.55; g.drawImage(car.white, X - car.ox, Y - car.oy + bob); g.globalAlpha = baseA; }
   // 冰淇淋车：车顶跑马灯（开车或晚上亮）、喇叭飘音符（开车时）
   if (cf.bulbs) rdcBulbs(g, X, Y + bob, cf.bulbs, fr, R.driving || rdDaylight() < 0.5);
@@ -898,7 +907,7 @@ function rdcDrawCar(g, x, y, o) {
   if (cf.beacons) cf.beacons.forEach((b, i) => rdcBeacon(g, X + b[0], Y + b[1] + bob, fr, o.moving || R.driving, i * 2));
   if (cf.stack && o.moving && o.dust) rdcStackSmoke(g, X + cf.stack[0], Y + cf.stack[1] + bob, fr, o.fast);
   // 尘土
-  if (o.moving && o.dust) rdcDust(g, X + cf.dustX, Y, fr, o.ground || '#c99464', o.fast || cf.heavy);
+  if (o.moving && o.dust) rdcDust(g, X + cf.dustX, GY, fr, o.ground || '#c99464', o.fast || cf.heavy);
   g.restore();
   return bob;
 }

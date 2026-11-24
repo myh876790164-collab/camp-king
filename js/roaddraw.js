@@ -454,23 +454,24 @@ function rdDrawVehicle(g, x0, y0, opt) {
   const stealth = rdSum('stealth') >= 0.5;
   if (stealth) g.globalAlpha = 0.65 + Math.sin(G.time * 3) * 0.1;
   // 阴影
-  if (!fine || hover) { g.fillStyle = 'rgba(10,10,25,0.35)'; g.fillRect(x - L - 2, Math.round(y0) + (hover ? 2 : 0), L + 4, 2); }
+  if (!fine) { g.fillStyle = 'rgba(10,10,25,0.35)'; g.fillRect(x - L - 2, Math.round(y0) + (hover ? 2 : 0), L + 4, 2); }
   // 挂车
   const tr = part('trailer');
   if (tr) rdDrawTrailer(g, x - L - 4, y, tr, hover, moving);
   // 反重力光
-  if (hover) { g.globalAlpha = 0.35 + Math.sin(G.time * 6) * 0.15; g.fillStyle = part('chassis').id === 'chs6' ? '#c27bd6' : '#73eff7'; g.fillRect(x - L + 3, Math.round(y0) - 2, L - 6, 2); g.fillRect(x - L + 6, Math.round(y0) - 4, L - 12, 1); g.globalAlpha = stealth ? 0.7 : 1; }
+  if (hover && !fine) { g.globalAlpha = 0.35 + Math.sin(G.time * 6) * 0.15; g.fillStyle = part('chassis').id === 'chs6' ? '#c27bd6' : '#73eff7'; g.fillRect(x - L + 3, Math.round(y0) - 2, L - 6, 2); g.fillRect(x - L + 6, Math.round(y0) - 4, L - 12, 1); g.globalAlpha = stealth ? 0.7 : 1; }
   // 轮子
   const tire = part('tires');
   const wheels = v.tent ? [-4, -L + 4] : [-9, -L + 10];
-  const fineWheels = fine && !hover && !(tire && tire.id === 'tire8');
+  const fineWheels = fine && !hover; // 精细车的轮胎、履带、悬挂、悬浮都在 js/roadmods.js 里画
   if (!hover && !fineWheels) rdDrawWheels(g, x, y, wheels, tire, R.km, v);
   // 车身
   const col = v.color, dk = rdShade(col, -0.3), lt = rdShade(col, 0.25), glass = '#73b8d8';
   const hit = R.hitT > 0;
   let fineBob = 0;
   if (fine) {
-    fineBob = rdcDrawCar(g, x, y, { moving, wheels: fineWheels, hit, driver: R.me.loc === 'drive' || (v.tent && R.driving), dust: opt.world && !hover, ground: rdBiomeAt(R.km).ground, fast: R.speedNow > 60 });
+    fineBob = rdcDrawCar(g, x, y, { moving, wheels: fineWheels, hit, driver: R.me.loc === 'drive' || (v.tent && R.driving), dust: opt.world && !hover, ground: rdBiomeAt(R.km).ground, fast: R.speedNow > 60,
+      gy: y0, hover, tire: tire && tire.id, chs: part('chassis') && part('chassis').id, armor: part('armor'), ram: part('ram') });
     g.save(); g.translate(0, fineBob / RD_Q); // 车上的零件跟着车身一起颠
   } else if (R.veh === 'courier' || R.veh === 'icecream') {
     const ice = R.veh === 'icecream';
@@ -508,10 +509,10 @@ function rdDrawVehicle(g, x0, y0, opt) {
   if (v.tent && !R.driving && R.me.loc === 'in') rdDrawCamp(g, x - L - (tr ? 50 : 6), y);
   // 外装甲
   const ar = part('armor');
-  if (ar) rdDrawArmor(g, x, y, L, ar, v);
+  if (ar && !fine) rdDrawArmor(g, x, y, L, ar, v);
   // 前撞角
   const ram = part('ram');
-  if (ram) rdDrawRam(g, x, y, ram);
+  if (ram && !fine) rdDrawRam(g, x, y, ram);
   // 车身外挂
   const ut = part('util');
   if (ut) rdDrawUtil(g, x, y, L, ut, v);
