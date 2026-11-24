@@ -1374,7 +1374,8 @@ MODES.sect = {
       };
       for (const k in PEAKS) G.sect.peaks[k] = { lv: 1 };
       sectPid = 1;
-      const head = makePerson({ head: true, mean: 6.5, age: 32, sex: Math.random() < 0.5 ? 'f' : 'm' });
+      const head = makePerson({ head: true, mean: 6.5, age: 32, sex: avLook().sex, name: avName() }); // 掌门 = 玩家的角色
+      head.hair = avLook().hc; sectLookFromAvatar(head);
       head.zj = 30; head.manual = manuals[0];
       addPerson(head, 'zongzhu');
       setProf(head, head.apt);

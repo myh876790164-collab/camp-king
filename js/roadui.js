@@ -275,26 +275,28 @@ function rdPartRow(c, label, p, btns, note) {
 function rdPreviewImg(scale) {
   const v = rdVeh(), tr = G.road.ext.trailer ? 50 : 0;
   const w = v.len + tr + 30, h = 64;
-  const cv = createCanvas(w, h), g = cv.getContext('2d');
+  const cv = createCanvas(w * RD_Q, h * RD_Q), g = cv.getContext('2d');
+  g.setTransform(RD_Q, 0, 0, RD_Q, 0, 0); // 和公路画面一样用精细像素
   rdDrawVehicle(g, w - 12, h - 6, {});
+  cv.lw = w; cv.lh = h; // 换算成「世界像素」的尺寸
   return cv;
 }
 function rdPanelGarage(c) {
   const R = G.road, ctx = c.ctx, st = rdStats(), v = rdVeh();
   // 预览
   const img = rdPreviewImg();
-  const sc = Math.max(2, Math.min(4, Math.floor(c.w * 0.45 / img.width)));
+  const sc = Math.max(2, Math.min(4, Math.floor(c.w * 0.45 / img.lw)));
   ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = '#1a1c2c'; ctx.fillRect(c.x, c.y, c.w, img.height * sc + 8);
-  ctx.drawImage(img, c.x + 4, c.y + 4, img.width * sc, img.height * sc);
-  const sx = c.x + img.width * sc + 14;
+  ctx.fillStyle = '#1a1c2c'; ctx.fillRect(c.x, c.y, c.w, img.lh * sc + 8);
+  ctx.drawImage(img, c.x + 4, c.y + 4, img.lw * sc, img.lh * sc);
+  const sx = c.x + img.lw * sc + 14;
   const stats = [
     v.name + (st.hover ? '（漂浮）' : ''), '耐久 ' + Math.round(R.hpV) + '/' + st.hp + ' · 护甲 ' + Math.round(st.armor * 100) + '%', '速度 ' + st.speed + ' km/h' + (st.over > 0 ? '（超重！）' : ''),
     st.fuelKm > 0 ? '油耗 ' + st.fuelKm.toFixed(2) + ' 升/公里' : st.powKm > 0 ? '电耗 ' + st.powKm.toFixed(2) + ' 电/公里' : '不耗燃料',
     '重量 ' + st.weight + '/' + st.torque + ' · 货舱 ' + rdCargoUsed() + '/' + st.cargo, '电力 ' + (R.powNet >= 0 ? '+' : '') + (R.powNet || 0).toFixed(1) + '/时 · 撞击 ' + st.ram,
   ];
   stats.forEach((t, i) => { if (sx + 60 < c.x + c.w) drawText(ctx, t, sx, c.y + 12 + i * 16, i ? 11 : 14, i ? '#c8d6e5' : '#ffcd75', 'left', i === 0); });
-  c.y += Math.max(img.height * sc + 8, stats.length * 16 + 8) + 6;
+  c.y += Math.max(img.lh * sc + 8, stats.length * 16 + 8) + 6;
   if (sx + 60 >= c.x + c.w) stats.forEach((t) => rdLine(c, t, 11));
   rdLine(c, '特性：' + v.perk, 11, '#a7f070');
   if (R.broken && R.speedNow < 1) { drawButton(ctx, c.x, c.y, 260, 32, '应急抢修（8 小时，不花废料，修到 30%）', () => rdEmergencyRepair(), { color: '#b13e53', size: 12 }); c.y += 38; }
@@ -547,8 +549,8 @@ function rdDrawCarSelect(ctx) {
     const img = rdPreviewImg();
     ctx.imageSmoothingEnabled = false;
     const sc = 2;
-    ctx.drawImage(img, x + 6, y + ch - img.height * sc - 4, img.width * sc, img.height * sc);
-    const tx = x + Math.min(150, img.width * sc + 10);
+    ctx.drawImage(img, x + 6, y + ch - img.lh * sc - 4, img.lw * sc, img.lh * sc);
+    const tx = x + Math.min(150, img.lw * sc + 10);
     drawText(ctx, v.name, tx, y + 18, 17, '#ffcd75');
     const lines = wrapText(ctx, v.desc, cw - (tx - x) - 10, 11);
     lines.slice(0, 3).forEach((ln, k) => drawText(ctx, ln, tx, y + 40 + k * 15, 11, '#c8d6e5', 'left', false));

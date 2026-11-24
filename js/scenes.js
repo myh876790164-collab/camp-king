@@ -16,6 +16,7 @@ function drawScene(ctx) {
   else if (G.scene === 'settings') drawSettings(ctx);
   else if (G.scene === 'zcamp') drawCampSelect(ctx);
   else if (G.scene === 'rcar') rdDrawCarSelect(ctx);
+  else if (G.scene === 'avatar') drawAvatarScene(ctx);
   drawConfirm(ctx);
 }
 
@@ -81,13 +82,15 @@ function drawLogo(ctx, y) {
 function drawTitle(ctx) {
   const sw = G.sw, sh = G.sh;
   drawLogo(ctx, sh * 0.16);
-  const bw = Math.min(260, sw - 40), bh = 48, x = (sw - bw) / 2;
+  const short = sh < 520, bw = Math.min(260, sw - 40), bh = short ? 40 : 48, gap = short ? 8 : 14, x = (sw - bw) / 2;
   let y = sh * 0.34;
   drawButton(ctx, x, y, bw, bh, '开始游戏', () => gotoScene('modes'), { color: '#b13e53', size: 18 });
-  y += bh + 14;
+  y += bh + gap;
   const anySave = MODE_ORDER.some(hasSave);
   drawButton(ctx, x, y, bw, bh, '读取存档', () => gotoScene('load'), { size: 18, dim: !anySave });
-  y += bh + 14;
+  y += bh + gap;
+  drawButton(ctx, x, y, bw, bh, '角色：' + avName(), () => avOpen('title'), { size: 16, color: '#29366f' });
+  y += bh + gap;
   drawButton(ctx, x, y, bw, bh, '设置', () => { G.settingsFrom = 'title'; gotoScene('settings'); }, { size: 18 });
   drawText(ctx, 'v0.3 原型', sw - 10, sh - 12, 11, '#566c86', 'right', false);
 }

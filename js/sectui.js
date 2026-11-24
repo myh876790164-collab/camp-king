@@ -146,11 +146,15 @@ function personRow(c, p, depth) {
   const y = c.y, h = 62, ready = p.realm < REALM_CAP && realmNeed(p).ready && !p.away;
   if (depth) { ctx.fillStyle = '#566c86'; ctx.fillRect(x - 10, y - 4, 2, h + 4); ctx.fillRect(x - 10, y + h / 2, 8, 2); } // 师承连线
   drawButton(ctx, x, y, w, h, '', () => openSect('person', { pid: p.id }), { color: ready ? '#3a3a1e' : '#262b44', active: ready });
-  ctx.fillStyle = REALM_ROBE[p.realm]; ctx.fillRect(x + 6, y + 6, 6, h - 12);
+  // Q 版头像（坐着打坐的弟子在名录里也显示打坐）
+  ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fillRect(x + 4, y + 4, 44, h - 8);
+  ctx.fillStyle = REALM_ROBE[p.realm]; ctx.fillRect(x + 4, y + h - 7, 44, 3);
+  sectPortrait(ctx, p, x + 9, y + 2, 1.7, p.pose === 'sit' && !p.moving ? 'sit' : 'stand');
+  const tx = x + 54;
   const ttl = p.head ? '【掌门】' : masterTitleOf(p) ? '【' + masterTitleOf(p) + '】' : '';
-  drawText(ctx, ttl + p.name, x + 20, y + 15, 14, ttl ? '#ffcd75' : '#f4f4f4');
+  drawText(ctx, ttl + p.name, tx, y + 15, 14, ttl ? '#ffcd75' : '#f4f4f4');
   ctx.font = 'bold 14px ' + FONT;
-  const nx = x + 28 + ctx.measureText(ttl + p.name).width;
+  const nx = tx + 8 + ctx.measureText(ttl + p.name).width;
   const lleft = lifeLeft(p);
   // 手机屏幕窄：放不下就依次省掉 职业、战力，免得和右边的“忠诚”叠在一起
   const rightW = ready ? 70 : p.head ? 0 : 56;
@@ -161,9 +165,9 @@ function personRow(c, p, depth) {
   if (ctx.measureText(info).width > x + w - 14 - rightW - nx) info = [parts[0], parts[2]].join(' · ');
   drawText(ctx, info, nx, y + 15, 12, lleft <= lifeMax(p) * 0.1 ? '#ef7d57' : '#c8d6e5', 'left', false);
   const did = p.dao || p.manual;
-  drawText(ctx, daoShort(p), x + 20, y + 35, 12, did ? DAOS[did].color : '#566c86', 'left', false);
-  drawText(ctx, progressText(p), x + 120, y + 35, 12, ready ? '#a7f070' : '#73eff7', 'left', false);
-  drawText(ctx, personStatus(p), x + 20, y + 52, 11, p.hurt > 0 ? '#ef7d57' : '#94b0c2', 'left', false);
+  drawText(ctx, daoShort(p), tx, y + 35, 12, did ? DAOS[did].color : '#566c86', 'left', false);
+  drawText(ctx, progressText(p), tx + 100, y + 35, 12, ready ? '#a7f070' : '#73eff7', 'left', false);
+  drawText(ctx, personStatus(p), tx, y + 52, 11, p.hurt > 0 ? '#ef7d57' : '#94b0c2', 'left', false);
   if (ready) drawText(ctx, '可突破！', x + w - 10, y + 15, 13, '#a7f070', 'right');
   else if (!p.head) drawText(ctx, '忠诚 ' + p.loy, x + w - 10, y + 15, 11, p.loy < 30 ? '#ef7d57' : '#94b0c2', 'right', false);
   c.y += h + 6;
@@ -181,6 +185,7 @@ function sectViewRecruit(c) {
   for (const p of S.cands.slice()) {
     const y = c.y, h = 108;
     ctx.fillStyle = '#262b44'; ctx.fillRect(c.x, y, c.w, h);
+    sectPortrait(ctx, p, c.x + c.w - 40, y + 4, 1.3, 'stand'); // 来拜师的人长什么样
     drawText(ctx, p.name + '　' + (p.sex === 'f' ? '女' : '男') + '，' + p.age + ' 岁　' + APT_TEXT[p.apt] + '（宜' + PROFS[p.apt].name + '）', c.x + 10, y + 14, 14, '#f4f4f4');
     let ax = c.x + 10;
     for (const k of ['bone', 'mind', 'qi', 'charm']) {
@@ -202,8 +207,17 @@ function sectViewPerson(c, p) {
   const S = G.sect, ctx = c.ctx, ui = G.sui;
   cButtons(c, [{ label: '◀ 返回弟子名录', onClick: () => openSect('list') }]);
   if (!p) { cLine(c, '此人已不在门中。', 14); return; }
+  // 右上角大头像
+  const pS = c.w >= 420 ? 3.6 : 2.4, pW = 18 * pS, pH = 27 * pS;
+  ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(c.x + c.w - pW - 8, c.y, pW + 8, pH + 4);
+  drawShadow(ctx, c.x + c.w - pW / 2 - 4, c.y + pH - pS, pW * 0.8);
+  sectPortrait(ctx, p, c.x + c.w - pW - 4, c.y + 2, pS, p.pose === 'sit' && !p.moving ? 'sit' : 'stand');
+  drawText(ctx, (SECT_HAIR_NAME[sectLookOf(p).hair] || '') + (c.w >= 420 ? ' · ' + REALMS[p.realm] + '期' : ''), c.x + c.w - pW / 2 - 4, c.y + pH + 12, 11, '#94b0c2', 'center', false);
+  const cw0 = c.w; c.w -= pW + 14; // 名字和下面几行不要压到头像
   drawText(ctx, (p.head ? '【掌门】' : masterTitleOf(p) ? '【' + masterTitleOf(p) + '】' : '') + p.name, c.x, c.y + 10, 18, p.head || masterTitleOf(p) ? '#ffcd75' : '#f4f4f4');
   c.y += 26;
+  const yAfterPortrait = c.y - 26 + pH + 22;
+  // （属性、状态这几行结束后恢复整行宽度，见下面「状态」那行）
   if (canChallengeHead(p)) {
     const h = headOf();
     cLine(c, '此人修为（' + REALMS[p.realm] + '）已在掌门 ' + h.name + '（' + REALMS[h.realm] + '）之上，可以在演武场发起挑战，胜者执掌宗门。', 12, '#ef7d57');
@@ -233,6 +247,7 @@ function sectViewPerson(c, p) {
   if (p.beast) bufs.push('灵兽「' + p.beast.name + '」Lv' + p.beast.lv + ' 战力 +' + beastPower(p));
   if (bufs.length) cLine(c, '加持：' + bufs.join('、'), 12, '#a7f070');
   cLine(c, '状态：' + personStatus(p), 12, p.hurt > 0 ? '#ef7d57' : '#73eff7');
+  c.w = cw0; if (c.y < yAfterPortrait) c.y = yAfterPortrait;
 
   // 修炼
   const n = realmNeed(p);
@@ -659,8 +674,8 @@ function drawSectWorld(ctx) {
       ctx.globalAlpha = 1;
     }
     const ready = p.realm < REALM_CAP && realmNeed(p).ready;
-    if (G.cam.zoom >= 2.4 || ready || p.head) sectLabel(ctx, (p.head ? '掌门 ' : '') + p.name, p.x, p.y - 21, p.head ? '#ffcd75' : '#f4f4f4');
-    if (ready) sectLabel(ctx, '▲可突破', p.x, p.y - 30 + Math.sin(t * 4) * 1.5, '#a7f070');
+    if (G.cam.zoom >= 2.4 || ready || p.head) sectLabel(ctx, (p.head ? '掌门 ' : '') + p.name, p.x, p.y - 24, p.head ? '#ffcd75' : '#f4f4f4');
+    if (ready) sectLabel(ctx, '▲可突破', p.x, p.y - 33 + Math.sin(t * 4) * 1.5, '#a7f070');
   }
 }
 

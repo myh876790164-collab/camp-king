@@ -19,7 +19,7 @@ function rcC() { return rdR().chat; }
 function rcEnsure() {
   const R = rdR();
   if (R.chat) return R.chat;
-  R.chat = { msgs: [], q: [], clk: 0, nextIdle: 2, nextEv: 30 + Math.random() * 20, unread: 0, dead: {}, story: {}, me: '幸存者No.' + (10000 + Math.floor(Math.random() * 90000)), cd: {}, heat: 0, filter: 'all', ticker: true };
+  R.chat = { msgs: [], q: [], clk: 0, nextIdle: 2, nextEv: 30 + Math.random() * 20, unread: 0, dead: {}, story: {}, me: avProfile().set ? avName() : '幸存者No.' + (10000 + Math.floor(Math.random() * 90000)), cd: {}, heat: 0, filter: 'all', ticker: true };
   const C = R.chat;
   rcSys('欢迎来到无尽公路。所有被传送者已被分配到平行的公路上，公共频道已开启。你的编号：' + C.me, 0);
   rcSys('提示：频道内可以交易，物品由系统传送；请谨防诈骗，任何「先付款」都要三思。', 0.5);

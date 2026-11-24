@@ -58,6 +58,7 @@ function backupImport() {
         let ok = true;
         for (const k of keys) ok = Store.set(k, obj.data[k]) && ok;
         G.settings = loadSettings();
+        avReload();
         showBanner(ok ? '导入成功' : '部分导入失败', ok ? '到“继续游戏”里读取存档' : '浏览器存储空间不足或被禁止', 4, ok ? '#38b764' : '#ef7d57');
       });
     };

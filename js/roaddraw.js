@@ -14,13 +14,23 @@ function rdMix(a, b, t) {
 }
 function rdShade(c, k) { return k > 0 ? rdMix(c, '#f4f4f4', k) : rdMix(c, '#1a1c2c', -k); }
 
-// 画布尺寸：横屏时 1 个像素格 = 3~5 个屏幕像素，竖屏时稍小，保证左右能看到足够远
+// 画面精细度：1 个「世界像素」= RD_Q × RD_Q 个精细像素。
+// 世界坐标（车长、怪物位置、碰撞）不变；新画的车直接画在精细像素上，细节多 3 倍
+const RD_Q = 3;
+// 画布尺寸：竖屏时镜头拉近，车占屏幕宽度约三分之一；1 个精细像素 = 整数个屏幕像素（像素才不会忽粗忽细）
 function rdSetupView() {
   const cw = G.canvas.width, ch = G.canvas.height, portrait = G.sw < G.sh;
-  const S = Math.max(2, Math.floor(Math.min(cw / (portrait ? 250 : 300), ch / 160)));
+  // 车内画面单独定镜头：车厢至少要占满大约半个屏幕宽（竖屏时也看得清）
+  const inside = G.road && G.road.view === 'in';
+  const ideal = inside ? Math.min(cw / (portrait ? 125 : 230), ch / (portrait ? 230 : 110)) : Math.min(cw / (portrait ? 150 : 270), ch / (portrait ? 230 : 150));
+  let F = ideal / RD_Q;
+  // 高清屏（手机）上屏幕像素很细，允许 0.5 档，镜头能拉得更合适；普通屏只用整数档
+  const step = G.dpr >= 2 ? 0.5 : 1;
+  F = F >= step * 0.75 ? Math.max(step, Math.round(F / step) * step) : Math.max(0.4, F);
+  const S = F * RD_Q;
   const W = Math.ceil(cw / S), H = Math.ceil(ch / S);
   if (!RDV || RDV.W !== W || RDV.H !== H) {
-    const buf = createCanvas(W, H), light = createCanvas(W, H);
+    const buf = createCanvas(W * RD_Q, H * RD_Q), light = createCanvas(W * RD_Q, H * RD_Q);
     RDV = { buf, g: buf.getContext('2d'), light, lg: light.getContext('2d'), W, H };
   }
   RDV.S = S;
@@ -47,7 +57,7 @@ function rdRender(ctx) {
   if (!R) return;
   const V = rdSetupView(), g = V.g;
   V.shakeX = G.shake > 0 ? Math.round((Math.random() - 0.5) * 3) : 0;
-  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.setTransform(RD_Q, 0, 0, RD_Q, 0, 0);
   g.imageSmoothingEnabled = false;
   if (R.view === 'in') rdDrawInterior(g);
   else rdDrawWorld(g);
@@ -405,7 +415,7 @@ function rdDrawNight(g, day, gy) {
   const dark = (1 - day) * 0.62;
   if (dark <= 0.02) return;
   const V = RDV, lg = V.lg, R = G.road;
-  lg.setTransform(1, 0, 0, 1, 0, 0);
+  lg.setTransform(RD_Q, 0, 0, RD_Q, 0, 0);
   lg.globalCompositeOperation = 'source-over';
   lg.clearRect(0, 0, V.W, V.H);
   lg.fillStyle = 'rgba(8,10,28,' + dark + ')';
@@ -425,7 +435,7 @@ function rdDrawNight(g, day, gy) {
   for (const m of R.mons || []) { const M = RD_MONSTERS[m.type]; hole(rdSX(m.x), gy + (M.fly ? m.y : -M.h / 2), 6, 0.35); } // 怪物身上的辐射荧光
   for (const s of R.sites) if (s.type === 'camp' || s.type === 'alien') hole(rdSX(s.km * RD_PX_KM), gy - 16, 40, 0.7);
   lg.globalCompositeOperation = 'source-over';
-  g.drawImage(V.light, 0, 0);
+  g.drawImage(V.light, 0, 0, V.W, V.H);
 }
 
 // ================= 车辆（按改装件拼出来） =================
@@ -436,14 +446,15 @@ function rdDrawVehicle(g, x0, y0, opt) {
   const st = R.st || rdStats();
   const hover = st.hover;
   const moving = R.speedNow > 1;
-  const bob = hover ? Math.round(-6 + Math.sin(G.time * 2.5) * 1.5) : (moving && Math.sin(G.time * 22) > 0.6 ? -1 : 0);
+  const fine = rdcHasCar(R.veh); // 已经重画成精细像素的车（js/roadcar.js）
+  const bob = hover ? Math.round(-6 + Math.sin(G.time * 2.5) * 1.5) : (!fine && moving && Math.sin(G.time * 22) > 0.6 ? -1 : 0);
   const lift = (part('chassis') && !hover ? Math.min(3, part('chassis').tier) : 0);
   const x = Math.round(x0), y = Math.round(y0 + bob - lift);
   const P = (dx, dy, w, h, c) => { g.fillStyle = c; g.fillRect(x + dx, y + dy, w, h); };
   const stealth = rdSum('stealth') >= 0.5;
   if (stealth) g.globalAlpha = 0.65 + Math.sin(G.time * 3) * 0.1;
   // 阴影
-  g.fillStyle = 'rgba(10,10,25,0.35)'; g.fillRect(x - L - 2, Math.round(y0) + (hover ? 2 : 0), L + 4, 2);
+  if (!fine || hover) { g.fillStyle = 'rgba(10,10,25,0.35)'; g.fillRect(x - L - 2, Math.round(y0) + (hover ? 2 : 0), L + 4, 2); }
   // 挂车
   const tr = part('trailer');
   if (tr) rdDrawTrailer(g, x - L - 4, y, tr, hover, moving);
@@ -452,11 +463,16 @@ function rdDrawVehicle(g, x0, y0, opt) {
   // 轮子
   const tire = part('tires');
   const wheels = v.tent ? [-4, -L + 4] : [-9, -L + 10];
-  if (!hover) rdDrawWheels(g, x, y, wheels, tire, R.km, v);
+  const fineWheels = fine && !hover && !(tire && tire.id === 'tire8');
+  if (!hover && !fineWheels) rdDrawWheels(g, x, y, wheels, tire, R.km, v);
   // 车身
   const col = v.color, dk = rdShade(col, -0.3), lt = rdShade(col, 0.25), glass = '#73b8d8';
   const hit = R.hitT > 0;
-  if (R.veh === 'courier' || R.veh === 'icecream') {
+  let fineBob = 0;
+  if (fine) {
+    fineBob = rdcDrawCar(g, x, y, { moving, wheels: fineWheels, hit, driver: R.me.loc === 'drive', dust: opt.world && !hover, ground: rdBiomeAt(R.km).ground, fast: R.speedNow > 60 });
+    g.save(); g.translate(0, fineBob / RD_Q); // 车上的零件跟着车身一起颠
+  } else if (R.veh === 'courier' || R.veh === 'icecream') {
     const ice = R.veh === 'icecream';
     P(-L + 2, -8, L - 4, 2, '#333c57'); // 底盘
     P(-L, -32, L - 14, 25, col); P(-L, -32, L - 14, 1, lt); P(-L, -8, L - 14, 1, dk); // 货厢
@@ -485,9 +501,9 @@ function rdDrawVehicle(g, x0, y0, opt) {
     P(-L + 6, -9, 8, 2, '#73eff7'); // 电池
     P(-L - 2, -16, 4, 6, '#a8794f'); // 后座储物箱
   }
-  if (hit) { g.globalAlpha = 0.5; g.fillStyle = '#f4f4f4'; g.fillRect(x - L, y - 34, L, 28); g.globalAlpha = stealth ? 0.7 : 1; }
+  if (hit && !fine) { g.globalAlpha = 0.5; g.fillStyle = '#f4f4f4'; g.fillRect(x - L, y - 34, L, 28); g.globalAlpha = stealth ? 0.7 : 1; }
   // 车窗里的人影（停车、人在车里时）
-  if (R.me.loc === 'drive' && !v.tent) { const hx = R.veh === 'garbage' ? -12 : R.veh === 'pickup' ? -15 : -11; P(hx, -22, 3, 3, '#f2d0a9'); P(hx, -23, 3, 1, '#3a2a22'); }
+  if (R.me.loc === 'drive' && !v.tent && !fine) { const hx = R.veh === 'garbage' ? -12 : R.veh === 'pickup' ? -15 : -11; const AL = avLook(); P(hx, -22, 3, 3, AV_SKIN[AL.skin]); P(hx, -23, 3, 1, AL.hc); }
   if (v.tent && (R.me.loc === 'drive' || R.driving)) rdDrawPerson(g, x - 10, y - 8, { pose: 'ride', face: 1 });
   if (v.tent && !R.driving && R.me.loc === 'in') rdDrawCamp(g, x - L - (tr ? 50 : 6), y);
   // 外装甲
@@ -504,7 +520,7 @@ function rdDrawVehicle(g, x0, y0, opt) {
   if (tk) { const n = Math.min(3, tk.tier); for (let k = 0; k < n; k++) { P(-L + 4 + k * 5, -12, 4, 5, tk.alien ? '#4b3378' : '#b13e53'); P(-L + 5 + k * 5, -13, 2, 1, '#333c57'); if (tk.alien) P(-L + 5 + k * 5, -10, 2, 1, '#73eff7'); } }
   // 车顶
   const rf = part('roof');
-  const roofY = R.veh === 'garbage' ? -34 : R.veh === 'pickup' ? -26 : v.tent ? -16 : -32;
+  const roofY = R.veh === 'garbage' ? -34 : R.veh === 'pickup' ? -26 : v.tent ? -16 : fine ? -26 : -32;
   if (rf) rdDrawRoof(g, x, y, L, rf, roofY);
   // 引擎特效：排气、火焰、光
   const en = part('engine');
@@ -521,6 +537,7 @@ function rdDrawVehicle(g, x0, y0, opt) {
   if (sp) { g.globalAlpha = 0.4 + Math.sin(G.time * 3) * 0.2; g.strokeStyle = '#c27bd6'; g.strokeRect(x - L + 2.5, y - 30.5, 6, 18); g.globalAlpha = stealth ? 0.7 : 1; }
   // 护盾
   if (R.shield > 1) { g.globalAlpha = 0.15 + 0.15 * (R.shield / Math.max(1, st.shieldMax)); g.strokeStyle = '#73eff7'; g.beginPath(); g.ellipse(x - L / 2, y - 16, L / 2 + 6, 22, 0, 0, 7); g.stroke(); g.globalAlpha = 1; }
+  if (fine) g.restore();
   g.globalAlpha = 1;
 }
 function rdDrawWheels(g, x, y, list, tire, km, v) {
@@ -700,8 +717,12 @@ function rdDrawPerson(g, x, y, o) {
   const R = G.road, f = o.face < 0 ? -1 : 1, t = G.time;
   x = Math.round(x); y = Math.round(y);
   const suit = R && R.suit ? RD_PARTS[R.suit] : null;
-  const shirt = o.shirt || (suit ? ({ suit1: '#6e4a2e', suit2: '#ffcd75', suit3: '#333c57', suit4: '#ffcd75', suit5: '#b13e53', suit6: '#566c86', suit7: '#94b0c2', suit8: '#4c5a36', suit9: '#4b3378' })[suit.id] : '#3b5dc9');
-  const skin = '#f2d0a9', hair = '#3a2a22', pants = '#29366f';
+  // 主角用玩家设置的角色外观（js/avatar.js）；穿上防护服后上衣变成防护服的颜色
+  const me = !o.tiny && !o.shirt, L = me ? avLook() : null;
+  const suitC = suit && suit.id !== 'suit1' ? ({ suit2: '#ffcd75', suit3: '#333c57', suit4: '#ffcd75', suit5: '#b13e53', suit6: '#566c86', suit7: '#94b0c2', suit8: '#4c5a36', suit9: '#4b3378' })[suit.id] : null;
+  const shirt = o.shirt || suitC || (L ? L.tc : suit ? '#6e4a2e' : '#3b5dc9');
+  const skin = L ? AV_SKIN[L.skin] : '#f2d0a9', hair = L ? L.hc : '#3a2a22', pants = L ? L.bc : '#29366f';
+  const longHair = L && ['long', 'bob', 'braid', 'twintail', 'ponytail'].includes(L.hair), skirt = L && !suitC && ['skirt', 'longskirt', 'qipao'].includes(L.bot);
   const P = (dx, dy, w, h, c) => { g.fillStyle = c; g.fillRect(f > 0 ? x + dx : x - dx - w, y + dy, w, h); };
   const pose = o.pose || 'stand';
   if (R && R.me.hitT > 0 && o.outside) { P(-2, -13, 5, 13, '#f4f4f4'); return; }
@@ -712,6 +733,7 @@ function rdDrawPerson(g, x, y, o) {
   if (pose === 'sit' || pose === 'drive' || pose === 'sitfloor' || pose === 'hug' || pose === 'ride') {
     const low = pose === 'sitfloor' || pose === 'hug' ? 4 : 0;
     P(-1, -12 + low, 4, 4, skin); P(-1, -13 + low, 4, 2, hair); P(-2, -12 + low, 1, 3, hair);
+    if (longHair) P(-2, -10 + low, 1, 3, hair);
     P(-1, -8 + low, 4, 5, shirt);
     if (pose === 'hug') { P(1, -6 + low, 3, 3, pants); P(2, -7 + low, 2, 2, skin); } // 抱膝
     else { P(0, -3 + low, 5, 2, pants); P(4, -3 + low, 1, 3, pants); P(4, 0 + low - 1, 2, 1, '#1a1c2c'); }
@@ -722,9 +744,16 @@ function rdDrawPerson(g, x, y, o) {
   const walk = pose === 'walk' || pose === 'run';
   const sw = walk ? Math.round(Math.sin(t * (pose === 'run' ? 18 : 11)) * 1.5) : 0;
   const bob = walk && Math.sin(t * 22) > 0 ? -1 : 0;
-  P(-1 + sw, -4, 2, 4, pants); P(1 - sw, -4, 2, 4, rdShade(pants, -0.2));
+  if (skirt) { P(-1 + sw, -3, 1, 3, skin); P(1 - sw, -3, 1, 3, skin); P(-2, -5 + bob, 5, 2, L.bot === 'qipao' ? shirt : pants); }
+  else { P(-1 + sw, -4, 2, 4, pants); P(1 - sw, -4, 2, 4, rdShade(pants, -0.2)); }
   P(-2, -9 + bob, 5, 5, shirt); P(-3, -9 + bob, 1, 4, '#6e4a2e'); // 背包
+  if (L && !suitC && L.t2 && ['jacket', 'labcoat', 'coat', 'suit', 'armor'].includes(L.top)) P(0, -9 + bob, 1, 4, L.t2); // 外套里面的衣服
   P(-1, -13 + bob, 4, 4, skin); P(-1, -14 + bob, 4, 2, hair); P(-2, -13 + bob, 1, 3, hair); P(2, -12 + bob, 1, 1, '#1a1c2c');
+  if (longHair) P(-2, -11 + bob, 1, L.hair === 'bob' ? 2 : 4, hair); // 长发 / 马尾垂在脑后
+  if (L && L.hair === 'ponytail') P(-3, -13 + bob, 1, 3, hair);
+  if (L && (avHas(L, 'cap') || avHas(L, 'beret') || avHas(L, 'strawhat'))) { const hc = avHas(L, 'cap') || avHas(L, 'beret') || avHas(L, 'strawhat'); P(-1, -15 + bob, 4, 2, hc); P(2, -14 + bob, avHas(L, 'strawhat') ? 3 : 2, 1, hc); if (avHas(L, 'strawhat')) P(-3, -14 + bob, 2, 1, hc); }
+  else if (L && (avHas(L, 'bandana') || avHas(L, 'headband'))) P(-1, -13 + bob, 4, 1, avHas(L, 'bandana') || avHas(L, 'headband'));
+  if (L && (avHas(L, 'sunglasses') || avHas(L, 'visor'))) P(1, -12 + bob, 2, 1, avHas(L, 'visor') || '#1a1c2c');
   // 手上的东西
   const hold = o.hold;
   if (o.outside && R && R.hand) {
@@ -796,8 +825,7 @@ function rdCellX(lay, ox, c, layer) {
 function rdDrawInterior(g) {
   const R = G.road, V = RDV, W = V.W, H = V.H, v = rdVeh();
   const lay = rdInteriorLayout();
-  // 放大倍数：车厢至少要占满大约半个屏幕宽（竖屏时也看得清）
-  const z = Math.max(1, Math.min(3, Math.floor(H / 95), Math.floor(W / 115)));
+  const z = 1; // 车内的镜头远近在 rdSetupView 里定
   const vw = W / z, vh = H / z;
   // 镜头：放得下就居中，放不下就从驾驶室开始，可以左右拖动
   const maxScroll = Math.max(0, lay.total - vw + 20);
@@ -812,105 +840,66 @@ function rdDrawInterior(g) {
   const ox = Math.round(lay.total < vw - 10 ? (vw + lay.total) / 2 - 4 : vw - 10 + R.icam);
   const floorY = Math.round(vh * (G.sw < G.sh ? 0.5 : 0.66)), ceil = floorY - 50;
   V.izoom = z; V.iox = ox; V.ifloor = floorY;
-  g.setTransform(z, 0, 0, z, 0, 0);
-  // 背景：外面的景色（模糊、在动）
+  g.setTransform(z * RD_Q, 0, 0, z * RD_Q, 0, 0);
+  // 背景：天空、远山、路面、车底大梁和轮子（js/roadin.js）
   const day = rdDaylight(), b = rdBiomeAt(R.km);
-  g.fillStyle = rdMix('#0b0d1c', b.sky[1], day); g.fillRect(0, 0, vw + 2, vh + 2);
-  g.fillStyle = rdMix('#10121f', b.ground, day * 0.8); g.fillRect(0, floorY + 6, vw + 2, vh);
   const wp = rdSum('wallpaper') > 0, wood = rdSum('floorWood') > 0, camp = v.tent;
   const comfort = rdStats().comfort;
+  const kind = wp ? 'paper' : comfort > 3 ? 'ply' : 'steel', floorK = wood ? 'wood' : 'plate';
+  const lit = R.powered !== false, night = day < 0.5;
+  const curtain = rdSum('curtain') || R.inner.some((it) => RD_PARTS[it.id].v === 'curtain');
+  // 轮子和大梁的位置：驾驶室下面一个前轮，每个车厢靠后一个后轮
+  const wh = { xs: [], spans: [] };
+  { let xx = ox - lay.cab; if (!camp) { wh.xs.push(ox - 14); wh.spans.push([xx, ox - 2]); }
+    lay.rooms.forEach((r, i) => { if (i > 0) xx -= lay.gap; if (!r.camp) { wh.xs.push(xx - r.w + Math.min(28, r.w / 2)); if (r.w > 120) wh.xs.push(xx - r.w + 52); wh.spans.push([xx - r.w + 4, xx]); } xx -= r.w; }); }
+  rdiBackground(g, vw, vh, floorY, day, b, wh);
   // 每个房间
   let x = ox - lay.cab;
-  if (!camp) rdDrawCab(g, ox - lay.cab, floorY, ceil, lay.cab, R, day, b);
+  if (!camp) rdiCab(g, ox - lay.cab, floorY, ceil, lay.cab, R, day, b);
   lay.rooms.forEach((r, i) => {
-    if (i > 0) { x -= lay.gap; rdDrawHitch(g, x + lay.gap, floorY); }
+    if (i > 0) { x -= lay.gap; rdiHitch(g, x + lay.gap, floorY, ceil); }
     const left = x - r.w;
     if (r.camp) rdDrawCampRoom(g, left, x, floorY, day, b);
     else {
-      // 车厢壳：外壳 → 内墙 → 地板
-      const shell = r.trailer ? '#566c86' : rdShade(v.color, -0.35);
-      g.fillStyle = shell; g.fillRect(left - 3, ceil - 4, r.w + 6, floorY - ceil + 12);
-      const wallC = wp ? '#c9a86a' : comfort > 3 ? '#8f7a62' : '#5c5650';
-      g.fillStyle = wallC; g.fillRect(left, ceil, r.w, floorY - ceil);
-      if (wp) { g.fillStyle = '#b8955a'; for (let k = left + 2; k < x; k += 6) g.fillRect(k, ceil, 1, floorY - ceil); for (let k = left + 4; k < x; k += 12) for (let j = ceil + 6; j < floorY - 4; j += 10) g.fillRect(k, j, 2, 2); }
-      else { g.fillStyle = rdShade(wallC, -0.15); for (let k = left + RD_CELL; k < x; k += RD_CELL) g.fillRect(k, ceil, 1, floorY - ceil); g.fillStyle = rdShade(wallC, -0.25); for (let k = left + 3; k < x; k += 13) { g.fillRect(k, ceil + 2, 1, 1); g.fillRect(k, floorY - 3, 1, 1); } if (comfort < 1.5) { g.fillStyle = '#6e4a2e'; g.fillRect(left + 8, ceil + 30, 3, 2); g.fillRect(left + r.w - 20, ceil + 8, 2, 3); } }
-      // 天花板灯
-      g.fillStyle = '#333c57'; g.fillRect(left, ceil, r.w, 2);
-      for (let k = left + 20; k < x - 10; k += 40) { g.fillStyle = R.powered === false ? '#566c86' : '#ffcd75'; g.fillRect(k, ceil + 2, 6, 1); }
+      rdiRoom(g, left, ceil, r.w, kind, floorK, r.trailer, lit, night);
       // 墙面格：没挂东西的地方是窗户
       const usedW = new Set();
       for (const it of R.inner) { const p = RD_PARTS[it.id]; if (p.layer === 'wall') for (let k = 0; k < (p.w || 1); k++) usedW.add(it.cell + k); }
       for (let c = 0; c < r.wcells; c++) {
         if (usedW.has(c + r.wstart)) continue;
         const wx = x - (c + 1) * RD_CELL;
-        rdDrawWindowCell(g, wx + 4, ceil + 8, RD_CELL - 8, 14, R, day, b, c + r.wstart);
-        if (rdSum('curtain') || R.inner.some((it) => RD_PARTS[it.id].v === 'curtain')) { g.fillStyle = '#b13e53'; g.fillRect(wx + 3, ceil + 7, 3, 16); g.fillRect(wx + RD_CELL - 6, ceil + 7, 3, 16); }
+        rdiWindow(g, wx + 4, ceil + 9, RD_CELL - 8, 13, R, day, b, c + r.wstart);
+        if (curtain) rdiCurtain(g, wx + 3, ceil + 8, RD_CELL - 6, 15);
       }
-      // 地板
-      g.fillStyle = wood ? '#8f6a42' : '#3d3f45'; g.fillRect(left, floorY, r.w, 4);
-      g.fillStyle = wood ? '#a8794f' : '#566c86'; for (let k = left; k < x; k += wood ? 9 : 4) g.fillRect(k, floorY, wood ? 8 : 1, 1);
-      // 灯光氛围
-      if (day < 0.5 && R.powered !== false) { g.globalAlpha = 0.12; g.fillStyle = '#ffcd75'; g.fillRect(left, ceil, r.w, floorY - ceil); g.globalAlpha = 1; }
     }
     // 空间核心：房间边缘闪光
     if (rdMax('spaceMul') > 1) { g.globalAlpha = 0.25 + Math.sin(G.time * 2) * 0.1; g.strokeStyle = '#c27bd6'; g.strokeRect(left + 0.5, ceil + 0.5, r.w - 1, floorY - ceil - 1); g.globalAlpha = 1; }
-    // 房间名
     x = left;
   });
   // 家具
   const items = R.inner.map((it, i) => ({ it, i, p: RD_PARTS[it.id] }));
-  for (const o of items) if ((o.p.layer || 'floor') === 'wall') rdDrawItem(g, o, rdCellX(lay, ox, o.it.cell, 'wall'), ceil + 6, true, lay);
-  for (const o of items) if ((o.p.layer || 'floor') !== 'wall') rdDrawItem(g, o, rdCellX(lay, ox, o.it.cell, 'floor'), floorY, false, lay);
+  // 家具先「自动精细化」（js/roadin.js 的 rdiFine），以后再逐个手绘
+  for (const o of items) if ((o.p.layer || 'floor') === 'wall') { const iw = (o.p.w || 1) * RD_CELL; rdiFine(g, rdCellX(lay, ox, o.it.cell, 'wall'), ceil + 6, [-iw - 3, -14, iw + 6, 48], (gg, ax, ay) => rdDrawItem(gg, o, ax, ay, true, lay)); }
+  for (const o of items) if ((o.p.layer || 'floor') !== 'wall') { const iw = (o.p.w || 1) * RD_CELL; rdiFine(g, rdCellX(lay, ox, o.it.cell, 'floor'), floorY, [-iw - 3, -46, iw + 6, 50], (gg, ax, ay) => rdDrawItem(gg, o, ax, ay, false, lay)); }
   // 宠物
   if (R.pet && R.me.loc !== 'out' && R.me.loc !== 'site') {
     const px = rdCellX(lay, ox, Math.floor(R.pet.ix), 'floor') - (R.pet.ix % 1) * RD_CELL;
-    if (R.pet.sleep) { rdDrawPet(g, px, floorY, R.pet.type, false, 1); rdZzz(g, px + 3, floorY - 8); } else rdDrawPet(g, px, floorY, R.pet.type, R.pet.walking, R.pet.face);
+    const PB = [-12, -18, 24, 20];
+    if (R.pet.sleep) { rdiFine(g, px, floorY, PB, (gg, ax, ay) => rdDrawPet(gg, ax, ay, R.pet.type, false, 1)); rdZzz(g, px + 3, floorY - 8); } else rdiFine(g, px, floorY, PB, (gg, ax, ay) => rdDrawPet(gg, ax, ay, R.pet.type, R.pet.walking, R.pet.face));
   }
   // 主角
   rdDrawMeInside(g, lay, ox, floorY, ceil);
   // 没开空间核心但外面看着一样大：提示
-  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.setTransform(RD_Q, 0, 0, RD_Q, 0, 0);
   // 夜里稍暗
   if (day < 0.5 && R.powered === false) { g.fillStyle = 'rgba(8,10,28,0.45)'; g.fillRect(0, 0, W, H); }
 }
-function rdDrawCab(g, x0, floorY, ceil, w, R, day, b) {
-  const v = rdVeh(), left = x0, right = x0 + w;
-  g.fillStyle = rdShade(v.color, -0.35); g.fillRect(left, ceil - 4, w + 6, floorY - ceil + 12);
-  g.fillStyle = '#333c57'; g.fillRect(left, ceil + 6, w, floorY - ceil - 6);
-  // 挡风玻璃（看到外面）
-  rdDrawWindowCell(g, left + 12, ceil + 6, w - 10, 20, R, day, b, 99);
-  g.fillStyle = '#1a1c2c'; g.fillRect(left + 10, ceil + 26, w - 6, 6); // 仪表台
-  g.fillStyle = R.speedNow > 1 ? '#a7f070' : '#566c86'; g.fillRect(left + 14, ceil + 28, 3, 2);
-  g.fillStyle = '#ffcd75'; g.fillRect(left + 20, ceil + 28, 2, 2);
-  g.fillStyle = '#566c86'; g.fillRect(left + 8, floorY - 14, 8, 2); g.fillRect(left + 8, floorY - 24, 3, 12); // 座椅
-  g.fillStyle = '#1a1c2c'; g.beginPath(); g.arc(left + 22, ceil + 30, 4, 0, 7); g.fill(); g.fillStyle = '#566c86'; g.fillRect(left + 21, ceil + 30, 2, 8); // 方向盘
-  g.fillStyle = '#3d3f45'; g.fillRect(left, floorY, w, 4);
-  // 自动驾驶：方向盘自己转，屏幕亮
-  if (R.driving && rdStats().autopilot) { g.fillStyle = '#73eff7'; g.fillRect(left + 26, ceil + 27, 4, 3); }
-  // 隔断
-  g.fillStyle = rdShade(v.color, -0.45); g.fillRect(left - 1, ceil, 2, floorY - ceil - 18);
-}
-function rdDrawHitch(g, x, floorY) { g.fillStyle = '#333c57'; g.fillRect(x - 10, floorY - 2, 10, 2); g.fillStyle = '#566c86'; g.fillRect(x - 8, floorY - 26, 6, 26); g.fillStyle = '#1a1c2c'; g.fillRect(x - 7, floorY - 22, 4, 20); }
 function rdDrawCampRoom(g, left, right, floorY, day, b) {
   // 露营地：没有墙，地上是泥土，左边是帐篷
   g.fillStyle = rdMix('#10121f', b.ground, day * 0.8); g.fillRect(left, floorY, right - left, 6);
   g.fillStyle = '#38b764'; g.beginPath(); g.moveTo(left - 30, floorY); g.lineTo(left - 14, floorY - 22); g.lineTo(left + 2, floorY); g.fill();
   g.fillStyle = '#1a1c2c'; g.fillRect(left - 16, floorY - 9, 5, 9);
   const fh = 4 + Math.sin(G.time * 12) * 1.5; g.fillStyle = '#6e4a2e'; g.fillRect(right - 14, floorY - 1, 9, 2); g.fillStyle = '#ef7d57'; g.fillRect(right - 12, floorY - 1 - fh, 4, fh); g.fillStyle = '#ffcd75'; g.fillRect(right - 11, floorY - fh, 2, fh - 1);
-}
-function rdDrawWindowCell(g, x, y, w, h, R, day, b, seed) {
-  g.fillStyle = '#1a1c2c'; g.fillRect(x - 1, y - 1, w + 2, h + 2);
-  g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip();
-  const sky = rdMix('#0b0d1c', b.sky[1], day);
-  g.fillStyle = sky; g.fillRect(x, y, w, h);
-  const sc = rdVehX() * 0.6 + seed * 37;
-  g.fillStyle = rdMix('#10121f', b.far, day);
-  for (let k = 0; k < w; k++) { const hh = 4 + rdNoise((k + sc * 0.1) / 9) * 6; g.fillRect(x + k, y + h - hh, 1, hh); }
-  g.fillStyle = rdMix('#10121f', b.mid, day);
-  for (let k = 0; k < w; k++) { const n = rdHash(Math.floor((k + sc) / 6)); if (n > 0.6) g.fillRect(x + k, y + h - 3 - Math.floor(n * 6), 1, 4 + Math.floor(n * 6)); }
-  if (R.weather && R.weather.type === 'storm') { g.fillStyle = 'rgba(148,176,194,0.6)'; for (let k = 0; k < 4; k++) g.fillRect(x + Math.floor(rdHash(k + seed) * w), y + ((G.time * 40 + k * 7) % h), 1, 2); }
-  g.restore();
-  g.fillStyle = '#566c86'; g.fillRect(x + Math.floor(w / 2), y, 1, h);
 }
 // 一件家具（x = 所在格的右边缘）
 function rdDrawItem(g, o, xr, base, wall, lay) {
@@ -1023,7 +1012,7 @@ function rdDrawMeInside(g, lay, ox, floorY, ceil) {
   }
   if (me.loc === 'drive') {
     const x = rdVeh().tent ? ox - 20 : ox - lay.cab + 10;
-    rdDrawPerson(g, x, floorY - 12, { pose: 'drive', face: 1 });
+    rdiFine(g, x, floorY - 12, [-14, -26, 28, 30], (gg, ax, ay) => rdDrawPerson(gg, ax, ay, { pose: 'drive', face: 1 }));
     if (me.bubble) rdDrawBubble(g, x + 2, floorY - 28, me.bubble);
     return;
   }
@@ -1066,7 +1055,8 @@ function rdDrawMeInside(g, lay, ox, floorY, ceil) {
   }
   const face = a && !me.walking && a.it ? 1 : me.face;
   if (a && a.type === 'shower' && !me.walking) g.globalAlpha = 0.6;
-  rdDrawPerson(g, px, y, { pose, face, hold, curl: extra === 'curl' });
+  const showerA = g.globalAlpha; g.globalAlpha = 1;
+  rdiFine(g, px, y, [-16, -30, 32, 34], (gg, ax, ay) => { gg.globalAlpha = showerA; rdDrawPerson(gg, ax, ay, { pose, face, hold, curl: extra === 'curl' }); });
   g.globalAlpha = 1;
   // 活动特效
   if (a && !me.walking) {

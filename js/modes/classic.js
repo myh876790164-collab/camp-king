@@ -88,7 +88,7 @@ MODES.classic = {
   perks: GENERIC_PERKS.concat(CLASSIC_SYNERGY),
   hooks: {
     update(dt) { choreTick(dt); }, // 伐木工、石匠出门干活
-    drawWorld(ctx) { drawChoreWorkers(ctx); },
+    drawWorld(ctx) { drawChoreWorkers(ctx); avDrawCommander(ctx); },
     buildingInfo(b) { return b.def.chore ? choreInfo(b) : null; },
   },
 };
