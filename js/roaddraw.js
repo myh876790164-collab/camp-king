@@ -103,32 +103,13 @@ function rdDrawWorld(g) {
   const dim = (c) => rdMix(c, '#10121f', (1 - day) * 0.7);
   // ---- 远景 + 中景（每个地区三层精细像素风景，见 js/roadscape.js） ----
   rdsDrawScenery(g, bi, (bi + RD_BIOMES.length - 1) % RD_BIOMES.length, blend, scroll, gy, day, dusk);
-  // ---- 近景：电线杆、广告牌 ----
-  rdDrawNearLayer(g, scroll * 0.6, gy, W, dim, b);
-  // ---- 路面 ----
-  const ground = dim(col('ground', 0)), road = dim(col('road', 0));
-  g.fillStyle = ground; g.fillRect(0, gy - 14, W, H - gy + 14);
-  g.fillStyle = rdShade(ground, -0.15); for (let x = 0; x < W; x += 3) { const n = rdHash(Math.floor((x + scroll) / 3)); if (n > 0.7) g.fillRect(x, gy - 14 + Math.floor(n * 6), 1, 1); }
-  g.fillStyle = road; g.fillRect(0, gy - 9, W, 16);
-  g.fillStyle = rdShade(road, -0.25); g.fillRect(0, gy + 7, W, 2);
-  g.fillStyle = rdShade(road, 0.12); g.fillRect(0, gy - 9, W, 1);
-  // 裂缝
-  g.fillStyle = rdShade(road, -0.3);
-  for (let i = Math.floor(scroll / 30) - 1; i < (scroll + W) / 30 + 1; i++) { if (rdHash(i * 3.3) < 0.5) continue; const x = Math.round(i * 30 - scroll + (V.ax % 30) + rdHash(i) * 20); g.fillRect(x, gy - 5 + Math.floor(rdHash(i + 1) * 9), 4 + Math.floor(rdHash(i + 2) * 6), 1); }
-  // 中线
-  g.fillStyle = dim(b.snow ? '#94b0c2' : '#c9a86a');
-  const off = ((scroll % 24) + 24) % 24;
-  for (let x = -off + (V.ax % 24); x < W; x += 24) g.fillRect(Math.round(x), gy - 1, 10, 1);
-  // 护栏（路的后侧）
-  g.fillStyle = dim('#94b0c2');
-  for (let x = -((scroll % 18) + 18) % 18 + (V.ax % 18); x < W; x += 18) { const i = Math.floor((x + scroll) / 18); if (rdHash(i * 7.7) < 0.15) continue; g.fillRect(Math.round(x), gy - 15, 1, 6); }
-  for (let x = 0; x < W; x += 2) { const i = Math.floor((x + scroll) / 60); if (rdHash(i * 5.1) < 0.25) continue; g.fillRect(x, gy - 14, 2, 1); }
-  // 雪 / 发光水洼
-  if (b.snow) { g.fillStyle = dim('#f4f4f4'); for (let x = 0; x < W; x += 2) if (rdHash(Math.floor((x + scroll) / 2) * 1.3) > 0.6) g.fillRect(x, gy + 9, 2, 2); }
+  // ---- 近景 + 路面 + 护栏也在上面一起画了（js/roadstreet.js）；长条图下面不够的地方补地面色 ----
+  const ground = dim(col('ground', 0));
+  g.fillStyle = rdShade(ground, -0.3); g.fillRect(0, gy + Math.floor(RDT_DOWN / RD_Q) - 1, W, H);
   // ---- 建筑 ----
   for (const s of R.sites) rdDrawSite(g, s, gy, dim, day);
   // ---- 路障 ----
-  for (const o of R.obs) if (!o.hit) rdDrawObstacle(g, o, gy, dim);
+  for (const o of R.obs) if (!o.hit) rdtDrawObstacle(g, o, gy);
   // ---- 车 + 怪物 + 人 ----
   const mons = (R.mons || []).slice().sort((a, b2) => (RD_MONSTERS[a.type].fly ? 1 : 0) - (RD_MONSTERS[b2.type].fly ? 1 : 0));
   for (const m of mons) if (!RD_MONSTERS[m.type].fly) rdDrawMonster(g, m, gy);
@@ -149,55 +130,13 @@ function rdDrawWorld(g) {
 }
 
 function rdDrawForeground(g, b, scroll, gy, W, H, ground, dim) {
-  // 路肩
-  g.fillStyle = dim(rdShade(ground, -0.08)); g.fillRect(0, gy + 9, W, 4);
-  g.fillStyle = dim(rdShade(ground, -0.25));
-  for (let x = 0; x < W; x += 2) { const n = rdHash(Math.floor((x + scroll) / 2) * 3.1); if (n > 0.55) g.fillRect(x, gy + 9 + Math.floor(n * 4), 1, 1); }
+  // 前景杂物（视差 1.3，见 js/roadstreet.js）
+  const R = G.road, bi = rdBiomeIndex(R.km), into = (R.km % RD_BIOME_LEN) / RD_BIOME_LEN;
+  rdtDrawFront(g, bi, (bi + RD_BIOMES.length - 1) % RD_BIOMES.length, into < 0.06 ? 1 - into / 0.06 : 0, scroll, gy);
   // 越往下越暗
   const gr = g.createLinearGradient(0, gy + 12, 0, H);
   gr.addColorStop(0, 'rgba(10,10,25,0)'); gr.addColorStop(1, 'rgba(10,10,25,0.45)');
-  // 近处杂物（视差 1.3）
-  const sc = scroll * 1.3, seg = 28;
-  for (let i = Math.floor(sc / seg) - 1; i < (sc + W) / seg + 1; i++) {
-    const n = rdHash(i * 5.3), x = Math.round(i * seg - sc + rdHash(i) * 12), y = gy + 18 + Math.floor(rdHash(i + 3) * Math.max(4, H - gy - 30));
-    if (y > H - 4) continue;
-    const c = dim(rdShade(ground, -0.35)), c2 = dim(rdShade(ground, -0.15));
-    g.fillStyle = c;
-    if (b.deco === 'crystal') { if (n > 0.6) { g.fillStyle = dim('#4b3378'); g.fillRect(x, y - 6, 2, 6); g.fillRect(x + 2, y - 3, 2, 3); g.globalAlpha = 0.6; g.fillStyle = '#73eff7'; g.fillRect(x, y - 6, 1, 3); g.globalAlpha = 1; } continue; }
-    if (b.snow) { if (n > 0.5) { g.fillStyle = dim('#f4f4f4'); g.fillRect(x - 4, y - 2, 10, 2); g.fillRect(x - 2, y - 3, 6, 1); } continue; }
-    if (n < 0.25) { g.fillRect(x, y - 2, 4, 2); g.fillStyle = c2; g.fillRect(x + 1, y - 3, 2, 1); } // 石头
-    else if (n < 0.4) { for (let k = 0; k < 4; k++) g.fillRect(x + k * 2 - 3, y - 2 - (k % 2) * 2, 1, 2 + (k % 2) * 2); } // 枯草
-    else if (n < 0.47) { g.fillStyle = dim('#1a1c2c'); g.fillRect(x, y - 3, 5, 3); g.fillStyle = dim('#333c57'); g.fillRect(x + 1, y - 2, 3, 1); } // 旧轮胎
-    else if (n < 0.52) { g.fillStyle = dim(b.rad >= 1 ? '#5a7a3a' : '#b13e53'); g.fillRect(x, y - 5, 4, 5); g.fillStyle = dim('#333c57'); g.fillRect(x, y - 4, 4, 1); } // 油桶
-    else if (n < 0.56) { g.fillStyle = dim('#c8d6e5'); g.fillRect(x, y - 1, 5, 1); g.fillRect(x + 4, y - 2, 2, 2); } // 骨头
-    else if (n < 0.62 && b.rad >= 0.6) { g.globalAlpha = 0.5 + Math.sin(G.time * 2 + i) * 0.2; g.fillStyle = '#a7f070'; g.fillRect(x - 3, y - 1, 9, 1); g.globalAlpha = 1; } // 辐射水洼
-    else if (n < 0.7 && b.deco === 'cactus') { g.fillStyle = dim('#5f8a4a'); g.fillRect(x, y - 5, 2, 5); g.fillRect(x - 2, y - 4, 2, 1); }
-  }
   g.fillStyle = gr; g.fillRect(0, gy + 12, W, H - gy);
-}
-
-function rdDrawNearLayer(g, sc, gy, W, dim, b) {
-  const seg = 90;
-  for (let i = Math.floor(sc / seg) - 1; i < (sc + W) / seg + 1; i++) {
-    const x = Math.round(i * seg - sc), n = rdHash(i * 4.1);
-    if (b.alien) continue;
-    // 电线杆 + 电线
-    g.fillStyle = dim('#4a3a2e');
-    g.fillRect(x, gy - 46, 2, 34); g.fillRect(x - 4, gy - 44, 10, 1);
-    if (rdHash(i * 2.2) > 0.2) { g.fillStyle = dim('#2c2838'); for (let k = 0; k < seg; k += 2) { const sag = Math.sin(k / seg * Math.PI) * 6; g.fillRect(x + k, Math.round(gy - 44 + sag), 2, 1); } }
-    // 广告牌
-    if (n > 0.72) {
-      const bx = x + 40;
-      g.fillStyle = dim('#4a3a2e'); g.fillRect(bx + 4, gy - 30, 2, 18); g.fillRect(bx + 20, gy - 30, 2, 18);
-      g.fillStyle = dim(['#b13e53', '#3b5dc9', '#ffcd75', '#38b764'][Math.floor(rdHash(i) * 4)]); g.fillRect(bx, gy - 44, 26, 15);
-      g.fillStyle = dim('#f4f4f4'); g.fillRect(bx + 3, gy - 41, 12, 2); g.fillRect(bx + 3, gy - 37, 18, 2);
-      g.fillStyle = dim('#1a1c2c'); if (rdHash(i + 1) > 0.5) g.fillRect(bx + 16, gy - 44, 10, 6); // 撕破的角
-    } else if (n < 0.15) { // 路牌
-      g.fillStyle = dim('#94b0c2'); g.fillRect(x + 50, gy - 26, 1, 14); g.fillStyle = dim('#38b764'); g.fillRect(x + 44, gy - 32, 14, 7); g.fillStyle = dim('#f4f4f4'); g.fillRect(x + 46, gy - 30, 8, 1);
-    } else if (n < 0.3) { // 废弃汽车
-      g.fillStyle = dim('#6e4a2e'); g.fillRect(x + 30, gy - 18, 20, 5); g.fillRect(x + 34, gy - 22, 11, 4); g.fillStyle = dim('#1a1c2c'); g.fillRect(x + 33, gy - 14, 3, 2); g.fillRect(x + 45, gy - 14, 3, 2);
-    }
-  }
 }
 
 // ---------- 路边建筑 ----------
@@ -273,15 +212,6 @@ function rdDrawSite(g, s, gy, dim, day) {
   }
 }
 
-function rdDrawObstacle(g, o, gy, dim) {
-  const x = Math.round(rdSX(o.km * RD_PX_KM)), y = gy;
-  if (x < -30 || x > RDV.W + 30) return;
-  if (o.type === 'car') { g.fillStyle = dim('#6e4a2e'); g.fillRect(x - 10, y - 10, 22, 7); g.fillRect(x - 6, y - 14, 12, 4); g.fillStyle = dim('#1a1c2c'); g.fillRect(x - 8, y - 4, 4, 3); g.fillRect(x + 5, y - 4, 4, 3); g.fillStyle = dim('#41a6f6'); g.fillRect(x - 4, y - 13, 3, 2); }
-  else if (o.type === 'barrier') { g.fillStyle = dim('#f4f4f4'); g.fillRect(x - 8, y - 9, 16, 4); g.fillStyle = dim('#b13e53'); for (let k = 0; k < 16; k += 4) g.fillRect(x - 8 + k, y - 9, 2, 4); g.fillStyle = dim('#566c86'); g.fillRect(x - 7, y - 5, 2, 5); g.fillRect(x + 5, y - 5, 2, 5); }
-  else if (o.type === 'crater') { g.fillStyle = dim('#1a1c2c'); g.beginPath(); g.ellipse(x, y + 1, 10, 3, 0, 0, 7); g.fill(); g.fillStyle = dim('#566c86'); g.fillRect(x - 12, y - 1, 3, 2); g.fillRect(x + 9, y - 1, 3, 2); }
-  else if (o.type === 'pole') { g.fillStyle = dim('#4a3a2e'); g.save(); g.translate(x, y - 2); g.rotate(-0.15); g.fillRect(-16, -2, 32, 3); g.restore(); }
-  else { g.fillStyle = dim('#566c86'); g.fillRect(x - 8, y - 6, 7, 6); g.fillRect(x - 2, y - 9, 8, 9); g.fillRect(x + 5, y - 4, 5, 4); }
-}
 
 // ---------- 怪物 ----------
 function rdDrawMonster(g, m, gy) {
@@ -386,7 +316,7 @@ function rdDrawNight(g, day, gy) {
   for (const m of R.mons || []) { const M = RD_MONSTERS[m.type]; hole(rdSX(m.x), gy + (M.fly ? m.y : -M.h / 2), 6, 0.35); } // 怪物身上的辐射荧光
   for (const s of R.sites) if (s.type === 'camp' || s.type === 'alien') hole(rdSX(s.km * RD_PX_KM), gy - 16, 40, 0.7);
   // 远景里的灯（窗户、红灯、荧光）：挖一个小亮点
-  for (const l of RDS_LIT) if (l.a2 > 0.08) { lg.globalAlpha = Math.min(1, l.a2); const r = l.r / RD_Q; lg.fillStyle = '#000'; lg.fillRect(l.x - r, l.y - r * 0.7, r * 2, r * 1.4); }
+  for (const l of RDS_LIT) if (l.a2 > 0.08) { lg.globalAlpha = Math.min(1, l.a2 * 0.7); const r = Math.min(8, l.r / RD_Q * 2.2); lg.drawImage(rdsGlow('#000000'), l.x - r, l.y - r, r * 2, r * 2); }
   lg.globalAlpha = 1;
   lg.globalCompositeOperation = 'source-over';
   g.drawImage(V.light, 0, 0, V.W, V.H);

@@ -543,10 +543,10 @@ function rdsToCanvas(B) {
   return cv;
 }
 // 描边：物体（材质 1）外面一圈深褐；物体顶上那一圈用浅一点的褐色
-function rdsOutline(B, o1, o2) {
+function rdsOutline(B, o1, o2, rows) {
   const s = B.c.slice(), sm = B.m.slice(), W = B.w, H = B.h;
   const f = (px, py) => { if (py < 0 || py >= H) return false; const i = py * W + ((px % W) + W) % W; return s[i] >= 0 && sm[i] === 1; };
-  for (let py = 0; py < Math.min(H, B.base + 2); py++) for (let px = 0; px < W; px++) {
+  for (let py = 0; py < Math.min(H, rows || B.base + 2); py++) for (let px = 0; px < W; px++) {
     const i = py * W + px;
     if (s[i] >= 0 && (sm[i] === 1 || sm[i] === 3)) continue;
     const down = f(px, py + 1), side = f(px - 1, py) || f(px + 1, py), up = f(px, py - 1);
@@ -610,12 +610,21 @@ function rdsDrawScenery(g, bi, pi, blend, scroll, gy, day, dusk) {
   const cur = rdsGetBiome(bi), prev = blend > 0.003 ? rdsGetBiome(pi) : null, lit = [];
   // 快到下一个地区时提前画好；其余地区的图扔掉省内存
   const nb = (bi + 1) % RD_BIOMES.length, into = (G.road.km % RD_BIOME_LEN) / RD_BIOME_LEN;
-  if (into > 0.9) rdsPrebuild(nb);
-  for (const key in RDS_CACHE) if (+key !== bi && +key !== pi && !(into > 0.9 && +key === nb)) delete RDS_CACHE[key];
+  if (into > 0.9) { if (!RDS_CACHE[nb]) rdsPrebuild(nb); else rdtPrebuild(nb); }
+  const keep = (key) => +key === bi || +key === pi || (into > 0.9 && +key === nb);
+  for (const key in RDS_CACHE) if (!keep(key)) delete RDS_CACHE[key];
+  for (const key in RDT_CACHE) if (!keep(key)) delete RDT_CACHE[key];
   for (let k = 0; k < 3; k++) {
     if (prev) rdsBlit(sg, prev[k], scroll * RDS_LAYERS[k].par, baseY, blend, lit, cw);
     rdsBlit(sg, cur[k], scroll * RDS_LAYERS[k].par, baseY, prev ? 1 - blend : 1, lit, cw);
   }
+  // 近景（电线杆、广告牌）和路面（见 js/roadstreet.js）
+  const T = rdtGet(bi), TP = prev ? rdtGet(pi) : null;
+  if (TP) rdsBlit(sg, TP.near, scroll * 0.6, baseY, blend, lit, cw);
+  rdsBlit(sg, T.near, scroll * 0.6, baseY, TP ? 1 - blend : 1, lit, cw);
+  rdsBlit(sg, T.street, scroll, gy * RD_Q, 1, lit, cw);
+  if (TP) rdsBlit(sg, TP.street, scroll, gy * RD_Q, blend, lit, cw);
+  RDT_TONE = { day, dusk };
   // 昼夜：夜里整体压暗偏蓝；黄昏 / 清晨蒙一层橙红
   sg.globalCompositeOperation = 'source-atop';
   const dk = (1 - day) * 0.66;
@@ -625,6 +634,16 @@ function rdsDrawScenery(g, bi, pi, blend, scroll, gy, day, dusk) {
   g.drawImage(V.sc, 0, 0, V.W, V.H);
   rdsDrawLights(g, lit, day);
   RDS_LIT = lit;
+}
+// 圆形柔光贴图（按颜色缓存）：夜里的灯晕、在黑幕上挖亮点
+const RDS_GLOW = {};
+function rdsGlow(col) {
+  if (RDS_GLOW[col]) return RDS_GLOW[col];
+  // 先画实色，再用中间实、四周透明的蒙版抠成圆形柔光
+  const m = createCanvas(32, 32), mc = m.getContext('2d'), mg = mc.createRadialGradient(16, 16, 0, 16, 16, 16);
+  mg.addColorStop(0, 'rgba(0,0,0,1)'); mg.addColorStop(0.3, 'rgba(0,0,0,0.6)'); mg.addColorStop(1, 'rgba(0,0,0,0)');
+  mc.fillStyle = col; mc.fillRect(0, 0, 32, 32); mc.globalCompositeOperation = 'destination-in'; mc.fillStyle = mg; mc.fillRect(0, 0, 32, 32);
+  return (RDS_GLOW[col] = m);
 }
 function rdsDrawLights(g, lit, day) {
   const t = G.time, q = 1 / RD_Q;
@@ -638,7 +657,7 @@ function rdsDrawLights(g, lit, day) {
     l.a2 = a;
     const r = l.r * q;
     g.fillStyle = l.col;
-    if (l.kind !== 'bubble') { g.globalAlpha = a * (0.03 + (1 - day) * 0.17); g.fillRect(l.x - r * 2, l.y - r, r * 4, r * 2); g.fillRect(l.x - r, l.y - r * 2, r * 2, r * 4); g.globalAlpha = a * 0.28; g.fillRect(l.x - r, l.y - r * 0.6, r * 2, r * 1.2); }
+    if (l.kind !== 'bubble') { g.globalAlpha = Math.min(1, a * (0.25 + (1 - day) * 0.45)); const R2 = Math.min(10, r * 3); g.drawImage(rdsGlow(l.col), l.x - R2, l.y - R2, R2 * 2, R2 * 2); }
     g.globalAlpha = Math.min(1, a * 1.2); g.fillRect(l.x - q, l.y - q, 2 * q, 2 * q);
   }
   g.globalAlpha = 1;
