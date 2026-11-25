@@ -1075,7 +1075,7 @@ MODES.zombie = {
       const c = G.core, campId = (G.opt && G.opt.camp) || 'police', camp = ZCAMPS[campId];
       G.introNote = '难度：' + zdiff().name;
       G.camp = { id: campId, craftMul: 1, fullHeal: false, dangerMul: 1 };
-      G.player = Object.assign(newPerson('你'), { baseHp: 100, weapon: 'bat', path: [], goal: null, search: null, down: 0 });
+      G.player = Object.assign(newPerson(avName()), { baseHp: 100, weapon: 'bat', path: [], goal: null, search: null, down: 0 });
       G.player.hp = personMaxHp(G.player);
       G.player.x = c.cx; G.player.y = c.cy + T * 1.5;
       G.survivors = [];

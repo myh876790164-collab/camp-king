@@ -694,28 +694,9 @@ function drawCultivator(ctx, p) {
     grd.addColorStop(0, 'rgba(255,240,180,0)'); grd.addColorStop(0.6, hexA(robe, 0.18)); grd.addColorStop(1, 'rgba(255,240,180,0)');
     ctx.fillStyle = grd; ctx.fillRect(x - r - 4, y - 7 - r - 4, (r + 4) * 2, (r + 4) * 2);
   }
-  const P = (a, b, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x + (f > 0 ? a : -a - w), y + b + bob, w, h); };
-  if (sitting) {
-    P(-5, -3, 10, 3, dk); P(-5, -3, 10, 1, robe);           // 盘腿
-    P(-3.5, -9, 7, 6, robe); P(-3.5, -9, 1, 6, lt); P(2.5, -9, 1, 6, dk);
-    P(-1, -9, 2, 6, p.sash || '#1d2b53');
-    P(-4.5, -6, 2, 3, dk); P(2.5, -6, 2, 3, dk); P(-1.5, -5, 3, 1.5, '#f2d0a9'); // 手结印
-  } else {
-    const step = moving ? Math.sin(G.time * 12 + p.id) * 1.2 : 0;
-    P(-2.5 + step, -2, 2, 2, '#2b2e38'); P(0.5 - step, -2, 2, 2, '#2b2e38');
-    P(-3.5, -9, 7, 7.5, robe); P(-4, -3, 8, 1.5, dk); P(-3.5, -9, 1, 7, lt); P(2.5, -9, 1, 7, dk);
-    P(-3.5, -6, 7, 1.2, p.sash || '#1d2b53');
-    P(-5, -8.5, 1.5, 4.5, dk); P(3.5, -8.5, 1.5, 4.5, dk);
-    P(-5, -4.2, 1.5, 1.3, '#f2d0a9'); P(3.5, -4.2, 1.5, 1.3, '#f2d0a9');
-  }
-  // 头
-  const hy = sitting ? -13.5 : -13.5;
-  P(-2.5, hy, 5, 4.5, '#f2d0a9');
-  P(-3, hy - 1, 6, 2, hairC);
-  if (p.sex === 'f') { P(-3, hy, 1.2, 6, hairC); P(1.8, hy, 1.2, 6, hairC); P(-1, hy - 2.5, 2, 1.5, hairC); }
-  else { P(-1.2, hy - 3, 2.4, 2, hairC); P(-0.4, hy - 3.6, 0.8, 0.8, '#ffcd75'); }
-  P(f > 0 ? 0.5 : -1.5, hy + 2, 1, 1, '#1a1c2c'); // 眼
-  if (p.head) { P(-3, hy - 2, 6, 1.2, '#ffcd75'); P(-0.6, hy - 4, 1.2, 2, '#ffcd75'); } // 掌门玉冠
-  if (p.hurt > 0) { ctx.fillStyle = '#b13e53'; ctx.fillRect(x + 3, y + hy - 3 + bob, 2, 2); }
+  // Q 版休闲风小人（js/sectlook.js）：站 / 走（两帧）/ 打坐
+  void hairC; void dk; void lt;
+  const pose = sitting ? 'sit' : moving ? (Math.sin(G.time * 10 + p.id) > 0 ? 'walk0' : 'walk1') : 'stand';
+  sectDrawLook(ctx, p, x, y + bob, SECT_LOOK_CELL, pose, f);
 }
 function hexA(hex, a) { const [r, g, b] = hexRgb(hex); return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')'; }

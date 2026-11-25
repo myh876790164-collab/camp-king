@@ -127,6 +127,13 @@ rdFamily('weapon', 'wpn', {}, [
   { n: '生物酸液喷射器', t: 6, wt: 8, fx: { dmg: 20, rate: 4, range: 150, ammo: 'none', use: 0, proj: 'acid', burn: 6 }, d: '基因改造的腺体自己分泌酸液，不耗任何东西' },
   { n: '自制土炮', t: 1, wt: 7, fx: { dmg: 24, rate: 0.4, range: 140, ammo: 'scrap', use: 0.5, proj: 'rock', splash: 14, noAir: true }, d: '水管+火药，动静很大' },
   { n: '复合弩炮', t: 3, wt: 9, fx: { dmg: 40, rate: 0.8, range: 200, ammo: 'scrap', use: 0.3, proj: 'harpoon', pierce: 3 }, d: '大号弩，安静又致命' },
+  // ---- 车外自瞄炮塔（turret：360° 转动自动瞄准，优先打最靠近车的怪，前后上方都能打） ----
+  { n: '自动机枪塔', t: 3, wt: 14, pw: 0.2, fx: { dmg: 6, rate: 6, range: 180, ammo: 'ammo', use: 0.1, proj: 'bullet', turret: 'mg' }, d: '带转台和传感器的机枪，自己找目标，车后和天上的也能打' },
+  { n: '双联自动炮塔', t: 4, wt: 22, pw: 0.3, fx: { dmg: 18, rate: 3, range: 220, ammo: 'ammo', use: 0.3, proj: 'bullet', turret: 'cannon', pierce: 1 }, d: '两门小口径机炮，打穿一只再打下一只' },
+  { n: '防空速射炮塔', t: 4, wt: 16, pw: 0.3, fx: { dmg: 9, rate: 8, range: 240, ammo: 'ammo', use: 0.12, proj: 'bullet', turret: 'aa', airBonus: 0.6 }, d: '四联装速射炮，优先打飞行怪，对空伤害 +60%' },
+  { n: '追踪导弹塔', t: 5, wt: 18, pw: 0.4, fx: { dmg: 36, count: 2, rate: 0.7, range: 300, ammo: 'ammo', use: 1, proj: 'missile', splash: 18, homing: 1, turret: 'missile' }, d: '发射会拐弯的导弹，几乎不会落空' },
+  { n: '激光点防御塔', t: 5, wt: 10, pw: 0.8, fx: { dmg: 13, rate: 7, range: 240, ammo: 'power', use: 0.2, proj: 'laser', turret: 'laser' }, d: '耗电，激光瞬间命中，不用子弹' },
+  { n: '外星哨兵炮塔', t: 6, wt: 8, pw: 1, fx: { dmg: 45, rate: 2, range: 280, ammo: 'power', use: 0.8, proj: 'plasma', splash: 24, turret: 'alien' }, d: '耗电，悬浮的外星哨兵，自己追着怪物开火' },
 ]);
 
 // ===== 动力系统 =====
@@ -486,6 +493,9 @@ const RD_RESEARCH = [
   { id: 'xspace2', name: '高维空间', lv: 4, cost: { alien: 40 }, hours: 36, bp: ['spc2', 'store5'], d: '空间折叠装置·II型、压缩储物格' },
   { id: 'xholo', name: '全息技术', lv: 4, cost: { alien: 22 }, hours: 24, bp: ['fun19', 'pc5', 'util10'], d: '全息娱乐室、外星AI核心、隐形力场' },
   { id: 'xgrav2', name: '引力操控', lv: 5, cost: { alien: 45 }, hours: 40, bp: ['wpn18', 'chs6', 'ram10', 'roof12'], d: '重力奇点发射器、引力波悬浮、力场犁、感应天线' },
+  { id: 'turret', name: '自动炮塔', lv: 2, cost: { scrap: 90, ammo: 30 }, hours: 18, bp: ['wpn23', 'wpn25'], d: '自动机枪塔、防空速射炮塔：装在车外，自己转着找怪打' },
+  { id: 'turret2', name: '智能火控', lv: 3, cost: { scrap: 150, power: 40 }, hours: 28, bp: ['wpn24', 'wpn26', 'wpn27'], d: '双联自动炮塔、追踪导弹塔、激光点防御塔' },
+  { id: 'xturret', name: '外星哨兵协议', lv: 4, cost: { alien: 30 }, hours: 30, bp: ['wpn28'], d: '外星哨兵炮塔：悬浮在车顶自动开火' },
   { id: 'xzero', name: '零点能', lv: 5, cost: { alien: 60 }, hours: 48, bp: ['eng12', 'spc3', 'wpn19', 'roof13', 'util11', 'med4'], d: '零点能引擎、空间折叠·III型、虚空光束、光子帆、纳米修复' },
 ];
 

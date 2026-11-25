@@ -293,6 +293,7 @@ function rdUpdate(dt) {
   R.evT -= dh;
   if (R.evT <= 0) { R.evT = 10 + Math.random() * 10; rdRandomEvent(); if (G.state !== 'play') return; }
   rdEncounterTick(dh, st);
+  rcTick(dt / (G.speed || 1)); // 聊天按现实时间刷新，加速时不会刷屏
   rdCombat(dt, st);
   rdFxTick(dt);
   // ---- 每天零点自动存档 ----
@@ -480,7 +481,7 @@ function rdRollPart(S, s) {
   if (!pick.length) pick = pool;
   return pick.length ? pick[Math.floor(Math.random() * pick.length)] : null;
 }
-function rdFound(p) { if (p.tier >= 4) rdR().me.mood = Math.min(100, rdR().me.mood + 6); if (p.tier >= 5) showBanner('稀有发现！', '【' + RD_TIER_NAME[p.tier] + '】' + p.name, 4, RD_TIER_COLOR[p.tier]); }
+function rdFound(p) { if (p.tier >= 4) rdR().me.mood = Math.min(100, rdR().me.mood + 6); if (p.tier >= 5) { showBanner('稀有发现！', '【' + RD_TIER_NAME[p.tier] + '】' + p.name, 4, RD_TIER_COLOR[p.tier]); rcPlayerRare(p); } }
 
 // ---------- 路障 ----------
 function rdCheckObstacles(st) {
@@ -557,11 +558,12 @@ function rdWeapons() {
 function rdMountPos(i) { // 武器在车上的位置（相对车头，像素）
   const v = rdVeh(), L = v.len;
   const xs = [-L * 0.45, -L * 0.75, -L * 0.25, -L * 0.6, -L * 0.15];
+  if (G.road.veh === 'pickup' && i < 2) return { x: [-L * 0.667, -L * 0.88][i], y: -26 }; // 皮卡：前两门架在后斗的炮座上
   return { x: xs[i % xs.length], y: -(v.tent ? 18 : L > 50 ? 30 : 26) };
 }
 function rdCombat(dt, st) {
   const R = rdR(), me = R.me;
-  R.mons = R.mons || []; R.proj = R.proj || [];
+  R.mons = R.mons || []; R.proj = R.proj || []; R.fx = R.fx || [];
   const vx = rdVehX(), L = rdVeh().len;
   rdSearchTick(dt);
   if (R.hitT > 0) R.hitT -= dt;
@@ -609,6 +611,11 @@ function rdCombat(dt, st) {
       G.shake = Math.max(G.shake || 0, M.big ? 0.3 : 0.12);
     }
     if (!M.fly && m.y < 0) m.y = Math.min(0, m.y + 60 * dt);
+    // 记录怪物速度（武器按它算提前量）
+    if (m.px != null && dt > 0) m.vx = Math.max(-220, Math.min(220, (m.x - m.px) / dt));
+    m.px = m.x;
+    // 车开着时，追在车后面又追不上的怪：跟 10 秒就放弃（不会一直吊在射程外面）
+    if (R.speedNow > 8 && m.x < vx - L - 30) { m.lagT = (m.lagT || 0) + dt; if (m.lagT > 10) m.leave = true; } else m.lagT = 0;
   }
   // 太远的怪物消失（被甩掉了）
   R.mons = R.mons.filter((m) => m.hp > 0 && m.x > vx - 700 && m.x < vx + 900);
@@ -622,8 +629,8 @@ function rdCombat(dt, st) {
     if (R.wcd[key] > 0) continue;
     const fx = w.p.fx, mp = rdMountPos(w.i);
     const ox = vx + mp.x, oy = mp.y;
-    const range = fx.range * (1 + st.rangePct) * (night ? 0.75 : 1);
-    const tgt = rdTarget(ox, range, fx.noAir);
+    const range = fx.range * (1 + st.rangePct) * (night && !fx.turret ? 0.75 : 1); // 炮塔有传感器，晚上不减射程
+    const tgt = fx.turret ? rdTargetTurret(ox, range, fx) : rdTarget(ox, range, fx.noAir);
     if (!tgt) continue;
     if (fx.ammo !== 'none' && fx.use > 0) {
       const have = G.res[fx.ammo] || 0;
@@ -631,6 +638,7 @@ function rdCombat(dt, st) {
       G.res[fx.ammo] = have - fx.use;
     }
     R.wcd[key] = 1 / fx.rate;
+    R.aimAt = R.aimAt || {}; R.aimAt[key] = G.time;
     R.aim = R.aim || {}; R.aim[key] = Math.atan2((tgt.y - (RD_MONSTERS[tgt.type].fly ? 0 : RD_MONSTERS[tgt.type].h / 2)) - oy, tgt.x - ox);
     rdFire(fx, ox, oy, tgt, 1 + st.aim, false);
   }
@@ -659,6 +667,19 @@ function rdCombat(dt, st) {
   for (const p of R.proj) rdProjTick(p, dt);
   R.proj = R.proj.filter((p) => p.life > 0);
 }
+// 炮塔挑目标：射程内离车最近（最有威胁）的怪；防空塔优先打飞的
+function rdTargetTurret(ox, range, fx) {
+  const R = rdR(), c = rdVehX() - rdVeh().len / 2;
+  let best = null, bs = 1e9;
+  for (const m of R.mons) {
+    if (m.hp <= 0 || m.leave) continue;
+    const M = RD_MONSTERS[m.type], my = M.fly ? m.y : -M.h / 2;
+    if (Math.hypot(m.x - ox, my) > range) continue;
+    const s = Math.abs(m.x - c) * (M.fly && fx.airBonus ? 0.3 : 1);
+    if (s < bs) { bs = s; best = m; }
+  }
+  return best;
+}
 function rdTarget(x, range, noAir) {
   const R = rdR();
   let best = null, bd = range;
@@ -670,7 +691,7 @@ function rdTarget(x, range, noAir) {
   }
   return best;
 }
-const RD_PROJ_SPD = { rock: 220, nail: 320, bullet: 420, pellet: 380, harpoon: 300, flame: 160, shell: 230, rocket: 260, mortar: 200, acid: 240, plasma: 280, grav: 150, spit: 160 };
+const RD_PROJ_SPD = { missile: 200, rock: 220, nail: 320, bullet: 420, pellet: 380, harpoon: 300, flame: 160, shell: 230, rocket: 260, mortar: 200, acid: 240, plasma: 280, grav: 150, spit: 160 };
 function rdFire(fx, ox, oy, tgt, mul, mine) {
   const R = rdR(), M = RD_MONSTERS[tgt.type];
   const ty = M.fly ? tgt.y : -M.h / 2;
@@ -697,10 +718,13 @@ function rdFire(fx, ox, oy, tgt, mul, mine) {
     const spread = n > 1 ? (Math.random() - 0.5) * (fx.proj === 'pellet' ? 22 : 30) : 0;
     const spd = RD_PROJ_SPD[fx.proj] || 300;
     const arc = fx.proj === 'mortar' || fx.proj === 'shell' || fx.proj === 'rock';
-    const tx = tgt.x + (tgt.spd || 0) * 0.15 * (tgt.face || 0), tyy = ty + spread;
+    // 提前量：按怪物真实的移动速度 × 子弹飞行时间（车在开、怪在追时也能打中）
+    const t0 = Math.max(0.05, Math.hypot(tgt.x - ox, ty - oy) / spd);
+    const tx = tgt.x + (tgt.vx || 0) * t0, tyy = ty + spread;
     const dist = Math.hypot(tx - ox, tyy - oy), time = Math.max(0.15, dist / spd);
-    R.proj.push({ kind: fx.proj, x: ox, y: oy, vx: (tx - ox) / time + (n > 1 && fx.proj === 'rocket' ? (Math.random() - 0.5) * 40 : 0), vy: (tyy - oy) / time - (arc ? 120 * time * 0.5 * 2 : 0), g: arc ? 240 : 0,
-      dmg: fx.dmg * mul, fx, life: time + 0.6, pierce: fx.pierce || 0, hitSet: [], mine });
+    const homing = fx.homing ? 1 : 0;
+    R.proj.push({ kind: fx.proj, x: ox, y: oy, vx: (tx - ox) / time + ((n > 1 && fx.proj === 'rocket') || homing ? (Math.random() - 0.5) * 60 : 0), vy: (tyy - oy) / time - (arc ? 120 * time * 0.5 * 2 : 0) - (homing ? 40 + Math.random() * 30 : 0), g: arc ? 240 : 0,
+      dmg: fx.dmg * mul * (M.fly && fx.airBonus ? 1 + fx.airBonus : 1), fx, life: time + (homing ? 2.5 : 0.6), pierce: fx.pierce || 0, hitSet: [], mine, tgt: homing ? tgt : null, spd });
   }
 }
 function rdProjTick(p, dt) {
@@ -713,9 +737,18 @@ function rdProjTick(p, dt) {
     return;
   }
   p.vy += (p.g || 0) * dt;
+  // 追踪导弹：一直拐向目标
+  if (p.tgt) {
+    const T = p.tgt;
+    if (T.hp > 0) {
+      const TM = RD_MONSTERS[T.type], ty = TM.fly ? T.y : -TM.h / 2, dx = T.x - p.x, dy = ty - p.y, d = Math.hypot(dx, dy) || 1;
+      const k = Math.min(1, dt * 5);
+      p.vx += (dx / d * p.spd * 1.2 - p.vx) * k; p.vy += (dy / d * p.spd * 1.2 - p.vy) * k;
+    } else p.tgt = null;
+  }
   const ox = p.x, oy = p.y;
   p.x += p.vx * dt; p.y += p.vy * dt;
-  if (p.kind === 'flame' || p.kind === 'rocket') if (Math.random() < 0.5) rdSmoke(p.x, p.y, p.kind === 'flame' ? '#ef7d57' : '#94b0c2');
+  if (p.kind === 'flame' || p.kind === 'rocket' || p.kind === 'missile') if (Math.random() < 0.5) rdSmoke(p.x, p.y, p.kind === 'flame' ? '#ef7d57' : '#94b0c2');
   // 撞地 / 命中
   const ground = p.y >= 0;
   for (const m of R.mons) {
@@ -1082,6 +1115,7 @@ function rdRandomEvent() {
     const w = [{ type: 'dust', name: '沙尘暴', d: '车速变慢，太阳能变弱' }, { type: 'rad', name: '辐射风暴', d: '辐射猛增，尽量待在车里' }, { type: 'storm', name: '暴雨', d: '雨水收集翻倍，太阳能变弱' }][Math.floor(Math.random() * 3)];
     R.weather = Object.assign({ left: 4 + Math.random() * 6 }, w);
     rdLog(w.name + '来了：' + w.d, '#ef7d57');
+    rcWeather(w.type);
     showBanner(w.name, w.d, 4, '#ef7d57');
   } else if (ev === 'wreck') {
     rdDialog('路边的废车', '一辆翻倒的车横在路边，看起来还没被人拆过。', [
@@ -1151,7 +1185,7 @@ function rdLose(title, why) {
 // ---------- 存档 ----------
 function rdSaveData() {
   const R = rdR(), out = {};
-  for (const k in R) if (!['mons', 'proj', 'fx', 'parts', 'floats', '_fx', '_fxPow', 'st', 'wcd', 'aim', 'trade', 'panel', 'search'].includes(k)) out[k] = R[k];
+  for (const k in R) if (!['mons', 'proj', 'fx', 'parts', 'floats', '_fx', '_fxPow', 'st', 'wcd', 'aim', 'aimAt', 'aimS', 'trade', 'panel', 'search'].includes(k)) out[k] = R[k];
   return { road: out, res: G.res };
 }
 function rdLoadData(d) {
@@ -1159,6 +1193,7 @@ function rdLoadData(d) {
   Object.assign(G.res, d.res);
   const R = G.road;
   R.mons = []; R.proj = []; R.fx = []; R.parts = []; R.floats = [];
+  if (R.chat) R.chat._real = 0;
   if (R.me.loc === 'out' || R.me.loc === 'site') { R.me.loc = 'in'; R.me.ix = 0.6; }
   R.me.act = null;
   R.powered = undefined;

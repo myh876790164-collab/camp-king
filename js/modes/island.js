@@ -908,7 +908,8 @@ MODES.island = {
       G.pickSlot = null;
       G.shoreTiles = shoreTiles();
       const c = G.core;
-      const a = newMember('你', c.cx - 8, c.cy + T * 1.4);
+      const a = newMember(avName(), c.cx - 8, c.cy + T * 1.4);
+      a.look = 'me'; // 你的角色外观
       a.hand = 'axe:0'; a.task = 'wood';
       const b = newMember(pick(ISLAND_NAMES), c.cx + 8, c.cy + T * 1.4);
       b.hand = 'basket:0'; b.task = 'gather';

@@ -194,6 +194,7 @@ MODES.frost = {
       ];
     },
     drawWorld(ctx) {
+      avDrawCommander(ctx);
       // 太冷的建筑头上显示雪花
       for (const b of G.buildings) {
         if (b.eff < 0.75 && (b.def.gather || b.def.attack || b.def.produce)) {

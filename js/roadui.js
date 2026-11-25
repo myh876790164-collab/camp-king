@@ -10,6 +10,7 @@ function rdFxText(p) {
     out.push('伤害 ' + f.dmg + (f.count ? '×' + f.count : ''), '射速 ' + f.rate + '/秒', f.range < 20 ? '近战' : '射程 ' + f.range);
     if (f.ammo && f.ammo !== 'none' && f.use) out.push('耗' + RD_RES[f.ammo].name + ' ' + f.use + '/发'); else if (f.ammo === 'none') out.push('不耗弹药');
     if (f.splash) out.push('爆炸'); if (f.pierce) out.push(f.pierce >= 99 ? '全穿透' : '穿透'); if (f.burn) out.push('燃烧'); if (f.slow) out.push('减速'); if (f.chain) out.push('连锁闪电'); if (f.pull) out.push('吸附'); if (f.noAir) out.push('打不到飞行怪');
+    if (f.turret) out.unshift('自瞄炮塔·360°'); if (f.homing) out.push('追踪'); if (f.airBonus) out.push('对空+' + pct(f.airBonus));
     return out.join(' · ');
   }
   const L = {
@@ -40,27 +41,17 @@ function rdDrawUI(ctx) {
   const R = G.road, sw = G.sw, sh = G.sh, st = R.st || rdStats();
   ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
   const playing = G.state === 'play';
-  // ---- 顶栏：资源 ----
-  const items = [['fuel', Math.floor(G.res.fuel) + (st.fuelKm > 0 || st.tank > 0 ? '/' + st.tank : '')], ['scrap', Math.floor(G.res.scrap)], ['food', Math.floor(G.res.food)], ['water', Math.floor(G.res.water)], ['med', Math.floor(G.res.med)], ['ammo', Math.floor(G.res.ammo)], ['power', Math.floor(G.res.power) + '/' + st.battery]];
-  if (G.res.alien > 0) items.push(['alien', Math.floor(G.res.alien)]);
-  ctx.font = 'bold 12px ' + FONT;
-  let x = 8, y = 6, rowH = 20;
-  const maxX = sw - 104;
-  const lines = [[]];
-  for (const it of items) { const w = 16 + ctx.measureText(it[1]).width + 12; if (x + w > maxX && lines[lines.length - 1].length) { lines.push([]); x = 8; } lines[lines.length - 1].push({ it, x, w }); x += w; }
-  const topH = 6 + lines.length * rowH + 4;
-  ctx.fillStyle = 'rgba(26,28,44,0.85)'; ctx.fillRect(0, 0, sw, topH); addButton(0, 0, sw, topH, null);
-  lines.forEach((ln, r) => ln.forEach(({ it, x: ix }) => {
-    const c = RD_RES[it[0]].color, yy = 6 + r * rowH;
-    ctx.fillStyle = '#1a1c2c'; ctx.fillRect(ix, yy + 2, 12, 12); ctx.fillStyle = c; ctx.fillRect(ix + 2, yy + 4, 8, 8);
-    drawText(ctx, it[1], ix + 16, yy + 9, 12, it[0] === 'fuel' && G.res.fuel < st.tank * 0.15 && st.fuelKm > 0 ? '#ef7d57' : '#f4f4f4');
-  }));
-  // 名称提示（第一次玩时看得懂）
+  // ---- 左上角：仪表盘（车速、里程、油量、电量、弹药、警示灯；点它打开仓库看所有资源） ----
+  const portrait = sw < sh;
+  const tickW = portrait ? sw - 16 : Math.min(360, sw * 0.42);
+  const dashH = 84, dashW = Math.floor(portrait ? sw - 16 - 92 : Math.min(380, sw - tickW - 24));
+  rdDrawDash(ctx, 8, 6, dashW, dashH);
+  const topH = 6 + dashH + 2;
   drawButton(ctx, sw - 46, 4, 40, 30, '‖', () => { G.state = 'paused'; }, { size: 15 });
   drawButton(ctx, sw - 94, 4, 44, 30, '×' + G.speed, () => { nextSpeed(); }, { size: 13 });
   // ---- 信息行 ----
   const h = Math.floor(rdHour()), mi = Math.floor((rdHour() % 1) * 60);
-  let info = '第' + rdDay() + '天 ' + String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0') + (rdIsNight() ? ' ☾' : ' ☀') + ' · ' + rdBiomeAt(R.km).name + ' · ' + Math.floor(R.km) + ' 公里 · ' + Math.round(R.speedNow) + ' km/h';
+  let info = '第' + rdDay() + '天 ' + String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0') + (rdIsNight() ? ' ☾' : ' ☀') + ' · ' + rdBiomeAt(R.km).name;
   if (R.weather) info += ' · ' + R.weather.name;
   drawText(ctx, info, 8, topH + 12, 12, '#ffcd75', 'left');
   // 前方建筑（瞭望台 / 雷达 / 车载电脑）
@@ -72,9 +63,22 @@ function rdDrawUI(ctx) {
     if (st.radar) t += '（危险' + (nx.danger < 0.2 ? '低' : nx.danger < 0.4 ? '中' : '高') + (S.slots.length ? '，可能有' + S.slots.slice(0, 3).map((k) => RD_SLOTS[k].name).join('/') : '') + '）';
     drawText(ctx, t, 8, iy, 11, '#73eff7', 'left', false); iy += 16;
   }
+  // ---- 聊天室滚动条 ----
+  if (playing) {
+    const th = rcTicker(ctx, portrait ? 8 : sw - tickW - 8, portrait ? iy : 40, tickW);
+    if (portrait) iy += th + 4;
+  }
   // ---- 状态条 ----
-  const portrait = sw < sh;
-  const bx = 8, by = portrait ? Math.round(RDV.gy * RDV.S / G.dpr + 36) : iy + 2, bw = portrait ? Math.min(170, (sw - 24) / 2) : 132;
+  // 油门踏板：放在车辆正下方（手机竖屏时状态条挪到踏板下面）
+  const bh = 48, yb = sh - bh - 6;
+  const roadY = Math.round(RDV.gy * RDV.S / G.dpr);
+  const carFront = rdToScreen(RDV.ax, RDV.gy).x, carC = carFront - rdVeh().len * RDV.S / G.dpr / 2;
+  let pedTop = roadY + 24, pedH = Math.min(132, (portrait ? yb - 150 : yb - 10) - pedTop), pedX;
+  if (pedH >= 86) pedX = carC - pedH * 0.34; // 车正下方
+  else { pedH = Math.min(120, yb - 10 - Math.max(topH + 40, roadY - 80)); pedTop = yb - 10 - pedH; pedX = carFront + 18; } // 横屏手机下面放不下：放在车头前面
+  const pedW = Math.round(pedH * 0.68);
+  const ped = { x: Math.round(Math.max(8, Math.min(sw - pedW - 8, pedX))), y: pedTop, w: pedW, h: pedH };
+  const bx = 8, by = portrait ? ped.y + ped.h + 10 : iy + 2, bw = portrait ? Math.min(170, (sw - 24) / 2) : 132;
   const me = R.me, maxHp = rdMaxHp();
   const bars = [
     ['生命', me.hp / maxHp, '#b13e53', Math.round(me.hp)], ['饱食', me.food / 100, '#a7f070', Math.round(me.food)], ['水分', me.water / 100, '#41a6f6', Math.round(me.water)],
@@ -95,17 +99,17 @@ function rdDrawUI(ctx) {
   const doing = rdDoingText();
   if (doing) drawText(ctx, doing, bx, by + (portrait ? Math.ceil(bars.length / 2) : bars.length) * 16 + 8, 11, '#c8d6e5', 'left', false);
   // ---- 底部按钮 ----
-  const bh = 48, yb = sh - bh - 6;
   ctx.fillStyle = 'rgba(26,28,44,0.85)'; ctx.fillRect(0, yb - 6, sw, bh + 12); addButton(0, yb - 6, sw, bh + 12, null);
   const outside = me.loc === 'out' || me.loc === 'site';
+  rdDrawPedal(ctx, ped, R.driving, outside);
   const btns = [
-    { l: R.driving ? '停车' : '出发', c: R.driving ? '#b13e53' : '#1f5e3a', f: () => rdToggleDrive(), dim: outside },
     { l: R.view === 'in' ? (rdVeh().tent ? '公路' : '车外') : (rdVeh().tent ? '营地' : '车内'), f: () => { R.view = R.view === 'in' ? 'out' : 'in'; } },
     { l: '改装', f: () => rdOpenPanel('garage') },
     { l: '仓库', f: () => rdOpenPanel('inv'), badge: R.inv.length },
     { l: '制作', f: () => rdOpenPanel('craft'), badge: R.craftQ.length },
     { l: '研究', f: () => rdOpenPanel('research') },
     { l: '日志', f: () => rdOpenPanel('log') },
+    { l: '聊天', f: () => rdOpenPanel('chat'), badge: R.chat ? R.chat.unread : 0 },
   ];
   const gap = 5, w = Math.min(86, (sw - 12 - gap * (btns.length - 1)) / btns.length);
   let x0 = (sw - (w * btns.length + gap * (btns.length - 1))) / 2;
@@ -168,6 +172,38 @@ function rdDrawUI(ctx) {
   if (G.state === 'over') drawEndOverlay(ctx, false);
   if (G.state === 'paused') drawPauseMenu(ctx); else drawConfirm(ctx);
 }
+// 像素风油门踏板（出发 / 停车）：停着时踏板抬起、写「出发」；开车时踏板被踩下去、写「停车」
+function rdDrawPedal(ctx, b, driving, dim) {
+  const labH = 26;
+  const u = Math.max(2, Math.floor(b.w / 18)); // 一个像素块的大小
+  const cols = Math.floor(b.w / u), rows = Math.floor((b.h - labH - 4) / u), ox = b.x + Math.floor((b.w - cols * u) / 2);
+  const P = (gx, gy, gw, gh, c) => { ctx.fillStyle = c; ctx.fillRect(ox + gx * u, b.y + gy * u, gw * u, gh * u); };
+  const press = driving ? Math.max(2, Math.floor(rows * 0.14)) : 0; // 踩下去：踏板变矮（往里倾斜）
+  ctx.globalAlpha = dim ? 0.45 : 1;
+  // 地板上的底座 + 铰链
+  P(0, rows - 2, cols, 2, '#262b44'); P(0, rows - 2, cols, 1, '#3b4458');
+  P(2, rows - 3, cols - 4, 1, '#94b0c2'); P(3, rows - 3, 1, 1, '#c8d6e5');
+  // 踏板（圆角的长条橡胶块）
+  const top = press, bot = rows - 3, x0 = 2, w = cols - 4;
+  for (let r = top; r < bot; r++) {
+    const k = r - top, last = bot - 1 - r, inset = k === 0 || last === 0 ? 2 : k === 1 || last === 1 ? 1 : 0;
+    P(x0 + inset - 1, r, w - inset * 2 + 2, 1, '#0d0d14'); // 黑边
+    let c = '#2a2a33';
+    if (k > 1 && last > 1 && k % 3 === 0) c = '#4c4c5c'; // 防滑横纹
+    P(x0 + inset, r, w - inset * 2, 1, c);
+    if (c !== '#2a2a33') P(x0 + inset, r, 2, 1, '#6a6a7c'); // 横纹左侧高光
+  }
+  P(x0 + 2, top, w - 4, 1, driving ? '#566c86' : '#8a8a9c'); // 顶部反光（踩下去时变暗）
+  // 底部金属铭牌
+  P(x0 + 2, bot - 3, w - 4, 2, '#9aa3ad'); P(x0 + 2, bot - 3, w - 4, 1, '#c8d6e5');
+  // 文字标签
+  const ly = b.y + rows * u + 4;
+  ctx.fillStyle = driving ? '#b13e53' : '#1f5e3a'; ctx.fillRect(b.x, ly, b.w, labH);
+  ctx.strokeStyle = '#ffcd75'; ctx.lineWidth = 2; ctx.strokeRect(b.x + 1, ly + 1, b.w - 2, labH - 2);
+  drawText(ctx, driving ? '停车' : '出发', b.x + b.w / 2, ly + labH / 2, 16, '#f4f4f4', 'center');
+  ctx.globalAlpha = 1;
+  addButton(b.x - 6, b.y - 6, b.w + 12, b.h + 10, dim ? null : () => { sfx('click'); rdToggleDrive(); });
+}
 function rdDoingText() {
   const R = G.road, me = R.me, a = me.act;
   if (me.loc === 'drive') return R.driving ? '正在开车' + (me.energy < 25 ? '（很困了）' : '') : '';
@@ -198,7 +234,7 @@ function rdDrawPanel(ctx) {
   ctx.fillStyle = 'rgba(10,10,30,0.6)'; ctx.fillRect(0, 0, sw, sh); addButton(0, 0, sw, sh, null);
   const pw = Math.min(640, sw - 12), ph = sh - 16, px = (sw - pw) / 2, py = 8;
   drawPanel(ctx, px, py, pw, ph);
-  const tabs = R.panel === 'trade' ? [['trade', R.trade ? R.trade.name : '交易']] : [['garage', '改装'], ['inv', '仓库'], ['craft', '制作'], ['research', '研究'], ['log', '日志']];
+  const tabs = R.panel === 'trade' ? [['trade', R.trade ? R.trade.name : '交易']] : [['garage', '改装'], ['inv', '仓库'], ['craft', '制作'], ['research', '研究'], ['log', '日志'], ['chat', '聊天']];
   const tw = Math.min(90, (pw - 60) / tabs.length);
   tabs.forEach(([k, l], i) => drawButton(ctx, px + 8 + i * (tw + 4), py + 8, tw, 32, l, () => { R.panel = k; R.pick = null; if (G.scroll) G.scroll.rpanel = 0; }, { active: R.panel === k || (R.panel === 'pick' && k === 'garage'), color: R.panel === k ? '#29366f' : '#333c57', size: 13 }));
   drawButton(ctx, px + pw - 44, py + 8, 36, 32, '✕', () => { G.state = 'play'; R.pick = null; }, { size: 14 });
@@ -212,6 +248,7 @@ function rdDrawPanel(ctx) {
   else if (R.panel === 'research') rdPanelResearch(c);
   else if (R.panel === 'log') rdPanelLog(c);
   else if (R.panel === 'trade') rdPanelTrade(c);
+  else if (R.panel === 'chat') rcPanel(c);
   endScroll(ctx, c.y + 10);
 }
 function rdLine(c, t, size, color, bold) { wrapText(c.ctx, t, c.w, size || 13).forEach((ln) => { drawText(c.ctx, ln, c.x, c.y + (size || 13) / 2 + 2, size || 13, color || '#c8d6e5', 'left', !!bold); c.y += (size || 13) + 5; }); }
@@ -238,26 +275,28 @@ function rdPartRow(c, label, p, btns, note) {
 function rdPreviewImg(scale) {
   const v = rdVeh(), tr = G.road.ext.trailer ? 50 : 0;
   const w = v.len + tr + 30, h = 64;
-  const cv = createCanvas(w, h), g = cv.getContext('2d');
+  const cv = createCanvas(w * RD_Q, h * RD_Q), g = cv.getContext('2d');
+  g.setTransform(RD_Q, 0, 0, RD_Q, 0, 0); // 和公路画面一样用精细像素
   rdDrawVehicle(g, w - 12, h - 6, {});
+  cv.lw = w; cv.lh = h; // 换算成「世界像素」的尺寸
   return cv;
 }
 function rdPanelGarage(c) {
   const R = G.road, ctx = c.ctx, st = rdStats(), v = rdVeh();
   // 预览
   const img = rdPreviewImg();
-  const sc = Math.max(2, Math.min(4, Math.floor(c.w * 0.45 / img.width)));
+  const sc = Math.max(2, Math.min(4, Math.floor(c.w * 0.45 / img.lw)));
   ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = '#1a1c2c'; ctx.fillRect(c.x, c.y, c.w, img.height * sc + 8);
-  ctx.drawImage(img, c.x + 4, c.y + 4, img.width * sc, img.height * sc);
-  const sx = c.x + img.width * sc + 14;
+  ctx.fillStyle = '#1a1c2c'; ctx.fillRect(c.x, c.y, c.w, img.lh * sc + 8);
+  ctx.drawImage(img, c.x + 4, c.y + 4, img.lw * sc, img.lh * sc);
+  const sx = c.x + img.lw * sc + 14;
   const stats = [
     v.name + (st.hover ? '（漂浮）' : ''), '耐久 ' + Math.round(R.hpV) + '/' + st.hp + ' · 护甲 ' + Math.round(st.armor * 100) + '%', '速度 ' + st.speed + ' km/h' + (st.over > 0 ? '（超重！）' : ''),
     st.fuelKm > 0 ? '油耗 ' + st.fuelKm.toFixed(2) + ' 升/公里' : st.powKm > 0 ? '电耗 ' + st.powKm.toFixed(2) + ' 电/公里' : '不耗燃料',
     '重量 ' + st.weight + '/' + st.torque + ' · 货舱 ' + rdCargoUsed() + '/' + st.cargo, '电力 ' + (R.powNet >= 0 ? '+' : '') + (R.powNet || 0).toFixed(1) + '/时 · 撞击 ' + st.ram,
   ];
   stats.forEach((t, i) => { if (sx + 60 < c.x + c.w) drawText(ctx, t, sx, c.y + 12 + i * 16, i ? 11 : 14, i ? '#c8d6e5' : '#ffcd75', 'left', i === 0); });
-  c.y += Math.max(img.height * sc + 8, stats.length * 16 + 8) + 6;
+  c.y += Math.max(img.lh * sc + 8, stats.length * 16 + 8) + 6;
   if (sx + 60 >= c.x + c.w) stats.forEach((t) => rdLine(c, t, 11));
   rdLine(c, '特性：' + v.perk, 11, '#a7f070');
   if (R.broken && R.speedNow < 1) { drawButton(ctx, c.x, c.y, 260, 32, '应急抢修（8 小时，不花废料，修到 30%）', () => rdEmergencyRepair(), { color: '#b13e53', size: 12 }); c.y += 38; }
@@ -334,7 +373,22 @@ function rdPanelPick(c) {
 }
 function rdPanelInv(c) {
   const R = G.road, ctx = c.ctx, st = rdStats();
-  rdLine(c, '货舱 ' + rdCargoUsed() + '/' + st.cargo + '（废料、食物、水、药、弹药、晶体占货舱）· 油箱 ' + Math.floor(G.res.fuel) + '/' + st.tank + ' · 电池 ' + Math.floor(G.res.power) + '/' + st.battery, 12, '#c8d6e5');
+  // 物资一览（像素图标）
+  rdHead(c, '物资　货舱 ' + rdCargoUsed() + '/' + st.cargo);
+  const keys = ['fuel', 'power', 'scrap', 'food', 'water', 'med', 'ammo', 'alien'];
+  const cols = c.w < 420 ? 2 : 4, gap = 6, cw = (c.w - gap * (cols - 1)) / cols, chh = 40;
+  keys.forEach((k, i) => {
+    const cx = c.x + (i % cols) * (cw + gap), cy = c.y + Math.floor(i / cols) * (chh + gap);
+    const cap = k === 'fuel' ? st.tank : k === 'power' ? st.battery : 0;
+    const low = (k === 'food' || k === 'water') ? G.res[k] < 3 : k === 'med' ? G.res[k] < 1 : cap ? G.res[k] < cap * 0.15 : false;
+    ctx.fillStyle = low ? 'rgba(177,62,83,0.35)' : 'rgba(38,43,68,0.9)'; ctx.fillRect(cx, cy, cw, chh);
+    rdIcon(ctx, k, cx + 6, cy + 8, 24);
+    drawText(ctx, RD_RES[k].name, cx + 38, cy + 12, 11, '#94b0c2', 'left', false);
+    drawText(ctx, Math.floor(G.res[k] || 0) + (cap ? ' / ' + cap : ''), cx + 38, cy + 28, 14, low ? '#ef7d57' : '#f4f4f4', 'left');
+  });
+  c.y += Math.ceil(keys.length / cols) * (chh + gap) + 2;
+  rdLine(c, '废料、食物、水、药、弹药、晶体占货舱；燃油在油箱里，电在电池里', 11, '#94b0c2');
+  rdHead(c, '零件');
   rdLine(c, '拆解零件可以换废料；工作台等级 ≥ 零件品阶时，拆解还能学会它的图纸（工作台等级：' + (st.craft || '没有工作台') + '）', 11, '#94b0c2');
   if (!R.inv.length) { rdLine(c, '仓库是空的。', 13, '#566c86'); return; }
   const order = ['weapon', ...RD_EXT_ORDER, 'hand', 'suit', 'in'];
@@ -466,6 +520,7 @@ function rdKey(key) {
   else if (key === 'c') rdOpenPanel('craft');
   else if (key === 'r') rdOpenPanel('research');
   else if (key === 'l') rdOpenPanel('log');
+  else if (key === 't') rdOpenPanel('chat');
   else return false;
   return true;
 }
@@ -494,8 +549,8 @@ function rdDrawCarSelect(ctx) {
     const img = rdPreviewImg();
     ctx.imageSmoothingEnabled = false;
     const sc = 2;
-    ctx.drawImage(img, x + 6, y + ch - img.height * sc - 4, img.width * sc, img.height * sc);
-    const tx = x + Math.min(150, img.width * sc + 10);
+    ctx.drawImage(img, x + 6, y + ch - img.lh * sc - 4, img.lw * sc, img.lh * sc);
+    const tx = x + Math.min(150, img.lw * sc + 10);
     drawText(ctx, v.name, tx, y + 18, 17, '#ffcd75');
     const lines = wrapText(ctx, v.desc, cw - (tx - x) - 10, 11);
     lines.slice(0, 3).forEach((ln, k) => drawText(ctx, ln, tx, y + 40 + k * 15, 11, '#c8d6e5', 'left', false));
