@@ -1113,7 +1113,9 @@ function rdRandomEvent() {
     showBanner('补给箱', RD_RES[k].name + ' +' + n, 3, '#a7f070');
   } else if (ev === 'weather') {
     const w = [{ type: 'dust', name: '沙尘暴', d: '车速变慢，太阳能变弱' }, { type: 'rad', name: '辐射风暴', d: '辐射猛增，尽量待在车里' }, { type: 'storm', name: '暴雨', d: '雨水收集翻倍，太阳能变弱' }][Math.floor(Math.random() * 3)];
+    if (w.type === 'storm' && rdBiomeAt(R.km).snow) Object.assign(w, { name: '暴风雪', d: '雪水收集翻倍，太阳能变弱' });
     R.weather = Object.assign({ left: 4 + Math.random() * 6 }, w);
+    R.weather.dur = R.weather.left; // 用来算天气渐入渐出
     rdLog(w.name + '来了：' + w.d, '#ef7d57');
     rcWeather(w.type);
     showBanner(w.name, w.d, 4, '#ef7d57');

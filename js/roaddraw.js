@@ -74,32 +74,13 @@ function rdDrawWorld(g) {
   // 两个地区之间渐变
   const into = (R.km % RD_BIOME_LEN) / RD_BIOME_LEN;
   const prev = RD_BIOMES[(bi + RD_BIOMES.length - 1) % RD_BIOMES.length];
-  const blend = into < 0.06 ? 1 - into / 0.06 : 0;
+  const blend = rdkBlend(R.km);
   const col = (k, i) => blend > 0 ? rdMix((Array.isArray(b[k]) ? b[k][i] : b[k]), (Array.isArray(prev[k]) ? prev[k][i] : prev[k]), blend) : (Array.isArray(b[k]) ? b[k][i] : b[k]);
   const day = rdDaylight();
   const scroll = rdVehX();
-  // ---- 天空 ----
-  const nightTop = '#0b0d1c', nightBot = '#1f2346';
+  // ---- 天空（js/roadsky.js：渐变、太阳月亮、星星、云、极光、闪电） ----
   const h = rdHour(), dusk = (h > 16.5 && h < 20) ? Math.max(0, 1 - Math.abs(h - 18.5) / 1.6) : (h > 4.5 && h < 7.5) ? Math.max(0, 1 - Math.abs(h - 6) / 1.4) : 0;
-  let top = rdMix(nightTop, col('sky', 0), day), bot = rdMix(nightBot, col('sky', 1), day);
-  if (dusk > 0) bot = rdMix(bot, '#ef7d57', dusk * 0.6);
-  const sg = g.createLinearGradient(0, 0, 0, gy);
-  sg.addColorStop(0, top); sg.addColorStop(1, bot);
-  g.fillStyle = sg; g.fillRect(0, 0, W, gy);
-  // 星星
-  if (day < 0.6) {
-    g.globalAlpha = (0.6 - day) / 0.6;
-    for (let i = 0; i < 70; i++) { const x = rdHash(i) * W, y = rdHash(i + 99) * gy * 0.7; g.fillStyle = rdHash(i + 7) > 0.85 ? '#ffcd75' : '#f4f4f4'; g.fillRect(Math.round(x), Math.round(y), 1, (Math.sin(G.time * 2 + i) > 0.7) ? 1 : 1); }
-    g.globalAlpha = 1;
-  }
-  // 太阳 / 月亮（沿弧线走）
-  const sunT = ((h - 5) / 15);
-  if (sunT > 0 && sunT < 1) { const sx = W * (0.1 + sunT * 0.8), sy = gy * 0.75 - Math.sin(sunT * Math.PI) * gy * 0.6; g.fillStyle = dusk > 0.2 ? '#ef7d57' : '#ffcd75'; g.beginPath(); g.arc(sx, sy, 7, 0, 7); g.fill(); g.globalAlpha = 0.25; g.beginPath(); g.arc(sx, sy, 12, 0, 7); g.fill(); g.globalAlpha = 1; }
-  else { const mt = ((h + 24 - 19) % 24) / 10; const mx = W * (0.1 + mt * 0.8), my = gy * 0.7 - Math.sin(Math.min(1, mt) * Math.PI) * gy * 0.55; g.fillStyle = '#f4f4f4'; g.beginPath(); g.arc(mx, my, 5, 0, 7); g.fill(); g.fillStyle = top; g.beginPath(); g.arc(mx + 2, my - 1, 4, 0, 7); g.fill(); }
-  // 外星区：天上的裂缝
-  if (b.alien) { g.globalAlpha = 0.35 + Math.sin(G.time) * 0.1; g.strokeStyle = '#73eff7'; g.lineWidth = 1; g.beginPath(); g.moveTo(W * 0.2, gy * 0.15); g.lineTo(W * 0.32, gy * 0.22); g.lineTo(W * 0.4, gy * 0.18); g.lineTo(W * 0.55, gy * 0.28); g.stroke(); g.globalAlpha = 1; }
-  // 辐射区：天边绿光
-  if (b.rad >= 1 || (R.weather && R.weather.type === 'rad')) { const gg = g.createLinearGradient(0, gy * 0.5, 0, gy); gg.addColorStop(0, 'rgba(167,240,112,0)'); gg.addColorStop(1, 'rgba(167,240,112,0.25)'); g.fillStyle = gg; g.fillRect(0, gy * 0.5, W, gy * 0.5); }
+  rdkSky(g, W, gy, b, prev, blend, day, dusk, h);
   const dim = (c) => rdMix(c, '#10121f', (1 - day) * 0.7);
   // ---- 远景 + 中景（每个地区三层精细像素风景，见 js/roadscape.js） ----
   rdsDrawScenery(g, bi, (bi + RD_BIOMES.length - 1) % RD_BIOMES.length, blend, scroll, gy, day, dusk);
@@ -122,9 +103,12 @@ function rdDrawWorld(g) {
   // ---- 前景：路肩碎石 + 近处的杂物（比路面滚得快一点，有纵深感） ----
   rdDrawForeground(g, b, scroll, gy, W, H, ground, dim);
   // ---- 天气 ----
-  rdDrawWeather(g, W, H, gy);
+  rdkWeather(g, W, H, gy, day, b, bi);
   // ---- 夜晚（车灯照亮） ----
   rdDrawNight(g, day, gy);
+  rdkBeam(g, gy, day);
+  // ---- 整体色调（地区、黄昏、闪电、暗角） ----
+  rdkGrade(g, W, H, gy, bi, (bi + RD_BIOMES.length - 1) % RD_BIOMES.length, blend, day, dusk);
   // 怪物血条
   for (const m of R.mons || []) { const M = RD_MONSTERS[m.type]; if (m.hp < m.max && m.hp > 0) { const x = Math.round(rdSX(m.x) - M.w / 2), y = Math.round(gy + (M.fly ? m.y : 0) - M.h - 4); g.fillStyle = '#1a1c2c'; g.fillRect(x, y, M.w, 2); g.fillStyle = '#b13e53'; g.fillRect(x, y, Math.max(1, Math.round(M.w * m.hp / m.max)), 2); } }
 }
@@ -132,7 +116,7 @@ function rdDrawWorld(g) {
 function rdDrawForeground(g, b, scroll, gy, W, H, ground, dim) {
   // 前景杂物（视差 1.3，见 js/roadstreet.js）
   const R = G.road, bi = rdBiomeIndex(R.km), into = (R.km % RD_BIOME_LEN) / RD_BIOME_LEN;
-  rdtDrawFront(g, bi, (bi + RD_BIOMES.length - 1) % RD_BIOMES.length, into < 0.06 ? 1 - into / 0.06 : 0, scroll, gy);
+  rdtDrawFront(g, bi, (bi + RD_BIOMES.length - 1) % RD_BIOMES.length, rdkBlend(R.km), scroll, gy);
   // 越往下越暗
   const gr = g.createLinearGradient(0, gy + 12, 0, H);
   gr.addColorStop(0, 'rgba(10,10,25,0)'); gr.addColorStop(1, 'rgba(10,10,25,0.45)');
@@ -219,17 +203,10 @@ function rdDrawProj(g, gy) {
   g.globalAlpha = 1;
 }
 
-function rdDrawWeather(g, W, H, gy) {
-  const R = G.road, w = R.weather;
-  if (!w) return;
-  if (w.type === 'dust') { g.fillStyle = 'rgba(201,148,100,0.35)'; g.fillRect(0, 0, W, H); g.fillStyle = 'rgba(232,190,140,0.6)'; for (let i = 0; i < 60; i++) { const x = (rdHash(i) * W * 2 - G.time * 140 * (0.5 + rdHash(i + 3))) % W; g.fillRect(Math.round((x + W) % W), Math.round(rdHash(i + 9) * H), 4, 1); } }
-  if (w.type === 'rad') { g.fillStyle = 'rgba(167,240,112,' + (0.12 + Math.sin(G.time * 3) * 0.05) + ')'; g.fillRect(0, 0, W, H); g.fillStyle = 'rgba(167,240,112,0.7)'; for (let i = 0; i < 30; i++) { const y = (rdHash(i) * H + G.time * 20 * (1 + rdHash(i + 1))) % H; g.fillRect(Math.round(rdHash(i + 5) * W), Math.round(y), 1, 1); } }
-  if (w.type === 'storm') { g.fillStyle = 'rgba(41,54,111,0.25)'; g.fillRect(0, 0, W, H); g.fillStyle = 'rgba(148,176,194,0.7)'; for (let i = 0; i < 90; i++) { const y = (rdHash(i) * H + G.time * 300) % H, x = (rdHash(i + 2) * W - G.time * 60) % W; g.fillRect(Math.round((x + W) % W), Math.round(y), 1, 4); } }
-}
 
 // 夜晚：整体变暗，车灯和建筑的灯光照亮
 function rdDrawNight(g, day, gy) {
-  const dark = (1 - day) * 0.62;
+  const dark = (1 - day) * 0.62 * (1 - RDK.flash * 0.7);
   if (dark <= 0.02) return;
   const V = RDV, lg = V.lg, R = G.road;
   lg.setTransform(RD_Q, 0, 0, RD_Q, 0, 0);
