@@ -1,0 +1,156 @@
+// =============================================
+//  公路求生：车内家具的精细像素画（手绘版，替代原来的「自动精细化」）+ 主角使用时的动画
+//  每种家具（按 v 外观名）逐像素画好缓存；会动的部分每帧画：火苗、热气、冰箱开门的灯光、水滴、心电图、
+//  发电机抖动冒烟、聚变核心转圈、电视画面、音符等。主角睡觉时被子盖在身上（画在人物上面）。
+//  坐标：精细像素。地上的家具原点在左下角（往上为负）；墙上的家具原点在左上角（往下为正）。
+//  还没手绘的家具继续用原来的画法（js/roaddraw.js 的 rdDrawItem + 自动精细化）
+// =============================================
+const RDF_CACHE = {};
+const RDF = {
+  blue: ['#9ac0e0', '#6a94bc', '#46709a', '#2a4c6e'], red: ['#e8987e', '#c66e56', '#984a3a', '#683024'],
+  sheet: ['#f6f2e6', '#ddd6c6', '#b4ac9a', '#847c6c'], wood: ['#cfa070', '#a47850', '#7a5636', '#523822'],
+  card: ['#dcb47e', '#bc905a', '#926a3e', '#664824'], olive: ['#acae7c', '#828456', '#5c603a', '#3c4026'],
+  steel: ['#e2e0d8', '#bcb8ae', '#8e8a80', '#625e56', '#3e3a34'], dark: ['#5e5852', '#423c36', '#2c2722', '#1c1814'],
+  white: ['#f8f6ee', '#e2ddd0', '#bcb6a6', '#8c8676'], purple: ['#d4b0f6', '#a47cd8', '#7252a8', '#48326e'],
+  cyan: ['#e0fcff', '#9cecf4', '#56bcd4', '#2e7c9c'], orange: ['#f4b070', '#dc8a46', '#ac622a', '#764018'],
+  green: ['#b8d88a', '#8ab45e', '#5e8a3c', '#3c5e24'], plum: ['#c890c8', '#a0649c', '#764474', '#4e2a4e'],
+  yellow: ['#f4d070', '#d8aa3e', '#a87e24', '#725416'], copper: ['#f0b878', '#c88448', '#94582c', '#5e341a'],
+  glow: '#73eff7', glow2: '#c27bd6', fire: ['#fff8d8', '#ffd860', '#f08a30', '#c03a1c'],
+};
+const rdfBx = (B, x, y, w, h, R, m) => rdcBox(B, Math.round(x), Math.round(y), Math.round(w), Math.round(h), R, m || 1, 0, 1);
+const rdfRc = (B, x, y, w, h, c, m) => rdcRect(B, Math.round(x), Math.round(y), Math.round(w), Math.round(h), c, m || 1);
+const rdfLn = (B, x0, y0, x1, y1, c, m) => rdcLine(B, Math.round(x0), Math.round(y0), Math.round(x1), Math.round(y1), c, m || 1);
+function rdfRound(B, x, y, w, h, r, R, m, sh) { // 圆角块（软的东西：床垫、枕头、睡袋），左上亮右下暗
+  for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
+    const cx = xx < r ? r - xx : xx >= w - r ? xx - (w - r - 1) : 0, cy = yy < r ? r - yy : yy >= h - r ? yy - (h - r - 1) : 0;
+    if (cx * cx + cy * cy > r * r) continue;
+    const t = (sh == null ? 0.15 : sh) + yy / h * 0.55 + xx / w * 0.15 + (cx + cy > r * 0.6 ? 0.1 : 0);
+    rdcPix(B, x + xx, y + yy, rdcRampAt(R, Math.min(1, t), x + xx, y + yy), m || 1);
+  }
+}
+function rdfLeg(B, x, y0, y1, R) { for (let y = y0; y < y1; y++) { rdcPix(B, x, y, R[1], 2); rdcPix(B, x + 1, y, R[2], 2); } }
+function rdfKnob(B, x, y) { rdcPix(B, x, y, '#e8e4d8', 2); rdcPix(B, x + 1, y + 1, '#6a665e', 2); }
+
+// ---------- 手绘家具：v → 画法 (B, W)；地上的往上画（y < 0），墙上的往下画（y > 0） ----------
+const RDF_B = {
+  // ===== 床 =====
+  cardboard: (B, W) => { rdfBx(B, 4, -5, W - 8, 5, RDF.card); for (let x = 10; x < W - 8; x += 22) rdfLn(B, x, -5, x + 3, -1, RDF.card[3]); rdfRc(B, 20, -5, 18, 1, '#d8cca0'); rdfRound(B, W - 34, -9, 26, 6, 3, RDF.red, 1); rdfRound(B, 8, -8, 16, 4, 2, RDF.sheet, 1); },
+  sleepbag: (B, W) => { rdfRound(B, 4, -11, W - 8, 11, 5, RDF.blue); for (let x = 22; x < W - 8; x += 9) rdfLn(B, x, -10, x, -2, RDF.blue[3]); rdfRound(B, 4, -12, 18, 12, 5, RDF.blue, 1, 0); rdfRound(B, 7, -10, 12, 7, 3, RDF.sheet, 1); rdfLn(B, 24, -6, W - 10, -6, '#d8d0c0'); },
+  cot: (B, W) => { for (let x = 6; x < W - 6; x++) { const s = Math.round(Math.sin((x - 6) / (W - 12) * Math.PI) * 2); rdfRc(B, x, -26 + s, 1, 5, rdcRampAt(RDF.olive, 0.2 + s * 0.15, x, 0)); } rdfLn(B, 6, -22, 30, 0, RDF.steel[3], 2); rdfLn(B, 30, -22, 6, 0, RDF.steel[3], 2); rdfLn(B, W - 30, -22, W - 6, 0, RDF.steel[3], 2); rdfLn(B, W - 6, -22, W - 30, 0, RDF.steel[3], 2); rdfRound(B, 8, -31, 18, 6, 3, RDF.sheet); },
+  mattress: (B, W) => { rdfBx(B, 4, -9, W - 8, 9, RDF.wood); for (let x = 4; x < W - 4; x += 16) rdfRc(B, x, -9, 2, 9, RDF.wood[3]); rdfRound(B, 4, -30, W - 8, 21, 4, RDF.sheet); for (let x = 10; x < W - 8; x += 6) rdfRc(B, x, -28, 1, 18, '#cfc6b2'); rdfRound(B, 8, -36, 30, 9, 4, RDF.sheet, 1, 0); rdfRound(B, 44, -33, W - 52, 9, 4, RDF.orange); rdcPix(B, 60, -22, '#b8a888'); rdcPix(B, 61, -22, '#b8a888'); },
+  bunk: (B, W) => { for (const x of [4, W - 8]) rdfBx(B, x, -72, 4, 72, RDF.wood); for (const y of [-64, -24]) { rdfBx(B, 6, y + 6, W - 12, 4, RDF.wood); rdfRound(B, 8, y - 4, W - 16, 10, 3, RDF.blue); rdfRound(B, 10, y - 8, 18, 6, 3, RDF.sheet, 1, 0); } for (let y = -60; y < -4; y += 7) rdfRc(B, W - 16, y, 10, 2, RDF.wood[1]); rdfLn(B, W - 16, -60, W - 16, -4, RDF.wood[2]); rdfRound(B, 30, -60, 34, 14, 2, RDF.red); },
+  hammock: (B, W) => { rdfRc(B, 2, 0, 4, 4, RDF.steel[3], 2); rdfRc(B, W - 6, 0, 4, 4, RDF.steel[3], 2); for (let x = 4; x < W - 4; x++) { const u = (x - 4) / (W - 8), s = Math.round(Math.sin(u * Math.PI) * 52); for (let k = 0; k < 8; k++) { const y = 4 + s + k - Math.round(Math.sin(u * Math.PI) * 6); if (u > 0.12 && u < 0.88) rdcPix(B, x, y, ((x >> 2) & 1) ? RDF.orange[k < 2 ? 0 : 1] : RDF.sheet[k < 2 ? 0 : 1], 1); } if (u <= 0.14 || u >= 0.86) rdcPix(B, x, 4 + s, '#a08060', 2); } },
+  bigbed: (B, W) => { rdfRound(B, 2, -60, 12, 60, 4, RDF.plum); for (let y = -54; y < -10; y += 9) rdcPix(B, 8, y, RDF.plum[3]); rdfBx(B, W - 10, -30, 8, 30, RDF.wood); rdfBx(B, 10, -14, W - 18, 8, RDF.wood); rdfRound(B, 12, -30, W - 22, 16, 4, RDF.sheet); rdfRound(B, 14, -38, 26, 10, 4, RDF.sheet, 1, 0); rdfRound(B, 30, -35, 22, 9, 4, RDF.white, 1, 0); rdfRound(B, 54, -32, W - 64, 16, 5, RDF.plum); for (let x = 60; x < W - 12; x += 12) rdcPix(B, x, -26, RDF.plum[0]); rdfBx(B, 12, -6, 4, 6, RDF.wood); rdfBx(B, W - 14, -6, 4, 6, RDF.wood); },
+  waterbed: (B, W) => { rdfBx(B, 4, -14, W - 8, 14, RDF.wood); rdfRound(B, 8, -28, W - 16, 15, 6, RDF.cyan); rdfRound(B, 10, -34, 26, 9, 4, RDF.sheet, 1, 0); rdfRound(B, 40, -30, W - 52, 12, 4, RDF.blue); },
+  capsule: (B, W) => { rdfRound(B, 2, -44, W - 4, 44, 14, RDF.white); rdfRound(B, 12, -36, W - 24, 22, 8, ['#4a6a7a', '#34505c', '#22343e'], 3); for (let x = 14; x < W - 14; x += 3) rdcPix(B, x, -12, '#73eff7', 4); rdfRc(B, 8, -4, W - 16, 4, RDF.steel[3], 2); },
+  alienpod: (B, W) => { rdfRound(B, 4, -40, W - 8, 30, 12, RDF.purple); rdfRound(B, 12, -34, W - 24, 16, 7, ['#5a3a8a', '#3e2866', '#281a44'], 3); for (let x = 14; x < W - 14; x += 6) rdcPix(B, x, -24, RDF.glow, 4); },
+  cryo: (B, W) => { rdfBx(B, 6, -10, W - 12, 10, RDF.steel, 2); rdfRound(B, 10, -70, W - 20, 62, 10, ['#cfeff6', '#9cd4e4', '#6ab0c8'], 3); rdfRound(B, 16, -62, W - 32, 46, 8, ['#5ac8e0', '#3aa0c0', '#2a7898'], 3); for (let k = 0; k < 18; k++) rdcPix(B, 14 + Math.floor(rdcHash(k, 1, 3) * (W - 28)), -66 + Math.floor(rdcHash(k, 2, 3) * 56), '#ffffff', 4); rdfBx(B, 6, -76, W - 12, 6, RDF.steel, 2); },
+  // ===== 灶 =====
+  burner: (B, W) => { const c = W / 2; rdfBx(B, c - 14, -6, 28, 6, RDF.steel, 2); for (const d of [-12, 10]) rdfLn(B, c + d, -6, c + d / 2, -18, RDF.steel[3], 2); rdfRc(B, c - 10, -18, 20, 2, RDF.steel[2], 2); rdfBx(B, c - 6, -10, 12, 4, ['#5a8ab4', '#3a6088'], 2); },
+  induction: (B, W) => { rdfBx(B, 4, -40, W - 8, 40, RDF.white); rdfRc(B, 2, -42, W - 4, 3, RDF.steel[1], 2); for (const x of [8, W / 2 + 2]) { rdfRc(B, x, -34, W / 2 - 12, 28, RDF.white[1]); rdfKnob(B, x + W / 2 - 18, -20); } rdfBx(B, 12, -46, W - 24, 4, RDF.dark, 2); rdcPix(B, W - 16, -45, '#e04a3a', 4); },
+  grill: (B, W) => { const c = W / 2; rdfRound(B, c - 22, -42, 44, 20, 9, RDF.dark, 2, 0); rdfRc(B, c - 24, -42, 48, 2, RDF.steel[3], 2); for (const d of [-16, 14]) rdfLn(B, c + d, -22, c + d * 1.3, 0, RDF.steel[3], 2); rdfLn(B, c, -22, c, 0, RDF.steel[3], 2); rdfRc(B, c - 26, -44, 52, 1, RDF.steel[1], 2); },
+  kitchen: (B, W) => { rdfBx(B, 2, -40, W - 4, 40, RDF.wood); for (let x = 2; x < W - 4; x += 26) { rdfRc(B, x, -36, 1, 34, RDF.wood[3]); rdfKnob(B, x + 20, -26); } rdfBx(B, 0, -44, W, 4, RDF.steel, 2); rdfBx(B, 24, -44, 34, 3, RDF.steel, 2); rdfRc(B, 26, -43, 30, 2, '#8aaab8', 3); rdfLn(B, 40, -44, 40, -56, RDF.steel[2], 2); rdfLn(B, 40, -56, 48, -56, RDF.steel[2], 2); rdfBx(B, 86, -46, 40, 3, RDF.dark, 2);
+    rdfBx(B, 8, -110, W - 16, 30, RDF.wood); for (let x = 8; x < W - 16; x += 34) { rdfRc(B, x, -108, 1, 28, RDF.wood[3]); rdfKnob(B, x + 28, -86); } for (let k = 0; k < 5; k++) rdfBx(B, 14 + k * 8, -60, 5, 8, [['#e8a040', '#c47a24'], ['#a8c070', '#7a9a48'], ['#e07050', '#b04a30']][k % 3], 1); rdfBx(B, W - 40, -50, 26, 4, RDF.wood); },
+  coffee: (B, W) => { rdfBx(B, 6, 34, W - 12, 4, RDF.wood); rdfBx(B, 14, 4, 34, 30, RDF.dark, 2); rdfRc(B, 18, 8, 26, 8, '#2a2622', 2); rdfBx(B, 24, 18, 14, 4, RDF.steel, 2); rdfRc(B, 40, 8, 4, 4, '#e04a3a', 4); for (let k = 0; k < 2; k++) rdfRound(B, 52 + k * 10, 26, 8, 8, 2, RDF.white); },
+  synth: (B, W) => { rdfBx(B, 6, -60, W - 12, 60, RDF.purple, 2); rdfRound(B, 14, -52, W - 28, 30, 8, ['#2e1f50', '#20143a', '#140c26'], 3); rdfBx(B, 14, -16, W - 28, 8, RDF.purple, 2); for (let x = 18; x < W - 18; x += 7) rdcPix(B, x, -12, RDF.glow, 4); },
+  // ===== 冰箱 =====
+  cooler: (B, W) => { const c = W / 2; rdfBx(B, c - 24, -26, 48, 26, RDF.blue); rdfBx(B, c - 26, -30, 52, 6, RDF.white); rdfRc(B, c - 8, -34, 16, 2, RDF.steel[3], 2); for (let k = 0; k < 2; k++) { rdfBx(B, c - 14 + k * 10, -40, 7, 10, [['#d84a3a', '#a8301e'], ['#5a9ad8', '#3a6aa8']][k], 2); } },
+  minifridge: (B, W) => { const c = W / 2; rdfRound(B, c - 22, -54, 44, 54, 4, RDF.white); rdfRc(B, c - 22, -40, 44, 1, RDF.white[3]); rdfRc(B, c + 16, -36, 2, 14, RDF.steel[2], 2); rdfRc(B, c + 16, -52, 2, 8, RDF.steel[2], 2); rdfRc(B, c - 14, -30, 6, 6, '#e8a040'); rdfRc(B, c - 6, -24, 8, 5, '#a0c8e0'); },
+  bigfridge: (B, W) => { rdfRound(B, 6, -90, W - 12, 90, 5, RDF.steel); rdfRc(B, W / 2, -88, 1, 86, RDF.steel[4]); for (const x of [W / 2 - 6, W / 2 + 4]) rdfRc(B, x, -70, 2, 26, RDF.steel[0], 2); rdfBx(B, 16, -76, 20, 24, ['#4a5a64', '#34404a', '#222a30'], 2); rdfRc(B, 22, -64, 8, 2, '#73eff7', 4); rdfRc(B, W - 40, -60, 8, 8, '#e8a040'); rdfRc(B, W - 28, -48, 10, 7, '#a0c8e0'); },
+  freezer: (B, W) => { rdfRound(B, 4, -40, W - 8, 40, 4, RDF.white); rdfBx(B, 2, -44, W - 4, 6, RDF.white); rdfRc(B, W / 2 - 10, -38, 20, 2, RDF.steel[3], 2); for (let k = 0; k < 6; k++) rdcPix(B, 10 + k * 11, -36 + (k % 2) * 20, '#d8f4ff', 4); },
+  stasis: (B, W, wall) => { const y0 = wall ? 2 : -62; rdfBx(B, 6, y0, W - 12, 60, ['#3e2c64', '#2e1f50', '#20143a'], 2); rdfRound(B, 12, y0 + 6, W - 24, 48, 6, ['#4a3a7a', '#382a62'], 3); },
+  // ===== 水 =====
+  barrel: (B, W) => { const c = W / 2; rdfBx(B, c - 20, -48, 40, 48, RDF.blue); for (const y of [-40, -16]) rdfRc(B, c - 20, y, 40, 2, RDF.blue[3]); rdfRound(B, c - 21, -52, 42, 6, 3, RDF.blue, 1, 0); rdfRc(B, c + 18, -12, 6, 3, RDF.steel[2], 2); rdfRc(B, c + 22, -10, 2, 3, RDF.steel[2], 2); },
+  filter: (B, W) => { const c = W / 2; rdfRc(B, c - 20, 2, 40, 2, RDF.steel[3], 2); rdfRound(B, c - 14, 4, 28, 44, 6, RDF.white); rdfRound(B, c - 10, 12, 20, 24, 4, ['#8ac8e8', '#5aa0c8', '#3a78a0'], 3); rdfRc(B, c - 2, 48, 4, 8, RDF.steel[2], 2); rdfRc(B, c - 6, 54, 12, 2, RDF.steel[2], 2); },
+  aquagen: (B, W) => { const c = W / 2; rdfBx(B, c - 26, -72, 52, 72, RDF.white); for (let y = -68; y < -44; y += 3) rdfRc(B, c - 22, y, 44, 1, RDF.steel[3], 2); rdfRound(B, c - 16, -38, 32, 22, 4, ['#8ac8e8', '#5aa0c8', '#3a78a0'], 3); rdfRc(B, c - 4, -12, 8, 6, RDF.steel[2], 2); rdcPix(B, c + 18, -66, '#73eff7', 4); },
+  // ===== 医疗 =====
+  firstaid: (B, W) => { const c = W / 2; rdfRound(B, c - 18, 10, 36, 28, 3, RDF.white); rdfRc(B, c - 3, 15, 6, 18, '#d84a3a'); rdfRc(B, c - 9, 21, 18, 6, '#d84a3a'); rdfRc(B, c - 6, 8, 12, 3, RDF.steel[2], 2); rdfRound(B, c + 20, 28, 10, 10, 4, RDF.sheet); },
+  medbed: (B, W) => { rdfBx(B, 6, -32, W - 40, 5, RDF.steel, 2); rdfRound(B, 6, -40, W - 40, 9, 3, RDF.white); rdfRound(B, 8, -46, 22, 7, 3, RDF.sheet, 1, 0); for (const x of [10, W - 40]) { rdfLeg(B, x, -27, -4, RDF.steel); rdgBall(B, x + 1, -3, 3, RDF.dark); } for (let x = 12; x < W - 44; x += 10) rdfRc(B, x, -52, 1, 12, RDF.steel[2], 2); rdfRc(B, 10, -52, W - 54, 1, RDF.steel[2], 2);
+    const sx = W - 22; rdfLeg(B, sx, -96, -2, RDF.steel); rdfRc(B, sx - 8, -2, 18, 2, RDF.steel[3], 2); rdfRound(B, sx - 6, -96, 12, 16, 3, ['#e8f4f8', '#c0dce4', '#90b4c0'], 3); rdfBx(B, sx - 14, -66, 28, 18, RDF.dark, 2); rdfRc(B, sx - 12, -64, 24, 14, '#10201a', 2); },
+  decon: (B, W) => { rdfBx(B, 4, -96, W - 8, 96, RDF.white); rdfBx(B, 10, -88, W - 20, 82, ['#b8e8a8', '#8ac87a', '#5ea050'], 3); rdfRc(B, W / 2, -88, 1, 82, RDF.white[2]); rdfBx(B, 4, -100, W - 8, 6, RDF.steel, 2); rdfRc(B, W / 2 - 4, -98, 8, 2, '#a7f070', 4); },
+  // ===== 电 =====
+  battery: (B, W, wall, t) => { const c = W / 2, R = t >= 3 ? RDF.blue : RDF.dark; for (let k = 0; k < 2; k++) { rdfBx(B, c - 24, -14 - k * 16, 48, 14, R, 2); rdfRc(B, c - 18, -18 - k * 16, 6, 4, '#d84a3a', 2); rdfRc(B, c + 12, -18 - k * 16, 6, 4, RDF.dark[1], 2); rdfRc(B, c - 20, -8 - k * 16, 40, 3, R[0], 2); } rdfLn(B, c - 15, -34, c + 15, -18, '#d84a3a'); },
+  generator: (B, W) => { rdfBx(B, 4, -44, W - 8, 4, RDF.dark, 2); rdfBx(B, 4, -4, W - 8, 4, RDF.dark, 2); for (const x of [4, W - 8]) rdfRc(B, x, -44, 4, 44, RDF.dark[1], 2); rdfBx(B, 14, -38, W - 28, 30, RDF.yellow, 1); rdfBx(B, 22, -32, 24, 18, RDF.dark, 2); for (let y = -30; y < -16; y += 3) rdfRc(B, 24, y, 20, 1, RDF.dark[0], 2); rdfRc(B, W - 24, -32, 8, 6, RDF.steel[3], 2); rdfLn(B, W - 12, -44, W - 12, -58, RDF.steel[2], 2); rdfRc(B, W - 14, -60, 5, 3, RDF.steel[3], 2); rdfKnob(B, 54, -24); },
+  fusion: (B, W) => { const c = W / 2; rdfBx(B, c - 22, -10, 44, 10, RDF.steel, 2); rdfBx(B, c - 22, -62, 44, 8, RDF.steel, 2); for (const d of [-20, 16]) rdfRc(B, c + d, -54, 4, 44, RDF.steel[2], 2); rdfRound(B, c - 16, -54, 32, 44, 10, ['#3a2a60', '#2a1c48'], 3); },
+  capwall: (B, W) => { rdfBx(B, 4, 2, W - 8, 56, ['#3a4a7a', '#2a3864', '#1e284a'], 2); for (let k = 0; k < 5; k++) rdfRound(B, 10 + k * 13, 8, 10, 40, 4, RDF.blue, 2); },
+};
+// 有的家具在地上 / 墙上高度不同；返回 [上方空间, 下方空间]（精细像素）
+function rdfSize(v, wall) { return wall ? [10, 150] : [150, 10]; }
+function rdfSprite(v, w, wall, tier) {
+  const key = v + '_' + w + '_' + (wall ? 1 : 0) + '_' + (v === 'battery' ? Math.min(3, tier) : 0);
+  if (RDF_CACHE[key]) return RDF_CACHE[key];
+  const W = w * RD_CELL * RD_Q, [up, down] = rdfSize(v, wall), B = rdcPaper(W + 16, up + down, 8, up);
+  RDF_B[v](B, W, wall, tier);
+  rdcWeather(B, v.length * 13, -0.2, 9999);
+  rdcOutline(B);
+  const S = rdcToCanvas(B);
+  // 阴影：剪影涂成深褐
+  const sh = createCanvas(S.cv.width, S.cv.height), sg = sh.getContext('2d'); sg.drawImage(S.cv, 0, 0); sg.globalCompositeOperation = 'source-in'; sg.fillStyle = '#140c08'; sg.fillRect(0, 0, sh.width, sh.height);
+  S.shadow = sh;
+  return (RDF_CACHE[key] = S);
+}
+function rdfHas(v) { return !!RDF_B[v]; }
+let RDF_USE = null; // 这一帧正在被使用的家具（主角画完后再画盖在身上的被子等）
+
+// ---------- 每帧：贴图 + 动画 ----------
+function rdfDraw(g, o, xr, base, wall) {
+  const p = o.p, v = p.v, w = p.w || 1, Q = RD_Q, R = G.road, t = G.time;
+  const S = rdfSprite(v, w, wall, p.tier), X = Math.round((xr - w * RD_CELL) * Q) / Q, W = w * RD_CELL * Q;
+  const off = p.pw > 0 && R.powered === false, using = !!(R.me.act && R.me.act.it === o.it && !R.me.walking);
+  const vib = v === 'generator' && R.genOn ? (Math.floor(t * 30) % 2) / Q : 0;
+  // 阴影 + 本体
+  g.globalAlpha = wall ? 0.4 : 0.22; g.drawImage(S.shadow, X - S.ox / Q + (wall ? 1 : 1.6), base - S.oy / Q + (wall ? 1.3 : -0.6), S.cv.width / Q, S.cv.height / Q);
+  g.globalAlpha = 1;
+  if (!wall) { g.fillStyle = 'rgba(20,12,8,0.3)'; g.fillRect(X + 1, base - 0.5, w * RD_CELL - 2, 1); }
+  g.drawImage(S.cv, X - S.ox / Q + vib, base - S.oy / Q, S.cv.width / Q, S.cv.height / Q);
+  // 动画（精细像素坐标）
+  g.save(); g.translate(X, base); g.scale(1 / Q, 1 / Q);
+  const F = (x, y, w2, h2, c, a) => { if (a != null) g.globalAlpha = a; g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w2, h2); g.globalAlpha = 1; };
+  const flame = (x, y, s) => { for (let k = 0; k < 6; k++) { const pp = (t * 2.2 + k / 6) % 1; F(x + Math.sin(t * 11 + k) * 2 - 1 + (k % 3 - 1) * 3 * s, y - pp * 10 * s, 3, 3, RDF.fire[Math.min(3, Math.floor(pp * 4))], 1 - pp * 0.5); } };
+  const steam = (x, y, n) => { for (let k = 0; k < (n || 3); k++) { const pp = (t * 0.6 + k / (n || 3)) % 1; F(x + Math.sin(pp * 6 + k) * 4, y - pp * 30, 3 + pp * 4, 3 + pp * 4, '#f4f0e8', (1 - pp) * 0.4); } };
+  const c = W / 2;
+  switch (v) {
+    case 'waterbed': F(20 + ((t * 20) % (W - 50)), -24, 14, 1, '#e0fcff', 0.6); F(30 + ((t * 13 + 40) % (W - 60)), -20, 10, 1, '#e0fcff', 0.4); break;
+    case 'capsule': if (!off) F(14 + ((t * 30) % (W - 28)), -12, 3, 1, '#ffffff'); break;
+    case 'alienpod': g.globalAlpha = 0.4 + Math.sin(t * 2) * 0.2; g.drawImage(rdsGlow('#c27bd6'), 6, -16, W - 12, 20); g.globalAlpha = 1; break;
+    case 'cryo': for (let k = 0; k < 4; k++) { const pp = (t * 0.4 + k / 4) % 1; F(20 + k * 10, -18 - pp * 40, 2, 2, '#e0fcff', 1 - pp); } break;
+    case 'burner': if (using) { flame(c, -10, 0.6); F(c - 12, -26, 24, 8, '#4a4640'); F(c - 12, -26, 24, 2, '#7a766e'); steam(c, -28, 2); } break;
+    case 'induction': if (using) { F(18, -48, 30, 3, '#e04a3a', 0.5 + Math.sin(t * 4) * 0.2); F(16, -56, 36, 8, '#3a3632'); F(16, -56, 36, 2, '#6a665e'); F(52, -54, 14, 2, '#3a3632'); for (let k = 0; k < 3; k++) F(22 + k * 8 + Math.sin(t * 9 + k) * 1, -58, 3, 2, ['#e8a040', '#a0c060', '#d06040'][k]); steam(34, -60, 3); } break;
+    case 'grill': { const gl = using ? 1 : 0.35; for (let k = 0; k < 8; k++) F(c - 18 + k * 5, -42, 3, 2, ['#ffd860', '#f08a30', '#c03a1c'][(k + Math.floor(t * 6)) % 3], gl); if (using) { for (let k = 0; k < 3; k++) { F(c - 14 + k * 10, -46, 8, 3, '#8a4a2a'); F(c - 14 + k * 10, -46, 8, 1, '#b06a3a'); } steam(c, -48, 4); } break; }
+    case 'kitchen': if (using) { flame(104, -48, 0.5); F(94, -58, 26, 8, '#3a3632'); F(94, -58, 26, 2, '#6a665e'); steam(106, -60, 3); } if (!off) F(26, -42, 30, 1, '#bfe8f4', 0.5); break;
+    case 'coffee': if (!off) F(40, 8, 4, 4, Math.sin(t * 3) > 0 ? '#e04a3a' : '#7a2a20'); if (using) { F(30, 22 + ((t * 20) % 8), 2, 3, '#5a3a20'); steam(32, 22, 2); } break;
+    case 'synth': if (!off) { g.globalAlpha = 0.45 + Math.sin(t * 3) * 0.25; g.drawImage(rdsGlow('#73eff7'), 14, -52, W - 28, 30); g.globalAlpha = 1; for (let k = 0; k < 3; k++) { const pp = (t * 0.7 + k / 3) % 1; F(c - 3 + Math.sin(t * 2 + k) * 8, -26 - pp * 22, 4, 4, '#c8fcff', 1 - pp); } } break;
+    case 'minifridge': case 'bigfridge': case 'freezer': if (using) { const big = v === 'bigfridge', fx = v === 'freezer' ? 6 : big ? W / 2 + 1 : c - 22, fw = v === 'freezer' ? W - 12 : big ? W / 2 - 7 : 44, fy = v === 'freezer' ? -44 : big ? -90 : -54, fh = v === 'freezer' ? 4 : big ? 88 : 54;
+      if (v === 'freezer') { F(6, -70, W - 12, 6, '#e2ddd0'); g.globalAlpha = 0.35; g.drawImage(rdsGlow('#e0f4ff'), 6, -64, W - 12, 26); g.globalAlpha = 1; }
+      else { F(fx, fy, fw, fh, '#f4ecc8'); for (let k = 1; k < 4; k++) F(fx + 2, fy + k * fh / 4, fw - 4, 1, '#bcb6a6'); F(fx + 6, fy + fh / 4 - 6, 6, 6, '#e8a040'); F(fx + 16, fy + fh / 2 - 5, 8, 5, '#a0c060'); F(fx + 8, fy + fh * 0.75 - 7, 5, 7, '#d06040'); F(fx - 12, fy, 12, fh, '#d8d2c4'); g.globalAlpha = 0.3; g.drawImage(rdsGlow('#fff4c8'), fx - 30, fy - 10, fw + 60, fh + 20); g.globalAlpha = 1; } } break;
+    case 'stasis': { const y0 = wall ? 8 : -56; g.globalAlpha = 0.35 + Math.sin(t * 2) * 0.15; g.drawImage(rdsGlow('#73eff7'), 12, y0, W - 24, 48); g.globalAlpha = 1; F(14, y0 + ((t * 20) % 44), W - 28, 1, '#c8fcff', 0.6); break; }
+    case 'barrel': if (using) for (let k = 0; k < 3; k++) F(c + 23, -6 + ((t * 30 + k * 3) % 8), 1, 2, '#8ac8e8'); break;
+    case 'filter': if (!off && (t * 1.3) % 1 < 0.5) F(c - 1, 58 + ((t * 1.3) % 0.5) * 30, 2, 3, '#8ac8e8'); F(c - 9, 30 - ((t * 3) % 16), 2, 2, '#e0fcff', 0.6); break;
+    case 'aquagen': if (!off) { F(c - 14, -36 + ((t * 6) % 18), 2, 2, '#e0fcff', 0.7); F(c - 1, -6 + ((t * 20) % 6), 2, 2, '#8ac8e8'); F(c + 17, -67, 3, 3, Math.sin(t * 4) > 0 ? '#73eff7' : '#2e7c9c'); } break;
+    case 'medbed': { const sx = W - 22; for (let k = 0; k < 3; k++) { const pp = (t * 0.8 + k / 3) % 1; F(sx - 1, -78 + pp * 10, 2, 2, '#c0dce4', 1 - pp); } const mx = sx - 12; for (let x = 0; x < 24; x++) { const ph = (x + t * 30) % 24, yy = ph > 10 && ph < 13 ? (ph < 11.5 ? -5 : 4) : 0; F(mx + x, -57 + yy, 1, 1, '#60ff90'); } if (using) F(mx + 20, -62, 2, 2, '#e04a3a', Math.sin(t * 6) > 0 ? 1 : 0.3); break; }
+    case 'decon': if (!off) { g.globalAlpha = 0.3; F(10, -88 + ((t * 40) % 82), W - 20, 3, '#ffffff'); g.globalAlpha = 1; if (using) for (let k = 0; k < 8; k++) F(14 + rdHash(k + Math.floor(t * 8)) * (W - 28), -84 + rdHash(k * 3 + Math.floor(t * 8)) * 76, 2, 2, '#e8ffe0', 0.7); } break;
+    case 'battery': { const lv = Math.min(1, G.res.power / Math.max(1, rdStats().battery)), n = Math.round(lv * 8); for (let k = 0; k < 8; k++) F(c - 16 + k * 4, -6, 3, 2, k < n ? (lv < 0.25 ? '#e04a3a' : '#a7f070') : '#2a2622'); break; }
+    case 'generator': if (R.genOn) { F(W - 14, -64, 2, 2, '#ffd060'); for (let k = 0; k < 4; k++) { const pp = (t * 1.2 + k / 4) % 1; F(W - 14 + Math.sin(pp * 5) * 3 - pp * 4, -62 - pp * 30, 4 + pp * 6, 4 + pp * 6, '#8a847c', (1 - pp) * 0.5); } F(56, -26, 3, 3, Math.sin(t * 8) > 0 ? '#a7f070' : '#3a5a2a'); } break;
+    case 'fusion': if (!off) { g.globalAlpha = 0.6 + Math.sin(t * 4) * 0.25; g.drawImage(rdsGlow('#73eff7'), c - 18, -50, 36, 36); g.globalAlpha = 1; for (let k = 0; k < 2; k++) { g.strokeStyle = k ? '#c27bd6' : '#73eff7'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(c, -32, 12, 4, t * (k ? -2 : 2), 0, 7); g.stroke(); } F(c - 2, -34, 4, 4, '#ffffff'); } break;
+    case 'capwall': { const lv = Math.min(1, G.res.power / Math.max(1, rdStats().battery)); for (let k = 0; k < 5; k++) { const hh = Math.round(36 * lv); F(12 + k * 13, 46 - hh, 6, hh, '#73eff7', 0.5 + Math.sin(t * 3 + k) * 0.2); } break; }
+  }
+  if (p.tier >= 6 && !wall) F(4, -2, W - 8, 1, '#73eff7', 0.3 + Math.sin(t * 3) * 0.15);
+  if (off) F(W - 14, wall ? 6 : -12, 4, 4, '#d84a3a');
+  g.restore();
+  if (using) RDF_USE = { v, X, base, W, wall };
+}
+// 主角画完之后：睡觉时盖上被子
+function rdfOverlay(g) {
+  const U = RDF_USE; RDF_USE = null;
+  if (!U) return;
+  const a = G.road.me.act; if (!a || a.type !== 'sleep') return;
+  const Q = RD_Q, cols = { sleepbag: RDF.blue, mattress: RDF.orange, bunk: RDF.red, bigbed: RDF.plum, waterbed: RDF.blue, cot: RDF.olive, cardboard: RDF.red };
+  const R2 = cols[U.v]; if (!R2) return;
+  const y = { sleepbag: -12, mattress: -34, bunk: -28, bigbed: -33, waterbed: -31, cot: -32, cardboard: -10 }[U.v];
+  const x0 = U.v === 'sleepbag' ? 22 : U.v === 'bigbed' ? 50 : U.v === 'bunk' ? 26 : 34, x1 = U.W - 8;
+  g.save(); g.translate(U.X, U.base); g.scale(1 / Q, 1 / Q);
+  const breathe = Math.round(Math.sin(G.time * 1.6));
+  for (let x = x0; x < x1; x++) { const h = 9 + (x < x0 + 20 ? breathe : 0); for (let k = 0; k < h; k++) { g.fillStyle = rdcRampAt(R2, 0.1 + k / h * 0.7, x, k); g.fillRect(x, y + k - (x < x0 + 20 ? breathe : 0), 1, 1); } }
+  g.fillStyle = R2[0]; g.fillRect(x0, y - (breathe), x1 - x0, 1);
+  g.restore();
+}

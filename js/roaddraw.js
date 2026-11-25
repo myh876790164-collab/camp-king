@@ -528,9 +528,9 @@ function rdDrawInterior(g) {
   });
   // 家具
   const items = R.inner.map((it, i) => ({ it, i, p: RD_PARTS[it.id] }));
-  // 家具先「自动精细化」（js/roadin.js 的 rdiFine），以后再逐个手绘
-  for (const o of items) if ((o.p.layer || 'floor') === 'wall') { const iw = (o.p.w || 1) * RD_CELL; rdiFine(g, rdCellX(lay, ox, o.it.cell, 'wall'), ceil + 6, [-iw - 3, -14, iw + 6, 48], (gg, ax, ay) => rdDrawItem(gg, o, ax, ay, true, lay), 'wall'); }
-  for (const o of items) if ((o.p.layer || 'floor') !== 'wall') { const iw = (o.p.w || 1) * RD_CELL; rdiFine(g, rdCellX(lay, ox, o.it.cell, 'floor'), floorY, [-iw - 3, -46, iw + 6, 50], (gg, ax, ay) => rdDrawItem(gg, o, ax, ay, false, lay), 'floor'); }
+  // 家具：手绘过的用 js/roadfurn.js，其余先「自动精细化」（js/roadin.js 的 rdiFine）
+  for (const o of items) if ((o.p.layer || 'floor') === 'wall') { if (rdfHas(o.p.v)) { rdfDraw(g, o, rdCellX(lay, ox, o.it.cell, 'wall'), ceil + 6, true); continue; } const iw = (o.p.w || 1) * RD_CELL; rdiFine(g, rdCellX(lay, ox, o.it.cell, 'wall'), ceil + 6, [-iw - 3, -14, iw + 6, 48], (gg, ax, ay) => rdDrawItem(gg, o, ax, ay, true, lay), 'wall'); }
+  for (const o of items) if ((o.p.layer || 'floor') !== 'wall') { if (rdfHas(o.p.v)) { rdfDraw(g, o, rdCellX(lay, ox, o.it.cell, 'floor'), floorY, false); continue; } const iw = (o.p.w || 1) * RD_CELL; rdiFine(g, rdCellX(lay, ox, o.it.cell, 'floor'), floorY, [-iw - 3, -46, iw + 6, 50], (gg, ax, ay) => rdDrawItem(gg, o, ax, ay, false, lay), 'floor'); }
   // 宠物
   if (R.pet && R.me.loc !== 'out' && R.me.loc !== 'site') {
     const px = rdCellX(lay, ox, Math.floor(R.pet.ix), 'floor') - (R.pet.ix % 1) * RD_CELL;
@@ -539,6 +539,7 @@ function rdDrawInterior(g) {
   }
   // 主角
   rdDrawMeInside(g, lay, ox, floorY, ceil);
+  rdfOverlay(g); // 睡觉时盖在身上的被子（js/roadfurn.js）
   rdiGradeScreen(g, vw, vh);
   // 没开空间核心但外面看着一样大：提示
   g.setTransform(RD_Q, 0, 0, RD_Q, 0, 0);
