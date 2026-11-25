@@ -101,15 +101,8 @@ function rdDrawWorld(g) {
   // 辐射区：天边绿光
   if (b.rad >= 1 || (R.weather && R.weather.type === 'rad')) { const gg = g.createLinearGradient(0, gy * 0.5, 0, gy); gg.addColorStop(0, 'rgba(167,240,112,0)'); gg.addColorStop(1, 'rgba(167,240,112,0.25)'); g.fillStyle = gg; g.fillRect(0, gy * 0.5, W, gy * 0.5); }
   const dim = (c) => rdMix(c, '#10121f', (1 - day) * 0.7);
-  // ---- 远山 ----
-  g.fillStyle = dim(col('far', 0));
-  for (let x = 0; x < W; x += 2) {
-    const wx = (x + scroll * 0.05) / 40;
-    const hh = 18 + rdNoise(wx) * 26 + rdNoise(wx * 3.1) * 8;
-    g.fillRect(x, gy - 12 - hh, 2, hh + 12);
-  }
-  // ---- 中景（城市废墟 / 枯树 / 仙人掌 / 水晶） ----
-  rdDrawMidLayer(g, b.deco, scroll * 0.25, dim(col('mid', 0)), gy, W, day);
+  // ---- 远景 + 中景（每个地区三层精细像素风景，见 js/roadscape.js） ----
+  rdsDrawScenery(g, bi, (bi + RD_BIOMES.length - 1) % RD_BIOMES.length, blend, scroll, gy, day, dusk);
   // ---- 近景：电线杆、广告牌 ----
   rdDrawNearLayer(g, scroll * 0.6, gy, W, dim, b);
   // ---- 路面 ----
@@ -183,48 +176,6 @@ function rdDrawForeground(g, b, scroll, gy, W, H, ground, dim) {
   g.fillStyle = gr; g.fillRect(0, gy + 12, W, H - gy);
 }
 
-// 中景：每段 40 像素按种子随机放一样东西
-function rdDrawMidLayer(g, deco, sc, c, gy, W, day) {
-  const seg = 34;
-  for (let i = Math.floor(sc / seg) - 2; i < (sc + W) / seg + 2; i++) {
-    const n = rdHash(i * 1.37), x = Math.round(i * seg - sc + n * 10);
-    g.fillStyle = c;
-    if (deco === 'ruin') {
-      const hh = 20 + Math.floor(rdHash(i + 5) * 40), w = 12 + Math.floor(rdHash(i + 9) * 14);
-      g.fillRect(x, gy - 12 - hh, w, hh);
-      // 断裂的楼顶
-      g.fillStyle = rdShade(c, 0.05);
-      for (let k = 0; k < w; k += 3) if (rdHash(i * 9 + k) > 0.5) g.fillRect(x + k, gy - 12 - hh - 2 - Math.floor(rdHash(i + k) * 4), 3, 3);
-      // 窗
-      g.fillStyle = day < 0.4 ? (rdHash(i + 3) > 0.8 ? '#ffcd75' : rdShade(c, -0.2)) : rdShade(c, -0.25);
-      for (let yy = gy - 10 - hh + 4; yy < gy - 16; yy += 5) for (let xx = x + 2; xx < x + w - 2; xx += 4) if (rdHash(xx * 0.3 + yy) > 0.45) g.fillRect(xx, yy, 2, 2);
-    } else if (deco === 'deadtree' || deco === 'snow') {
-      if (n < 0.3) continue;
-      const hh = 16 + Math.floor(rdHash(i + 2) * 22);
-      if (deco === 'snow') { // 雪松
-        for (let k = 0; k < hh; k += 2) { const ww = Math.max(1, Math.floor((hh - k) / 2.5)); g.fillRect(x - ww, gy - 12 - k, ww * 2 + 1, 2); }
-        g.fillStyle = rdShade(c, 0.6); for (let k = 4; k < hh; k += 6) g.fillRect(x - Math.floor((hh - k) / 3), gy - 12 - k, Math.floor((hh - k) / 1.5), 1);
-      } else {
-        g.fillRect(x, gy - 12 - hh, 2, hh);
-        for (let k = 6; k < hh; k += 5) { const dir = rdHash(i + k) > 0.5 ? 1 : -1, len = 3 + Math.floor(rdHash(i * k) * 5); for (let j = 0; j < len; j++) g.fillRect(x + dir * (j + 1), gy - 12 - k - Math.floor(j / 2), 1, 1); }
-      }
-    } else if (deco === 'cactus') {
-      if (n < 0.45) { if (n < 0.2) { g.fillRect(x, gy - 18, 14, 6); g.fillRect(x + 3, gy - 22, 8, 4); } continue; } // 石头
-      const hh = 10 + Math.floor(rdHash(i + 2) * 12);
-      g.fillRect(x, gy - 12 - hh, 3, hh); g.fillRect(x - 3, gy - 12 - hh + 4, 3, 2); g.fillRect(x - 3, gy - 12 - hh + 1, 2, 4); g.fillRect(x + 3, gy - 12 - hh + 6, 3, 2); g.fillRect(x + 5, gy - 12 - hh + 3, 2, 4);
-    } else if (deco === 'glow') {
-      if (n < 0.35) continue;
-      const hh = 8 + Math.floor(rdHash(i + 2) * 30);
-      g.fillRect(x, gy - 12 - hh, 6, hh); g.fillRect(x + 6, gy - 12 - hh * 0.6, 4, hh * 0.6); // 冷却塔 / 废墟
-      if (rdHash(i + 4) > 0.6) { g.globalAlpha = 0.5 + Math.sin(G.time * 2 + i) * 0.2; g.fillStyle = '#a7f070'; g.fillRect(x - 4, gy - 13, 14, 1); g.globalAlpha = 1; }
-    } else if (deco === 'crystal') {
-      if (n < 0.3) continue;
-      const hh = 10 + Math.floor(rdHash(i + 2) * 34);
-      g.beginPath(); g.moveTo(x, gy - 12); g.lineTo(x + 3, gy - 12 - hh); g.lineTo(x + 7, gy - 12); g.fill();
-      g.globalAlpha = 0.6 + Math.sin(G.time * 1.5 + i) * 0.3; g.fillStyle = '#73eff7'; g.fillRect(x + 3, gy - 12 - hh + 2, 1, hh * 0.5); g.globalAlpha = 1;
-    }
-  }
-}
 function rdDrawNearLayer(g, sc, gy, W, dim, b) {
   const seg = 90;
   for (let i = Math.floor(sc / seg) - 1; i < (sc + W) / seg + 1; i++) {
@@ -434,6 +385,9 @@ function rdDrawNight(g, day, gy) {
   for (const f of R.fx || []) hole(rdSX(f.x), gy + f.y, (f.r || 10) * 2, 0.8);
   for (const m of R.mons || []) { const M = RD_MONSTERS[m.type]; hole(rdSX(m.x), gy + (M.fly ? m.y : -M.h / 2), 6, 0.35); } // 怪物身上的辐射荧光
   for (const s of R.sites) if (s.type === 'camp' || s.type === 'alien') hole(rdSX(s.km * RD_PX_KM), gy - 16, 40, 0.7);
+  // 远景里的灯（窗户、红灯、荧光）：挖一个小亮点
+  for (const l of RDS_LIT) if (l.a2 > 0.08) { lg.globalAlpha = Math.min(1, l.a2); const r = l.r / RD_Q; lg.fillStyle = '#000'; lg.fillRect(l.x - r, l.y - r * 0.7, r * 2, r * 1.4); }
+  lg.globalAlpha = 1;
   lg.globalCompositeOperation = 'source-over';
   g.drawImage(V.light, 0, 0, V.W, V.H);
 }
