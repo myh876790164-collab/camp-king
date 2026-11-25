@@ -260,8 +260,10 @@ function rdPartRow(c, label, p, btns, note) {
   const bw = btns.length ? btns.reduce((s, b) => s + (b.w || 60) + 4, 0) : 0;
   const tx = c.x + 8;
   if (label) drawText(ctx, label, tx, c.y + 13, 11, '#94b0c2', 'left', false);
-  const lx = label ? tx + Math.max(64, ctx.measureText(label).width + 10) : tx;
+  const lx0 = label ? tx + Math.max(64, ctx.measureText(label).width + 10) : tx;
+  const lx = p ? lx0 + 42 : lx0;
   if (p) {
+    rdoIcon(ctx, p, lx0, c.y + 5, 36); // 零件像素图标（js/roadicons.js）
     drawText(ctx, rdPartLabel(p), lx, c.y + 13, 13, RD_TIER_COLOR[p.tier]);
     const t = note || rdFxText(p);
     const lines = wrapText(ctx, t, c.w - (lx - c.x) - bw - 8, 10);
