@@ -622,6 +622,7 @@ function rdsDrawScenery(g, bi, pi, blend, scroll, gy, day, dusk) {
   const T = rdtGet(bi), TP = prev ? rdtGet(pi) : null;
   if (TP) rdsBlit(sg, TP.near, scroll * 0.6, baseY, blend, lit, cw);
   rdsBlit(sg, T.near, scroll * 0.6, baseY, TP ? 1 - blend : 1, lit, cw);
+  rdbDrawSites(sg, gy, lit); // 路边建筑（js/roadsites.js），在护栏后面
   rdsBlit(sg, T.street, scroll, gy * RD_Q, 1, lit, cw);
   if (TP) rdsBlit(sg, TP.street, scroll, gy * RD_Q, blend, lit, cw);
   RDT_TONE = { day, dusk };
@@ -652,6 +653,7 @@ function rdsDrawLights(g, lit, day) {
     if (l.kind === 'win') a *= (1 - day) * (l.ph > 5.2 ? 0.7 + 0.3 * Math.sin(t * 9 + l.ph) * Math.sin(t * 3.7) : 0.9);
     else if (l.kind === 'blink') a *= ((t * 0.8 + l.ph) % 2) < 0.35 ? 1 : 0.1;
     else if (l.kind === 'bubble') { const p = (t * 0.6 + l.ph) % 1; a *= (1 - p) * 0.9; l.y -= p * 4 * q * 3; }
+    else if (l.kind === 'neon') a *= (Math.sin(t * 23 + l.ph) > -0.9 && Math.sin(t * 1.3 + l.ph * 3) > -0.8 ? 1 : 0.12) * (0.15 + (1 - day) * 0.85);
     else a *= 0.5 + 0.3 * Math.sin(t * 1.6 + l.ph) + (1 - day) * 0.2;
     if (a < 0.03) continue;
     l.a2 = a;

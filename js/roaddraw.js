@@ -141,75 +141,11 @@ function rdDrawForeground(g, b, scroll, gy, W, H, ground, dim) {
 
 // ---------- 路边建筑 ----------
 function rdDrawSite(g, s, gy, dim, day) {
-  const S = RD_SITES[s.type], x = Math.round(rdSX(s.km * RD_PX_KM)), w = S.w, h = S.h;
-  if (x + w < -10 || x - w > RDV.W + 10) return;
-  const left = x - Math.round(w / 2), base = gy - 13, r = (k) => rdHash(s.seed + k);
-  const wall = dim(rdMix(S.color, '#8a8070', 0.55)), dark = rdShade(wall, -0.3);
-  if (s.searched) g.globalAlpha = 0.75;
-  if (s.type === 'alien') { // 坠落舱：斜插在地里的发光舱体
-    g.fillStyle = dim('#2e1f50'); g.beginPath(); g.ellipse(x, base - 14, 30, 14, -0.25, 0, 7); g.fill();
-    g.fillStyle = dim('#4b3378'); g.beginPath(); g.ellipse(x - 4, base - 18, 22, 9, -0.25, 0, 7); g.fill();
-    g.globalAlpha = (s.searched ? 0.3 : 0.7) + Math.sin(G.time * 3) * 0.2; g.fillStyle = '#73eff7';
-    for (let k = 0; k < 5; k++) g.fillRect(x - 18 + k * 8, base - 16 - k * 2, 3, 2);
-    g.fillRect(x + 6, base - 4, 3, 4); g.globalAlpha = 1;
-    g.fillStyle = dim('#5a4a6e'); g.fillRect(x - 36, base - 1, 72, 2); // 撞出的土堆
-  } else if (s.type === 'camp') { // 帐篷 + 篝火 + 栅栏
-    g.fillStyle = dim('#6e4a2e'); for (let k = 0; k < w; k += 4) g.fillRect(left + k, base - 8, 1, 8); g.fillRect(left, base - 7, w, 1);
-    g.fillStyle = dim('#c9a86a'); g.beginPath(); g.moveTo(left + 10, base); g.lineTo(left + 24, base - 18); g.lineTo(left + 38, base); g.fill();
-    g.fillStyle = dim('#5f8a4a'); g.beginPath(); g.moveTo(left + 50, base); g.lineTo(left + 62, base - 15); g.lineTo(left + 74, base); g.fill();
-    const fh = 3 + Math.sin(G.time * 12) * 1.5; g.fillStyle = '#ef7d57'; g.fillRect(x - 1, base - fh - 1, 3, fh); g.fillStyle = '#ffcd75'; g.fillRect(x, base - fh, 1, fh - 1);
-    g.fillStyle = dim('#ffcd75'); g.fillRect(left + 4, base - 30, 1, 22); g.fillRect(left + 5, base - 30, 8, 5); // 旗子
-    rdDrawPerson(g, left + 44, base, { pose: 'stand', face: -1, shirt: '#3b5dc9', tiny: true });
-  } else {
-    // 主体
-    g.fillStyle = wall; g.fillRect(left, base - h, w, h);
-    g.fillStyle = dark; g.fillRect(left, base - h, w, 2);
-    // 屋顶 / 招牌
-    const sign = dim(S.color);
-    if (s.type === 'gas') { // 加油站：雨棚 + 油泵
-      g.fillStyle = wall; g.fillRect(left, base - h, w * 0.45, h);
-      g.fillStyle = dim('#c8d6e5'); g.fillRect(left + w * 0.4, base - h + 4, w * 0.6, 4); g.fillStyle = sign; g.fillRect(left + w * 0.4, base - h + 8, w * 0.6, 2);
-      g.fillStyle = dim('#94b0c2'); g.fillRect(left + w * 0.55, base - h + 10, 2, h - 10); g.fillRect(left + w * 0.95 - 2, base - h + 10, 2, h - 10);
-      g.fillStyle = sign; g.fillRect(left + w * 0.7, base - 12, 5, 12); g.fillStyle = dim('#1a1c2c'); g.fillRect(left + w * 0.7 + 1, base - 10, 3, 3);
-      g.fillStyle = dim('#94b0c2'); g.fillRect(left + w + 2, base - h - 14, 2, h + 14); g.fillStyle = sign; g.fillRect(left + w - 4, base - h - 22, 14, 10);
-    } else {
-      g.fillStyle = sign; g.fillRect(left + 4, base - h - 6, w - 8, 7);
-      g.fillStyle = dim('#f4f4f4'); for (let k = 0; k < (w - 16) / 5; k++) if (r(k + 50) > 0.25) g.fillRect(left + 8 + k * 5, base - h - 4, 3, 3);
-      if (s.type === 'factory') { g.fillStyle = dark; g.fillRect(left + w - 14, base - h - 26, 6, 26); g.fillRect(left + w - 26, base - h - 18, 5, 18); if (!s.searched) { g.globalAlpha = 0.3; g.fillStyle = '#94b0c2'; g.fillRect(left + w - 15 + Math.sin(G.time) * 2, base - h - 34, 8, 6); g.globalAlpha = s.searched ? 0.75 : 1; } }
-      if (s.type === 'military') { g.fillStyle = dim('#4c5a36'); for (let k = 0; k < w; k += 6) g.fillRect(left + k, base - 8, 5, 8); g.fillStyle = dim('#c9a86a'); g.fillRect(left + w - 10, base - h - 18, 2, 18); g.fillRect(left + w - 16, base - h - 22, 14, 6); }
-      if (s.type === 'farm') { g.fillStyle = dim('#b13e53'); g.beginPath(); g.moveTo(left, base - h); g.lineTo(left + w / 2, base - h - 16); g.lineTo(left + w, base - h); g.fill(); g.fillStyle = dim('#c9a86a'); g.fillRect(left + w + 4, base - 30, 10, 30); g.beginPath(); g.arc(left + w + 9, base - 30, 5, Math.PI, 0); g.fill(); }
-      if (s.type === 'house') { g.fillStyle = dim('#6e4a2e'); g.beginPath(); g.moveTo(left - 3, base - h); g.lineTo(left + w / 2, base - h - 14); g.lineTo(left + w + 3, base - h); g.fill(); }
-      if (s.type === 'junkyard') { for (let k = 0; k < 5; k++) { g.fillStyle = dim(['#6e4a2e', '#566c86', '#b13e53', '#38b764'][k % 4]); g.fillRect(left + k * 18, base - 8 - (k % 2) * 7, 16, 7); } }
-      if (s.type === 'rvpark') { g.fillStyle = dim('#e8e4d8'); g.fillRect(left + 8, base - 16, 30, 13); g.fillRect(left + 48, base - 14, 26, 11); g.fillStyle = dim('#1a1c2c'); g.fillRect(left + 12, base - 4, 4, 4); g.fillRect(left + 52, base - 4, 4, 4); g.fillStyle = dim('#41a6f6'); g.fillRect(left + 12, base - 13, 6, 4); g.fillRect(left + 52, base - 11, 6, 4); }
-      if (s.type === 'lab') { g.fillStyle = dim('#c8d6e5'); g.beginPath(); g.arc(left + w / 2, base - h, 14, Math.PI, 0); g.fill(); g.fillStyle = dim('#94b0c2'); g.fillRect(left + w - 10, base - h - 20, 1, 20); g.beginPath(); g.arc(left + w - 10, base - h - 20, 4, 0, Math.PI); g.fill(); }
-      // 窗户：破的、暗的、晚上偶尔有光
-      const rows = Math.max(1, Math.floor((h - 16) / 12));
-      for (let ry = 0; ry < rows; ry++) for (let k = 0; k < Math.floor((w - 10) / 12); k++) {
-        if (s.type === 'junkyard' || s.type === 'rvpark') continue;
-        const wx = left + 6 + k * 12, wy = base - h + 6 + ry * 12, rr = r(k * 7 + ry);
-        g.fillStyle = rr > 0.8 ? dim('#41a6f6') : rr > 0.3 ? dim('#1a1c2c') : dark;
-        if (day < 0.3 && rr > 0.93 && !s.searched) g.fillStyle = '#ffcd75';
-        g.fillRect(wx, wy, 6, 6);
-        if (rr > 0.5 && rr < 0.7) { g.fillStyle = wall; g.fillRect(wx + 3, wy + 2, 3, 4); } // 碎玻璃
-      }
-      // 门
-      g.fillStyle = dim('#1a1c2c'); g.fillRect(x - 4, base - 12, 8, 12);
-      if (!s.searched) { g.fillStyle = dim('#3a2a22'); g.fillRect(x - 4, base - 12, 3, 12); }
-      // 裂缝、藤蔓
-      g.fillStyle = dark; for (let k = 0; k < 4; k++) { const cx = left + Math.floor(r(k + 30) * w); for (let j = 0; j < 6; j++) g.fillRect(cx + Math.floor(Math.sin(j + k) * 2), base - h + 4 + j * 3, 1, 3); }
-      if (rdBiomeAt(s.km).deco === 'deadtree') { g.fillStyle = dim('#38b764'); for (let k = 0; k < w; k += 3) if (r(k + 90) > 0.6) g.fillRect(left + k, base - h + Math.floor(r(k) * 10), 1, 4 + Math.floor(r(k + 1) * 8)); }
-      if (rdBiomeAt(s.km).snow) { g.fillStyle = dim('#f4f4f4'); g.fillRect(left - 1, base - h - 2, w + 2, 2); }
-    }
-  }
-  g.globalAlpha = 1;
-  // 正在搜索：门口的进度条
+  // 建筑本身在 js/roadsites.js 里画（和远景一起，在护栏后面）；这里只画搜索进度条
   const R = G.road;
-  if (R.search && R.search.site === s && R.search.phase === 'in') {
-    const p = R.search.t / R.search.dur;
-    g.fillStyle = '#1a1c2c'; g.fillRect(x - 15, base - h - 14, 30, 4); g.fillStyle = '#ffcd75'; g.fillRect(x - 14, base - h - 13, Math.round(28 * p), 2);
-    // 手电筒在窗户里晃
-    g.fillStyle = '#ffcd75'; g.globalAlpha = 0.6; g.fillRect(left + 6 + Math.floor((Math.sin(G.time * 1.3) * 0.5 + 0.5) * (w - 14)), base - h + 7, 3, 3); g.globalAlpha = 1;
-  }
+  if (!(R.search && R.search.site === s && R.search.phase === 'in')) return;
+  const S = RD_SITES[s.type], x = Math.round(rdSX(s.km * RD_PX_KM)), top = gy - 13 - S.h, p = R.search.t / R.search.dur;
+  g.fillStyle = '#1a1c2c'; g.fillRect(x - 15, top - 14, 30, 4); g.fillStyle = '#ffcd75'; g.fillRect(x - 14, top - 13, Math.round(28 * p), 2);
 }
 
 
