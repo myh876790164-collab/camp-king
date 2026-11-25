@@ -141,6 +141,7 @@ function rdgProj(g, gy) {
     else { g.fillStyle = '#f4f4f4'; g.fillRect(x, y, 2, 1); }
   }
   for (const f of R.fx || []) {
+    if (f.kind === 'mdeath') { rdnDeath(g, f, gy); continue; } // 怪物死亡爆散（js/roadmons.js）
     const a = Math.max(0, f.life / f.max), x = rdSX(f.x), y = gy + f.y;
     if (f.kind === 'laser' || f.kind === 'beam' || f.kind === 'rail') {
       const x2 = rdSX(f.x2), y2 = gy + f.y2, col = f.kind === 'laser' ? '#ff7a50' : f.kind === 'beam' ? '#c27bd6' : '#73eff7', wd = f.kind === 'rail' ? 3 : f.kind === 'beam' ? 2 : 1.33;

@@ -794,6 +794,7 @@ function rdHitMon(m, dmg, fx, ram) {
   if (m.hp <= 0 && !m.dead) {
     m.dead = true;
     R.stats.kills++;
+    { const MM = RD_MONSTERS[m.type]; R.fx = R.fx || []; R.fx.push({ kind: 'mdeath', type: m.type, x: m.x, y: MM.fly ? m.y : 3, face: m.face, fr: Math.floor((m.ph || 0) * 10) % 4, life: 0.7, max: 0.7, r: MM.w / 2 }); } // 死亡爆散
     const M = RD_MONSTERS[m.type], st = R.st || rdStats();
     rdBurst(m.x, M.fly ? m.y : -M.h / 2, M.glow, 8);
     const got = [];

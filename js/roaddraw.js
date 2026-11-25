@@ -135,6 +135,7 @@ function rdDrawSite(g, s, gy, dim, day) {
 
 // ---------- 怪物 ----------
 function rdDrawMonster(g, m, gy) {
+  if (rdnHas(m.type)) { rdnDraw(g, m, gy); return; } // 精细像素怪物（js/roadmons.js）
   const M = RD_MONSTERS[m.type], x = Math.round(rdSX(m.x)), y = Math.round(gy + (M.fly ? m.y : 0) + (M.fly ? 0 : 3) + (m.lunge > 0 ? -2 : 0));
   if (x < -40 || x > RDV.W + 40) return;
   const f = m.face, c = m.hitT > 0 ? '#f4f4f4' : M.color, gl = M.glow, t = m.ph;
