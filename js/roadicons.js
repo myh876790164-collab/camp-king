@@ -171,3 +171,23 @@ function rdoIcon(ctx, p, x, y, s) {
   } else { ctx.fillStyle = tc; ctx.fillRect(x + s / 2 - 4, y + s / 2 - 4, 8, 8); }
   ctx.restore();
 }
+
+// =============== 资源图标（32×32 精细像素，替换原来的 12×12 字符画） ===============
+const RDO_RES = {
+  fuel: (B) => { rdcBox(B, -10, -12, 20, 26, RDO.red, 1, 0, 1); rdcRect(B, -10, -12, 20, 2, RDO.red[0], 1); rdcRect(B, 4, -16, 6, 4, RDO.dark[1], 2); rdcRect(B, -8, -15, 8, 3, RDO.dark[2], 2); rdcLine(B, -6, -6, 6, 8, RDO.red[3], 1); rdcLine(B, 6, -6, -6, 8, RDO.red[3], 1); rdcRect(B, -10, 4, 20, 1, RDO.red[3], 1); },
+  water: (B) => { rdcBox(B, -10, -8, 20, 22, RDO.blue, 1, 0, 1); rdcPoly(B, [[-10, -8], [-6, -14], [6, -14], [10, -8]], RDO.blue, 1); rdcRect(B, -4, -16, 8, 3, RDO.dark[1], 2); for (let y = -4; y < 12; y++) rdcPix(B, -7, y, '#d8f0ff', 3); rdcRect(B, -10, 0, 20, 1, RDO.blue[3], 1); },
+  scrap: (B) => { rdcBox(B, -14, -12, 10, 4, RDO.steel, 2, 0, 1); rdcBox(B, -11, -8, 4, 16, RDO.steel, 2, 0, 1); rdcBox(B, -14, 8, 10, 4, RDO.steel, 2, 0, 1); for (let k = 0; k < 3; k++) { rdcLine(B, 0 + k * 4, 12, 4 + k * 4, -12, RDO.rust[1], 2); rdcLine(B, 1 + k * 4, 12, 5 + k * 4, -12, RDO.rust[2], 2); } rdgRiv(B, -10, -11); },
+  food: (B) => { rdgTube(B, -10, 10, 0, 0, RDO.steel); rdcBox(B, -10, -10, 20, 22, RDO.steel, 2, 0, 1); rdcBox(B, -10, -6, 20, 14, RDO.red, 1, 0, 1); rdcRect(B, -6, -3, 12, 8, '#f4ecd8', 1); rdgBall(B, 0, 1, 3, ['#f0c060', '#d89030', '#a86818'], 1); rdcRect(B, -10, -11, 20, 2, RDO.steel[0], 2); },
+  med: (B) => { rdcBox(B, -13, -9, 26, 20, ['#f8f6ee', '#e2ddd0', '#bcb6a6'], 1, 0, 1); rdcRect(B, -5, -13, 10, 4, RDO.dark[1], 2); rdcRect(B, -2, -6, 4, 14, '#d84a3a', 1); rdcRect(B, -7, -1, 14, 4, '#d84a3a', 1); rdcRect(B, -13, 8, 26, 1, '#a8a294', 1); },
+  ammo: (B) => { for (let k = 0; k < 3; k++) { const x = -10 + k * 8; rdcBox(B, x, -4, 6, 16, RDO.yellow, 2, 0, 1); rdcPoly(B, [[x, -4], [x + 3, -12], [x + 6, -4]], RDO.copper, 2); rdcRect(B, x, 10, 6, 2, RDO.yellow[3], 2); } },
+  power: (B) => { rdcBox(B, -10, -12, 20, 26, ['#5a6a8a', '#3a4868', '#26304a'], 2, 0, 1); rdcRect(B, -4, -15, 8, 3, RDO.steel[2], 2); rdcPoly(B, [[2, -9], [-5, 2], [0, 2], [-2, 10], [5, -1], [0, -1]], '#ffe060', 4); },
+  alien: (B) => { rdcPoly(B, [[0, -15], [7, -3], [3, 14], [-3, 14], [-7, -3]], RDO.purple, 2); rdcPoly(B, [[0, -15], [0, 14], [-3, 14], [-7, -3]], [RDO.purple[0], RDO.purple[1]], 2); rdcPoly(B, [[9, -6], [13, 0], [11, 12], [7, 12]], RDO.purple, 2); rdcPoly(B, [[-9, -2], [-6, 12], [-11, 12], [-13, 2]], RDO.purple, 2); rdcPix(B, -1, -8, '#ffffff', 4); rdcPix(B, -2, -6, '#f0dcff', 4); },
+  engine: (B) => { rdcBox(B, -12, -6, 22, 14, ['#ffd060', '#e8a020', '#b07010'], 4, 0, 1); rdcRect(B, -8, -11, 10, 5, '#e8a020', 4); rdcRect(B, 10, -2, 4, 6, '#e8a020', 4); rdcRect(B, -16, -2, 4, 6, '#e8a020', 4); rdcRect(B, -8, -2, 14, 6, '#6a4010', 4); },
+};
+const RDO_RES_CACHE = {};
+function rdoResIcon(key) {
+  if (RDO_RES_CACHE[key] !== undefined) return RDO_RES_CACHE[key];
+  if (!RDO_RES[key]) return (RDO_RES_CACHE[key] = null);
+  const B = rdcPaper(32, 32, 16, 16); RDO_RES[key](B); rdcOutline(B);
+  return (RDO_RES_CACHE[key] = rdcToCanvas(B).cv);
+}

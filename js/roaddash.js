@@ -33,6 +33,8 @@ const RD_ICON_MAP = {
 const RD_ICON_CACHE = {};
 function rdIconImg(key) {
   if (RD_ICON_CACHE[key]) return RD_ICON_CACHE[key];
+  const fine = typeof rdoResIcon === 'function' ? rdoResIcon(key) : null; // 新的精细像素图标（js/roadicons.js）
+  if (fine) return (RD_ICON_CACHE[key] = fine);
   const m = RD_ICON_MAP[key], c = createCanvas(12, 12), g = c.getContext('2d');
   m.forEach((row, y) => { for (let x = 0; x < row.length; x++) { const col = RD_ICON_PAL[row[x]]; if (col) { g.fillStyle = col; g.fillRect(x, y, 1, 1); } } });
   return (RD_ICON_CACHE[key] = c);
@@ -126,7 +128,7 @@ function rdDrawDash(ctx, x, y, w, h) {
   rdDashText(ctx, String(d.km).padStart(6, '0'), sx, sy - 11, 9, style === 'analog' ? '#ffcd75' : pal.dim);
   d.gauges.forEach((gg, i) => {
     const c = L.gs[i], gx = x + c.cx * P, gy = y + c.cy * P;
-    ctx.fillStyle = style === 'analog' ? '#d8d2bf' : style === 'lcd' ? 'rgba(29,42,20,0.15)' : 'rgba(255,255,255,0.12)';
+    ctx.fillStyle = style === 'analog' ? 'rgba(240,226,192,0.16)' : style === 'lcd' ? 'rgba(29,42,20,0.15)' : 'rgba(255,255,255,0.12)';
     ctx.fillRect(gx - 23, gy + 6, 18, 18);
     rdIcon(ctx, gg.key, gx - 22, gy + 7, 16, gg.low && Math.floor(G.time * 3) % 2 ? 0.35 : 1);
     rdDashText(ctx, String(gg.v), gx + 7, gy + 16, 12, gg.low ? pal.hot : pal.text);
@@ -157,12 +159,16 @@ function rdDrawDash(ctx, x, y, w, h) {
 // 老式指针仪表（车身颜色的边框）
 function rdDashAnalog(K, W, H, d, L) {
   const v = rdVeh(), body = v.color, trim = v.stripe;
-  K.rect(0, 0, W, H, '#5a6270'); K.rect(1, 1, W - 2, H - 2, body); K.rect(2, 2, W - 4, H - 4, '#1a1a20');
-  K.rect(2, 2, W - 4, 2, trim); // 顶上的装饰条
-  for (let x = 4; x < W - 4; x += 6) K.px(x, H - 4, '#2a2a33');
+  // 暖色做旧：深褐描边 + 车漆外框（锈点、划痕）+ 铆钉 + 深褐色表盘底
+  K.rect(0, 0, W, H, '#24160f'); K.rect(1, 1, W - 2, H - 2, rdMix(body, '#8a7a62', 0.35)); K.rect(1, 1, W - 2, 1, rdMix(body, '#f4ead0', 0.4)); K.rect(1, H - 2, W - 2, 1, rdMix(body, '#24160f', 0.5));
+  for (let i = 0; i < W * H / 14; i++) { const x = Math.floor(rdHash(i * 3.1) * W), y = Math.floor(rdHash(i * 7.3) * H); if (x < 2 || y < 2 || x > W - 3 || y > H - 3 || (x > 3 && x < W - 4 && y > 3 && y < H - 4)) continue; K.px(x, y, rdHash(i) > 0.5 ? '#a85a2a' : '#6a3a1c'); }
+  K.rect(3, 3, W - 6, H - 6, '#1e1712'); K.rect(3, 3, W - 6, 1, '#3a2c22');
+  K.rect(3, 3, W - 6, 2, trim); // 顶上的装饰条
+  for (const [rx, ry] of [[1, 1], [W - 3, 1], [1, H - 3], [W - 3, H - 3]]) { K.px(rx, ry, '#d8d0c0'); K.px(rx + 1, ry + 1, '#48423a'); }
+  for (let x = 5; x < W - 5; x += 6) K.px(x, H - 5, '#2e241c');
   // 速度表
   const s = L.sp;
-  K.disc(s.cx, s.cy, s.r + 1, '#9aa3ad'); K.disc(s.cx, s.cy, s.r, '#0e0e12');
+  K.disc(s.cx, s.cy, s.r + 1, '#c8a060'); K.disc(s.cx, s.cy, s.r, '#14100c'); K.arc(s.cx, s.cy, s.r + 1, Math.PI * 1.1, Math.PI * 1.6, '#f0d8a0');
   const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25;
   for (let i = 0; i <= 12; i++) {
     const a = a0 + (a1 - a0) * i / 12, red = i >= 10, big = i % 2 === 0;
@@ -174,15 +180,15 @@ function rdDashAnalog(K, W, H, d, L) {
   // 小表（油量 / 电量）
   d.gauges.forEach((gg, i) => {
     const c = L.gs[i], b0 = Math.PI * 1.1, b1 = Math.PI * 1.9;
-    K.disc(c.cx, c.cy - 2, c.r + 1, '#9aa3ad'); K.disc(c.cx, c.cy - 2, c.r, '#0e0e12');
-    K.rect(c.cx - c.r - 1, c.cy + 1, c.r * 2 + 3, c.r + 2, '#1a1a20');
-    K.rect(c.cx - c.r, c.cy, c.r * 2 + 1, 1, '#9aa3ad');
+    K.disc(c.cx, c.cy - 2, c.r + 1, '#c8a060'); K.disc(c.cx, c.cy - 2, c.r, '#14100c');
+    K.rect(c.cx - c.r - 1, c.cy + 1, c.r * 2 + 3, c.r + 2, '#1e1712');
+    K.rect(c.cx - c.r, c.cy, c.r * 2 + 1, 1, '#c8a060');
     for (let k = 0; k <= 4; k++) { const a = b0 + (b1 - b0) * k / 4; K.px(c.cx + Math.cos(a) * (c.r - 1), c.cy - 2 + Math.sin(a) * (c.r - 1), k === 0 ? '#e23b3b' : '#e9e1c8'); }
     const a = b0 + (b1 - b0) * Math.max(0, Math.min(1, gg.f));
     K.line(c.cx, c.cy - 2, c.cx + Math.cos(a) * (c.r - 2), c.cy - 2 + Math.sin(a) * (c.r - 2), '#ff6a3d');
   });
   // 右边：镀铬小牌子
-  if (L.rw > 18) { K.rect(L.rx, 5, L.rw, 13, '#26262e'); K.rect(L.rx, H - 16, L.rw, 13, '#26262e'); }
+  if (L.rw > 18) { for (const yy of [5, H - 16]) { K.rect(L.rx, yy, L.rw, 13, '#2a2018'); K.rect(L.rx, yy, L.rw, 1, '#4a3a2c'); K.px(L.rx + 1, yy + 1, '#a89a84'); K.px(L.rx + L.rw - 2, yy + 1, '#a89a84'); } }
 }
 // 电单车：绿色液晶码表
 function rdDashLcd(K, W, H, d, L) {

@@ -89,9 +89,12 @@ function rdDrawUI(ctx) {
   bars.forEach((b, i) => {
     const col = portrait ? i % 2 : 0, row = portrait ? Math.floor(i / 2) : i;
     const xx = bx + col * (bw + 8), yy = by + row * 16;
-    ctx.fillStyle = 'rgba(26,28,44,0.7)'; ctx.fillRect(xx, yy, bw, 13);
-    const bad = (b[0] === '辐射' ? b[1] > 0.5 : b[1] < 0.25);
-    ctx.fillStyle = b[2]; ctx.fillRect(xx + 34, yy + 3, Math.max(0, Math.min(1, b[1])) * (bw - 38), 7);
+    // 暖色像素风状态条：深褐底 + 描边 + 两段明暗的条（上亮下暗）
+    ctx.fillStyle = 'rgba(30,23,18,0.82)'; ctx.fillRect(xx, yy, bw, 13);
+    const bad = (b[0] === '辐射' ? b[1] > 0.5 : b[1] < 0.25), bl = Math.max(0, Math.min(1, b[1])) * (bw - 38);
+    ctx.fillStyle = '#120c08'; ctx.fillRect(xx + 33, yy + 2, bw - 36, 9);
+    ctx.fillStyle = rdShade(b[2], -0.25); ctx.fillRect(xx + 34, yy + 3, bl, 7); ctx.fillStyle = b[2]; ctx.fillRect(xx + 34, yy + 3, bl, 4); ctx.fillStyle = rdShade(b[2], 0.35); ctx.fillRect(xx + 34, yy + 3, bl, 1);
+    if (bad && Math.floor(G.time * 2.5) % 2) { ctx.fillStyle = 'rgba(239,125,87,0.25)'; ctx.fillRect(xx, yy, bw, 13); }
     drawText(ctx, b[0], xx + 3, yy + 7, 10, bad ? '#ef7d57' : '#c8d6e5', 'left', false);
     drawText(ctx, String(b[3]), xx + bw - 3, yy + 7, 10, '#f4f4f4', 'right', false);
   });
@@ -156,7 +159,7 @@ function rdDrawUI(ctx) {
     if (me.loc === 'out' || me.loc === 'site') drawText(ctx, '（你下车搜索去了，车里没人）', sw / 2, yb - 40, 12, '#94b0c2', 'center', false);
   }
   // 车外飘字
-  for (const f of R.floats || []) { const p = rdToScreen(rdSX(f.x), RDV.gy + f.y - f.t * 14); ctx.globalAlpha = Math.max(0, 1 - f.t / 1.4); drawText(ctx, f.text, p.x, p.y, 12, f.color, 'center'); }
+  for (const f of R.floats || []) rdFloatDraw(ctx, f); // 掉落物飘字（弹出 + 深褐描边 + 资源小图标）
   ctx.globalAlpha = 1;
   // ---- 横幅 ----
   if (G.banner) {
@@ -563,4 +566,22 @@ function rdDrawCarSelect(ctx) {
   });
   G.road = saved; G.res = savedRes;
   endScroll(ctx, maxY + 10);
+}
+
+// 掉落物飘字：先弹一下再慢慢上升变淡；文字有深褐描边；文字里提到的资源前面画小图标
+function rdFloatDraw(ctx, f) {
+  const ease = 1 - Math.pow(1 - Math.min(1, f.t / 0.5), 3), p = rdToScreen(rdSX(f.x), RDV.gy + f.y - ease * 12 - f.t * 4);
+  const pop = f.t < 0.15 ? 0.7 + f.t / 0.15 * 0.5 : f.t < 0.25 ? 1.2 - (f.t - 0.15) / 0.1 * 0.2 : 1, size = Math.round(12 * pop);
+  ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, (1.4 - f.t) / 0.5));
+  ctx.font = 'bold ' + size + 'px ' + FONT; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  const parts = String(f.text).split(' '), keys = Object.keys(RD_RES);
+  const widths = parts.map((s) => ctx.measureText(s).width + (keys.some((k) => s.indexOf(RD_RES[k].name) >= 0) ? size + 2 : 0));
+  let x = p.x - (widths.reduce((a, b) => a + b, 0) + (parts.length - 1) * 6) / 2;
+  parts.forEach((s, i) => {
+    const k = keys.find((kk) => s.indexOf(RD_RES[kk].name) >= 0);
+    if (k) { rdIcon(ctx, k, x, p.y - size / 2, size); x += size + 2; }
+    ctx.lineWidth = 3; ctx.strokeStyle = '#24160f'; ctx.strokeText(s, x, p.y); ctx.fillStyle = f.color; ctx.fillText(s, x, p.y);
+    x += ctx.measureText(s).width + 6;
+  });
+  ctx.restore();
 }
