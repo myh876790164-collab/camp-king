@@ -208,7 +208,7 @@ function rdDrawVehicle(g, x0, y0, opt) {
   if (!fine) { g.fillStyle = 'rgba(10,10,25,0.35)'; g.fillRect(x - L - 2, Math.round(y0) + (hover ? 2 : 0), L + 4, 2); }
   // 挂车
   const tr = part('trailer');
-  if (tr) rdDrawTrailer(g, x - L - 4, y, tr, hover, moving);
+  if (tr) rdpTrailer(g, x - L - 4, y, tr, hover, moving); // 精细像素挂车（js/roadparts.js）
   // 反重力光
   if (hover && !fine) { g.globalAlpha = 0.35 + Math.sin(G.time * 6) * 0.15; g.fillStyle = part('chassis').id === 'chs6' ? '#c27bd6' : '#73eff7'; g.fillRect(x - L + 3, Math.round(y0) - 2, L - 6, 2); g.fillRect(x - L + 6, Math.round(y0) - 4, L - 12, 1); g.globalAlpha = stealth ? 0.7 : 1; }
   // 轮子
@@ -264,16 +264,14 @@ function rdDrawVehicle(g, x0, y0, opt) {
   // 前撞角
   const ram = part('ram');
   if (ram && !fine) rdDrawRam(g, x, y, ram);
-  // 车身外挂
-  const ut = part('util');
-  if (ut) rdDrawUtil(g, x, y, L, ut, v);
-  // 油箱（侧挂油桶）
-  const tk = part('tank');
-  if (tk) { const n = Math.min(3, tk.tier); for (let k = 0; k < n; k++) { P(-L + 4 + k * 5, -12, 4, 5, tk.alien ? '#4b3378' : '#b13e53'); P(-L + 5 + k * 5, -13, 2, 1, '#333c57'); if (tk.alien) P(-L + 5 + k * 5, -10, 2, 1, '#73eff7'); } }
-  // 车顶
-  const rf = part('roof');
+  // 车顶高度、车身外挂、油箱、车顶（精细像素，js/roadparts.js）
   const roofY = fine && rdcCarRoof(R.veh) ? rdcCarRoof(R.veh) : R.veh === 'garbage' ? -34 : R.veh === 'pickup' ? -26 : v.tent ? -16 : fine ? -26 : -32;
-  if (rf) rdDrawRoof(g, x, y, L, rf, roofY);
+  const ut = part('util');
+  if (ut) rdpUtil(g, x, y, L, ut, v, roofY);
+  const tk = part('tank');
+  if (tk) rdpTank(g, x, y, L, tk, v);
+  const rf = part('roof');
+  if (rf) rdpRoof(g, x, y, L, rf, roofY);
   // 引擎特效：排气、火焰、光
   const en = part('engine');
   rdDrawEngineFx(g, x, y, L, en, moving, v);
@@ -285,7 +283,7 @@ function rdDrawVehicle(g, x0, y0, opt) {
   });
   // 空间核心：车门处的空间涟漪
   const sp = part('space');
-  if (sp) { g.globalAlpha = 0.4 + Math.sin(G.time * 3) * 0.2; g.strokeStyle = '#c27bd6'; g.strokeRect(x - L + 2.5, y - 30.5, 6, 18); g.globalAlpha = stealth ? 0.7 : 1; }
+  if (sp) { rdpSpace(g, x, y, L, sp); g.globalAlpha = stealth ? 0.7 : 1; }
   // 护盾
   if (R.shield > 1) { g.globalAlpha = 0.15 + 0.15 * (R.shield / Math.max(1, st.shieldMax)); g.strokeStyle = '#73eff7'; g.beginPath(); g.ellipse(x - L / 2, y - 16, L / 2 + 6, 22, 0, 0, 7); g.stroke(); g.globalAlpha = 1; }
   if (fine) g.restore();
@@ -343,33 +341,6 @@ function rdDrawRam(g, x, y, p) {
   else if (id === 'ram10') { g.globalAlpha = 0.4 + Math.sin(G.time * 5) * 0.15; g.fillStyle = '#73eff7'; g.beginPath(); g.moveTo(x, y - 24); g.lineTo(x + 12, y - 8); g.lineTo(x, y - 2); g.fill(); g.globalAlpha = 1; }
 }
 function R_RAMPOS() { return Math.sin(G.time * 6) > 0.8 ? 3 : 0; }
-function rdDrawUtil(g, x, y, L, p, v) {
-  const P = (dx, dy, w, h, c) => { g.fillStyle = c; g.fillRect(x + dx, y + dy, w, h); };
-  const id = p.id, top = v.tent ? -16 : -30;
-  if (id === 'util1') { P(-2, -11, 3, 3, '#566c86'); P(1, -10, 2, 1, '#94b0c2'); }
-  else if (id === 'util2' || id === 'util6' || id === 'util9') { const c = id === 'util2' ? '#94b0c2' : '#41a6f6'; for (let k = 0; k < L - 4; k += 3) P(-L + 2 + k, top - 1 + (k % 2), 2, 1, c); if (id !== 'util2' && Math.random() < 0.3) P(-L + Math.floor(Math.random() * L), top - 2, 1, 2, '#73eff7'); }
-  else if (id === 'util3' || id === 'util12') { P(-L - 3, -24, 4, 10, '#6e4a2e'); P(-L - 3, -24, 4, 1, '#a8794f'); }
-  else if (id === 'util4') { P(-16, top - 3, 4, 3, '#333c57'); P(-15, top - 2, 2, 1, '#94b0c2'); if (G.road.speedNow > 1 || true) { g.fillStyle = '#ffcd75'; const t = (G.time * 2) % 1; g.globalAlpha = 1 - t; g.fillRect(x - 13 + t * 8, y + top - 6 - t * 4, 1, 2); g.globalAlpha = 1; } }
-  else if (id === 'util5') { P(-L + 2, top - 4, 3, 4, '#566c86'); P(-L + 6, top - 4, 3, 4, '#566c86'); }
-  else if (id === 'util7') { P(-L + 4, -20, 3, 7, '#b13e53'); P(-L + 4, -21, 3, 1, '#1a1c2c'); }
-  else if (id === 'util8') { const a = Math.sin(G.time * 2) * 0.5; g.save(); g.translate(x - L / 2, y + top); g.rotate(-0.6 + a); g.fillStyle = '#ffcd75'; g.fillRect(0, -1, 12, 2); g.fillStyle = '#566c86'; g.fillRect(11, -2, 3, 4); g.restore(); }
-  else if (id === 'util10') { /* 隐形：车身半透明（rdDrawVehicle 里处理） */ }
-  else if (id === 'util11') { g.fillStyle = '#73eff7'; for (let k = 0; k < 8; k++) { const t = G.time * 1.5 + k; g.globalAlpha = 0.5; g.fillRect(Math.round(x - L / 2 + Math.cos(t) * L * 0.6), Math.round(y - 16 + Math.sin(t * 1.3) * 14), 1, 1); } g.globalAlpha = 1; }
-}
-function rdDrawRoof(g, x, y, L, p, ry) {
-  const P = (dx, dy, w, h, c) => { g.fillStyle = c; g.fillRect(x + dx, y + dy, w, h); };
-  const id = p.id, rx = -L + 3, rw = L - 18;
-  if (id === 'roof1') { P(rx, ry - 2, rw, 1, '#566c86'); P(rx, ry - 4, 1, 3, '#566c86'); P(rx + rw - 1, ry - 4, 1, 3, '#566c86'); P(rx + 3, ry - 6, 7, 4, '#a8794f'); P(rx + 12, ry - 5, 6, 3, '#38b764'); P(rx + 20, ry - 7, 5, 5, '#8f6a42'); }
-  else if (id === 'roof2') { P(rx, ry - 6, rw, 2, '#b13e53'); for (let k = 0; k < rw; k += 4) P(rx + k, ry - 6, 2, 2, '#f4f4f4'); P(rx, ry - 4, 1, 4, '#566c86'); P(rx + rw - 1, ry - 4, 1, 4, '#566c86'); }
-  else if (id === 'roof3' || id === 'roof9' || id === 'roof13') { const big = id !== 'roof3', c = id === 'roof13' ? '#c27bd6' : '#29366f'; P(rx, ry - 3, big ? rw : rw / 2, 2, c); for (let k = 0; k < (big ? rw : rw / 2); k += 3) P(rx + k, ry - 3, 1, 2, '#41a6f6'); if (big) { P(rx + 2, ry - 6, rw - 4, 2, c); for (let k = 2; k < rw - 2; k += 3) P(rx + k, ry - 6, 1, 2, id === 'roof13' ? '#73eff7' : '#41a6f6'); } }
-  else if (id === 'roof4') { P(rx + 2, ry - 4, 5, 3, '#333c57'); P(rx + 9, ry - 4, 5, 3, '#333c57'); P(rx + 6, ry - 3, 1, 1, '#ffcd75'); P(rx + 13, ry - 3, 1, 1, '#ffcd75'); P(-14, ry + 7, 3, 2, '#333c57'); P(-12, ry + 7, 1, 1, '#ffcd75'); }
-  else if (id === 'roof5') { P(rx + 4, ry - 14, 1, 14, '#6e4a2e'); P(rx + 12, ry - 14, 1, 14, '#6e4a2e'); P(rx + 2, ry - 16, 13, 3, '#8f6a42'); P(rx + 2, ry - 19, 1, 3, '#8f6a42'); P(rx + 14, ry - 19, 1, 3, '#8f6a42'); }
-  else if (id === 'roof6' || id === 'roof12') { const a = G.time * 2; P(rx + 8, ry - 6, 1, 6, '#94b0c2'); g.fillStyle = id === 'roof12' ? '#c27bd6' : '#c8d6e5'; g.fillRect(Math.round(x + rx + 8 - Math.cos(a) * 4), y + ry - 9, Math.max(1, Math.round(Math.abs(Math.cos(a)) * 8)), 3); if (id === 'roof12') { g.globalAlpha = 0.5; g.fillStyle = '#73eff7'; g.fillRect(x + rx + 8, y + ry - 12, 1, 3); g.globalAlpha = 1; } }
-  else if (id === 'roof7' || id === 'roof14') { P(rx + 6, ry - 2, 10, 2, '#566c86'); if (id === 'roof14') P(rx + 20, ry - 2, 10, 2, '#566c86'); }
-  else if (id === 'roof8') { P(rx + 6, ry - 12, 1, 12, '#94b0c2'); const a = G.time * (G.road.speedNow > 1 ? 14 : 2); g.fillStyle = '#f4f4f4'; for (let k = 0; k < 3; k++) { const b = a + k * 2.094; g.fillRect(Math.round(x + rx + 6 + Math.cos(b) * 5), Math.round(y + ry - 12 + Math.sin(b) * 5), 1, 1); g.fillRect(Math.round(x + rx + 6 + Math.cos(b) * 3), Math.round(y + ry - 12 + Math.sin(b) * 3), 1, 1); } }
-  else if (id === 'roof10') { P(rx + 2, ry - 6, 14, 6, '#333c57'); P(rx + 3, ry - 5, 12, 1, '#566c86'); const R = G.road; if (R.search && R.search.phase === 'in') { const s = R.search.site, dx = rdSX(s.km * RD_PX_KM) + Math.sin(G.time * 2) * 20, dy = RDV.gy - RD_SITES[s.type].h - 26 + Math.sin(G.time * 3) * 4; g.fillStyle = '#c8d6e5'; g.fillRect(Math.round(dx - 3), Math.round(dy), 6, 1); g.fillStyle = '#566c86'; g.fillRect(Math.round(dx - 1), Math.round(dy + 1), 2, 1); } else { P(rx + 6, ry - 8, 6, 1, '#c8d6e5'); } }
-  else if (id === 'roof11') { P(rx + 4, ry - 6, 10, 1, '#41a6f6'); P(rx + 4, ry - 6, 1, 6, '#94b0c2'); P(rx + 13, ry - 6, 1, 6, '#94b0c2'); P(rx + 7, ry - 4, 4, 4, '#29366f'); }
-}
 function rdDrawEngineFx(g, x, y, L, en, moving, v) {
   const R = G.road;
   if (!moving) return;
@@ -379,23 +350,6 @@ function rdDrawEngineFx(g, x, y, L, en, moving, v) {
   if (id === 'eng10') { const f = 4 + Math.random() * 5; g.fillStyle = '#ef7d57'; g.fillRect(x - L - f, y - 14, f, 4); g.fillStyle = '#ffcd75'; g.fillRect(x - L - f * 0.6, y - 13, f * 0.6, 2); g.fillStyle = '#566c86'; g.fillRect(x - L - 1, y - 15, 2, 6); return; }
   if (id === 'eng6') { g.fillStyle = '#c8d6e5'; g.fillRect(x - 10, y - 18, 2, 3); g.fillRect(x - 13, y - 18, 2, 3); if (Math.random() < 0.15) { g.fillStyle = '#ef7d57'; g.fillRect(x - L - 3, y - 8, 2, 2); } }
   if (Math.random() < (id === 'eng1' ? 0.15 : 0.35)) rdSmoke(rdVehX() - L - 1, -7, id === 'eng5' ? '#a7f070' : '#566c86');
-}
-function rdDrawTrailer(g, x, y, p, hover, moving) {
-  const P = (dx, dy, w, h, c) => { g.fillStyle = c; g.fillRect(x + dx, y + dy, w, h); };
-  const id = p.id;
-  P(-2, -9, 6, 1, '#333c57'); // 挂钩
-  let L = 24, H = 14, col = '#8f6a42';
-  if (id === 'trl2') { L = 32; H = 22; col = '#e8e4d8'; } else if (id === 'trl3') { L = 44; H = 26; col = '#b13e53'; } else if (id === 'trl4') { L = 46; H = 32; col = '#f4f4f4'; } else if (id === 'trl5') { L = 44; H = 26; col = '#4c5a36'; } else if (id === 'trl6') { L = 20; H = 18; col = '#4b3378'; }
-  if (!hover) { const r = 4, wx = x - L / 2; g.fillStyle = '#1a1c2c'; g.beginPath(); g.arc(wx, y - r, r, 0, 7); g.fill(); g.fillStyle = '#94b0c2'; g.beginPath(); g.arc(wx, y - r, 1.5, 0, 7); g.fill(); }
-  else { g.globalAlpha = 0.35; g.fillStyle = '#73eff7'; g.fillRect(x - L + 2, y + 4, L - 4, 2); g.globalAlpha = 1; }
-  if (id === 'trl1') { P(-L, -12, L, 6, col); P(-L, -12, L, 1, '#a8794f'); P(-L + 3, -16, 6, 4, '#38b764'); P(-L + 11, -17, 7, 5, '#a8794f'); return; }
-  P(-L, -7 - H, L, H, col); P(-L, -7 - H, L, 1, rdShade(col, 0.3)); P(-L, -8, L, 1, rdShade(col, -0.3));
-  if (id === 'trl3') for (let k = 2; k < L; k += 4) P(-L + k, -6 - H, 1, H - 2, rdShade(col, -0.2));
-  if (id === 'trl2' || id === 'trl4') { P(-L + 4, -3 - H, 8, 6, '#73b8d8'); P(-L + 18, -3 - H, 8, 6, '#73b8d8'); P(-L, -12, L, 2, '#41a6f6'); if (id === 'trl4') { P(-L + 4, -3 - H + 12, 8, 5, '#73b8d8'); P(-L + 30, -3 - H, 8, 6, '#73b8d8'); } }
-  if (id === 'trl5') { for (let k = 0; k < L; k += 8) P(-L + k, -7 - H, 7, H, rdShade(col, (k / 8) % 2 ? -0.1 : 0)); P(-L + 4, -3 - H, 10, 2, '#1a1c2c'); }
-  if (id === 'trl6') { g.globalAlpha = 0.5 + Math.sin(G.time * 2) * 0.3; P(-L + 3, -4 - H, L - 6, 1, '#73eff7'); P(-L + 3, -10, L - 6, 1, '#c27bd6'); g.globalAlpha = 1; }
-  // 窗户里的灯（晚上）
-  if (rdDaylight() < 0.5 && id !== 'trl3' && id !== 'trl5') { g.globalAlpha = 0.7; P(-L + 5, -2 - H, 6, 4, '#ffcd75'); g.globalAlpha = 1; }
 }
 // 电单车停车时：帐篷 + 篝火
 // x：营地右边（世界像素），帐篷在左、篝火在右；画成精细像素（js/roadcar.js 的 rdcTent / rdcCampfire）

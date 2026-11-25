@@ -19,7 +19,7 @@ const RDI_PAL = {
 
 // ---------- 车厢房间（缓存成图片） ----------
 // w：房间宽（世界像素）；kind：'steel' | 'ply' | 'paper'；floor：'plate' | 'wood'；skin：外壳车漆颜色（ramp）
-function rdiRoomKey(w, kind, floor, trailer, lit) { return [w, kind, floor, trailer ? 1 : 0, lit ? 1 : 0, rdiVeh()].join('|'); }
+function rdiRoomKey(w, kind, floor, trailer, lit) { return [w, kind, floor, trailer ? (G.road.ext.trailer || 1) : 0, lit ? 1 : 0, rdiVeh()].join('|'); }
 // 当前车型（车内外壳颜色、车型专属的内部细节跟着它变）
 function rdiVeh() { return (G.road && G.road.veh) || 'courier'; }
 function rdiSkin() { const v = rdiVeh(); return v === 'garbage' ? RDC_PAL.olive : v === 'pickup' ? RDC_PAL.brick : v === 'icecream' ? RDC_PAL.rose : RDC_PAL.cream; }
@@ -85,7 +85,7 @@ function rdiBuildRoom(w, kind, floor, trailer, lit) {
   const FW = w * Q, FH = 50 * Q; // 房间内部：宽 FW，高 FH（天花板 y = 0，地面 y = FH）
   const ice = !trailer && rdiVeh() === 'icecream';
   const B = rdcPaper(FW + 20, FH + 36 + (ice ? 26 : 0), 10, 13 + (ice ? 26 : 0));
-  const skin = trailer ? P.metal : rdiSkin(), garbage = !trailer && rdiVeh() === 'garbage', pickup = !trailer && rdiVeh() === 'pickup';
+  const skin = trailer ? rdpTrailerSkin() : rdiSkin(), garbage = !trailer && rdiVeh() === 'garbage', pickup = !trailer && rdiVeh() === 'pickup';
   // —— 外壳切面（上、左、右）：车漆 → 保温棉 → 内衬
   rdcBox(B, -9, -12, FW + 18, 4, skin, 1);
   rdcBox(B, -9, -8, FW + 18, 5, IP.foam, 1);
@@ -125,6 +125,7 @@ function rdiBuildRoom(w, kind, floor, trailer, lit) {
   if (garbage) rdiGarbageRoom(B, FW, FH);
   if (pickup) rdiPickupRoom(B, FW, FH);
   if (ice) rdiIceRoom(B, FW, FH);
+  if (trailer) rdpTrailerRoom(B, FW, FH); // 挂车车内按种类换花样（js/roadparts.js）
   rdiGrime(B, FW, FH, kind);
   // —— 天花板：暗色顶棚 + 横梁 + 灯具
   rdcBox(B, 0, 0, FW, 6, [RDC_PAL.dark[0], RDC_PAL.dark[1], RDC_PAL.dark[2]], 6);
