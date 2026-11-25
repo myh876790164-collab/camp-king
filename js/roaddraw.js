@@ -99,7 +99,7 @@ function rdDrawWorld(g) {
   if (R.pet && R.me.loc === 'out') rdDrawPet(g, rdSX(R.me.wx) - R.me.face * 8, gy + 3, R.pet.type, true, R.me.face);
   for (const m of mons) if (RD_MONSTERS[m.type].fly) rdDrawMonster(g, m, gy);
   // ---- 子弹、特效 ----
-  rdDrawProj(g, gy);
+  rdgProj(g, gy); // 子弹、光束、爆炸（js/roadguns.js）
   // ---- 前景：路肩碎石 + 近处的杂物（比路面滚得快一点，有纵深感） ----
   rdDrawForeground(g, b, scroll, gy, W, H, ground, dim);
   // ---- 天气 ----
@@ -156,52 +156,6 @@ function rdDrawMonster(g, m, gy) {
 }
 
 // ---------- 子弹、爆炸、粒子 ----------
-function rdDrawProj(g, gy) {
-  const R = G.road;
-  for (const p of R.proj || []) {
-    const x = Math.round(rdSX(p.x)), y = Math.round(gy + p.y);
-    const k = p.kind;
-    if (k === 'spit') { g.fillStyle = p.color; g.fillRect(x - 1, y - 1, 3, 3); continue; }
-    if (k === 'bullet' || k === 'nail') { g.fillStyle = '#ffcd75'; g.fillRect(x - 2, y, 3, 1); }
-    else if (k === 'pellet') { g.fillStyle = '#f4f4f4'; g.fillRect(x, y, 1, 1); }
-    else if (k === 'rock') { g.fillStyle = '#94b0c2'; g.fillRect(x - 1, y - 1, 2, 2); }
-    else if (k === 'harpoon') { g.fillStyle = '#c8d6e5'; g.fillRect(x - 5, y, 7, 1); g.fillRect(x + 1, y - 1, 2, 3); }
-    else if (k === 'flame') { const r = 2 + Math.random() * 2; g.fillStyle = Math.random() < 0.5 ? '#ef7d57' : '#ffcd75'; g.fillRect(x - r / 2, y - r / 2, r, r); }
-    else if (k === 'shell' || k === 'mortar') { g.fillStyle = '#566c86'; g.fillRect(x - 1, y - 1, 3, 3); g.fillStyle = '#ffcd75'; g.fillRect(x, y, 1, 1); }
-    else if (k === 'rocket') { g.fillStyle = '#c8d6e5'; g.fillRect(x - 3, y, 4, 2); g.fillStyle = '#ef7d57'; g.fillRect(x - 5, y, 2, 2); }
-    else if (k === 'missile') { const a = Math.atan2(p.vy, p.vx), cx = Math.cos(a), cy = Math.sin(a); g.fillStyle = '#c8d6e5'; for (let s = 0; s < 3; s++) g.fillRect(Math.round(x - cx * s), Math.round(y - cy * s), 1, 1); g.fillStyle = '#b13e53'; g.fillRect(Math.round(x + cx), Math.round(y + cy), 1, 1); g.fillStyle = '#ffcd75'; g.fillRect(Math.round(x - cx * 4), Math.round(y - cy * 4), 2, 2); }
-    else if (k === 'plasma') { g.fillStyle = '#c27bd6'; g.fillRect(x - 2, y - 2, 5, 5); g.fillStyle = '#f4f4f4'; g.fillRect(x - 1, y - 1, 3, 3); }
-    else if (k === 'grav') { g.strokeStyle = '#c27bd6'; g.beginPath(); g.arc(x, y, 3 + Math.sin(G.time * 20), 0, 7); g.stroke(); g.fillStyle = '#1a1c2c'; g.fillRect(x - 1, y - 1, 3, 3); }
-    else if (k === 'acid') { g.fillStyle = '#a7f070'; g.fillRect(x - 1, y - 1, 3, 2); }
-    else { g.fillStyle = '#f4f4f4'; g.fillRect(x, y, 2, 1); }
-  }
-  for (const f of R.fx || []) {
-    const a = Math.max(0, f.life / f.max);
-    const x = rdSX(f.x), y = gy + f.y;
-    if (f.kind === 'laser' || f.kind === 'beam' || f.kind === 'rail') {
-      g.globalAlpha = a; g.strokeStyle = f.kind === 'laser' ? '#ef7d57' : f.kind === 'beam' ? '#c27bd6' : '#73eff7'; g.lineWidth = f.kind === 'rail' ? 3 : 1;
-      g.beginPath(); g.moveTo(x, y); g.lineTo(rdSX(f.x2), gy + f.y2); g.stroke();
-      g.strokeStyle = '#f4f4f4'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(rdSX(f.x2), gy + f.y2); g.stroke(); g.globalAlpha = 1;
-    } else if (f.kind === 'arc') {
-      g.globalAlpha = a; g.strokeStyle = '#73eff7'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y);
-      const x2 = rdSX(f.x2), y2 = gy + f.y2;
-      for (let k = 1; k < 6; k++) g.lineTo(x + (x2 - x) * k / 6 + (Math.random() - 0.5) * 6, y + (y2 - y) * k / 6 + (Math.random() - 0.5) * 6);
-      g.lineTo(x2, y2); g.stroke(); g.globalAlpha = 1;
-    } else {
-      const r = f.r * (1 - a * 0.5);
-      g.globalAlpha = a;
-      g.fillStyle = f.kind === 'gravboom' ? '#5d275d' : f.kind === 'plasmaboom' ? '#c27bd6' : '#ef7d57';
-      g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
-      g.fillStyle = f.kind === 'gravboom' ? '#1a1c2c' : '#ffcd75'; g.beginPath(); g.arc(x, y, r * 0.55, 0, 7); g.fill();
-      g.globalAlpha = 1;
-    }
-  }
-  for (const p of R.parts || []) {
-    g.globalAlpha = p.fade ? Math.max(0, p.life / 0.4) * 0.6 : Math.min(1, p.life * 3);
-    g.fillStyle = p.c; const s = p.s || 1; g.fillRect(Math.round(rdSX(p.x)), Math.round(gy + p.y), s, s);
-  }
-  g.globalAlpha = 1;
-}
 
 
 // 夜晚：整体变暗，车灯和建筑的灯光照亮
@@ -327,8 +281,7 @@ function rdDrawVehicle(g, x0, y0, opt) {
   const ws = rdWeapons();
   ws.forEach((w) => {
     const mp = rdMountPos(w.i), gx = x + mp.x, gy = y + mp.y + (R.veh === 'pickup' && w.i < 2 ? 6 : 0) + (R.veh === 'garbage' ? -2 : 0);
-    if (w.p.fx.turret) rdDrawTurret(g, gx, gy, w.p, 'w' + w.i, w.i);
-    else rdDrawGun(g, gx, gy, w.p, (R.aim && R.aim['w' + w.i]) || 0);
+    rdgDraw(g, gx, gy, w, 'w' + w.i, w.i); // 精细像素武器（js/roadguns.js）
   });
   // 空间核心：车门处的空间涟漪
   const sp = part('space');
@@ -426,63 +379,6 @@ function rdDrawEngineFx(g, x, y, L, en, moving, v) {
   if (id === 'eng10') { const f = 4 + Math.random() * 5; g.fillStyle = '#ef7d57'; g.fillRect(x - L - f, y - 14, f, 4); g.fillStyle = '#ffcd75'; g.fillRect(x - L - f * 0.6, y - 13, f * 0.6, 2); g.fillStyle = '#566c86'; g.fillRect(x - L - 1, y - 15, 2, 6); return; }
   if (id === 'eng6') { g.fillStyle = '#c8d6e5'; g.fillRect(x - 10, y - 18, 2, 3); g.fillRect(x - 13, y - 18, 2, 3); if (Math.random() < 0.15) { g.fillStyle = '#ef7d57'; g.fillRect(x - L - 3, y - 8, 2, 2); } }
   if (Math.random() < (id === 'eng1' ? 0.15 : 0.35)) rdSmoke(rdVehX() - L - 1, -7, id === 'eng5' ? '#a7f070' : '#566c86');
-}
-function rdDrawGun(g, x, y, p, ang) {
-  const fx = p.fx, k = fx.proj, alien = p.alien;
-  g.fillStyle = '#333c57'; g.fillRect(x - 3, y - 2, 6, 3); g.fillStyle = '#566c86'; g.fillRect(x - 2, y - 4, 4, 2);
-  // 炮管朝向目标：前后上下都能转（朝后时把图翻过来，炮管不会倒着）
-  const aa = ang || -0.1;
-  g.save(); g.translate(x, y - 3); g.rotate(aa); if (Math.cos(aa) < 0) g.scale(1, -1);
-  const B = (dx, dy, w, h, c) => { g.fillStyle = c; g.fillRect(dx, dy, w, h); };
-  if (k === 'rock') { B(-2, -2, 6, 3, '#8f6a42'); B(3, -3, 1, 5, '#6e4a2e'); }
-  else if (k === 'nail') { B(-2, -2, 6, 4, '#ffcd75'); B(4, -1, 3, 1, '#566c86'); }
-  else if (k === 'bullet') { const n = p.id === 'wpn12' ? 3 : p.id === 'wpn7' ? 2 : 1; B(-3, -2, 6, 4, '#333c57'); for (let i = 0; i < n; i++) B(3, -1 + i * 1 - (n - 1) / 2, p.id === 'wpn3' ? 7 : 9, 1, '#94b0c2'); if (p.id === 'wpn12') B(3, -2, 2, 4, '#566c86'); }
-  else if (k === 'pellet') { B(-3, -2, 6, 4, '#333c57'); B(3, -2, 6, 3, '#566c86'); B(8, -2, 1, 3, '#1a1c2c'); }
-  else if (k === 'harpoon') { B(-3, -2, 6, 3, '#6e4a2e'); B(3, -1, 9, 1, '#c8d6e5'); B(11, -2, 2, 3, '#c8d6e5'); }
-  else if (k === 'flame') { B(-3, -3, 5, 5, '#b13e53'); B(2, -1, 6, 2, '#566c86'); if (Math.random() < 0.5) B(8, -1, 2, 2, '#ef7d57'); }
-  else if (k === 'arc') { B(-1, -8, 2, 8, '#566c86'); for (let i = 0; i < 3; i++) B(-3 + i, -7 + i * 2, 6 - i * 2, 1, '#41a6f6'); if (Math.random() < 0.4) B(-2 + Math.floor(Math.random() * 4), -10, 1, 2, '#73eff7'); }
-  else if (k === 'shell' || k === 'mortar') { B(-3, -3, 6, 5, '#4c5a36'); B(2, -2, k === 'mortar' ? 7 : 8, 3, '#566c86'); B(k === 'mortar' ? 8 : 9, -2, 1, 3, '#1a1c2c'); }
-  else if (k === 'rocket') { B(-4, -4, 9, 7, '#4c5a36'); B(4, -3, 1, 2, '#1a1c2c'); B(4, 0, 1, 2, '#1a1c2c'); B(2, -3, 1, 2, '#b13e53'); }
-  else if (k === 'rail') { B(-3, -2, 6, 4, '#29366f'); B(3, -2, 12, 1, '#c8d6e5'); B(3, 1, 12, 1, '#c8d6e5'); g.globalAlpha = 0.5 + Math.sin(G.time * 8) * 0.3; B(4, -1, 10, 2, '#73eff7'); g.globalAlpha = 1; }
-  else if (k === 'laser' || k === 'beam') { B(-3, -2, 6, 4, '#4b3378'); B(3, -1, 5, 2, '#c27bd6'); B(8, -2, 2, 4, k === 'laser' ? '#ef7d57' : '#c27bd6'); }
-  else if (k === 'plasma') { B(-3, -3, 6, 5, '#4b3378'); B(3, -2, 5, 3, '#2e1f50'); g.fillStyle = '#c27bd6'; g.beginPath(); g.arc(9, -0.5, 2 + Math.sin(G.time * 10) * 0.5, 0, 7); g.fill(); }
-  else if (k === 'grav') { B(-3, -3, 6, 5, '#2e1f50'); g.strokeStyle = '#c27bd6'; g.beginPath(); g.arc(7, -0.5, 3, 0, 7); g.stroke(); B(6, -1, 2, 2, '#1a1c2c'); }
-  else if (k === 'acid') { g.fillStyle = '#5a7a3a'; g.beginPath(); g.ellipse(1, -1, 5, 3, 0, 0, 7); g.fill(); B(5, -1, 4, 2, '#a7f070'); }
-  else { B(-3, -2, 6, 4, '#333c57'); B(3, -1, 7, 2, '#94b0c2'); }
-  if (alien) { g.globalAlpha = 0.4; B(-3, 2, 6, 1, '#73eff7'); g.globalAlpha = 1; }
-  g.restore();
-}
-// 车外自瞄炮塔：底座 + 会转的炮塔头；没目标时左右巡视，开火时转向目标
-function rdDrawTurret(g, x, y, p, key, i) {
-  const R = G.road, t = p.fx.turret;
-  R.aimS = R.aimS || {};
-  const last = R.aimAt && R.aimAt[key], busy = last != null && G.time - last < 1.5 && last <= G.time;
-  const want = busy ? R.aim[key] : -Math.PI / 2 + Math.sin(G.time * 0.7 + i * 1.7) * 1.15;
-  let cur = R.aimS[key] != null ? R.aimS[key] : want;
-  let diff = Math.atan2(Math.sin(want - cur), Math.cos(want - cur));
-  cur += diff * Math.min(1, (busy ? 0.35 : 0.06));
-  R.aimS[key] = cur;
-  const P = (dx, dy, w, h, c) => { g.fillStyle = c; g.fillRect(x + dx, y + dy, w, h); };
-  const flash = busy && G.time - last < 0.06;
-  const hy = t === 'alien' ? -9 + Math.sin(G.time * 2.5 + i) * 1.5 : -5; // 炮塔头的高度
-  // 底座
-  if (t === 'alien') {
-    g.globalAlpha = 0.35 + Math.sin(G.time * 4) * 0.15; P(-4, -1, 8, 1, '#73eff7'); P(-2, hy + 4, 4, -hy - 4, '#c27bd6'); g.globalAlpha = 1;
-  } else {
-    P(-6, -1, 12, 2, '#262b44'); P(-5, -3, 10, 2, '#566c86'); P(-5, -3, 10, 1, '#94b0c2'); P(-1, -5, 2, 2, '#333c57');
-    if (t === 'aa') { const ra = G.time * 3; P(4, -7, 1, 4, '#566c86'); P(4 + Math.round(Math.cos(ra) * 2), -8, 1, 1, '#c8d6e5'); }
-  }
-  g.save(); g.translate(x, y + hy); g.rotate(cur); if (Math.cos(cur) < 0) g.scale(1, -1);
-  const B = (dx, dy, w, h, c) => { g.fillStyle = c; g.fillRect(dx, dy, w, h); };
-  let muzzle = 10;
-  if (t === 'mg') { B(-4, -3, 7, 5, '#4c5a36'); B(-4, -3, 7, 1, '#6e7d4a'); B(3, -2, 8, 1, '#94b0c2'); B(3, 0, 8, 1, '#94b0c2'); B(-3, -4, 3, 1, '#333c57'); if (Math.floor(G.time * 2) % 2) B(-1, -4, 1, 1, '#ef7d57'); muzzle = 11; }
-  else if (t === 'cannon') { B(-5, -4, 9, 7, '#3b4a5a'); B(-5, -4, 9, 1, '#566c86'); B(4, -3, 10, 2, '#566c86'); B(4, 1, 10, 2, '#566c86'); B(13, -3, 2, 2, '#1a1c2c'); B(13, 1, 2, 2, '#1a1c2c'); B(-3, -2, 2, 2, '#ffcd75'); muzzle = 15; }
-  else if (t === 'aa') { B(-4, -3, 7, 6, '#5a6a3a'); B(-4, -3, 7, 1, '#7a8a5a'); for (let k = 0; k < 4; k++) B(3, -3 + k * 2, 11, 1, '#c8d6e5'); muzzle = 14; }
-  else if (t === 'missile') { B(-4, -4, 10, 8, '#4c5a36'); B(-4, -4, 10, 1, '#6e7d4a'); for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) { B(1 + a * 3, -3 + b * 4, 2, 2, '#1a1c2c'); B(5 + a * 0, -3 + b * 4, 1, 2, '#b13e53'); } muzzle = 7; }
-  else if (t === 'laser') { B(-3, -3, 6, 6, '#29366f'); B(-3, -3, 6, 1, '#41a6f6'); B(3, -1, 6, 2, '#c8d6e5'); g.globalAlpha = 0.6 + Math.sin(G.time * 9) * 0.3; B(9, -2, 2, 4, '#73eff7'); g.globalAlpha = 1; muzzle = 11; }
-  else if (t === 'alien') { g.fillStyle = '#4b3378'; g.beginPath(); g.arc(0, 0, 4, 0, 7); g.fill(); g.strokeStyle = '#c27bd6'; g.beginPath(); g.arc(0, 0, 4.5, 0, 7); g.stroke(); B(1, -1, 3, 2, '#73eff7'); B(4, -1, 2, 2, '#f4f4f4'); muzzle = 6; }
-  if (flash) { B(muzzle, -2, 3, 4, '#ffcd75'); B(muzzle + 1, -1, 2, 2, '#f4f4f4'); }
-  g.restore();
 }
 function rdDrawTrailer(g, x, y, p, hover, moving) {
   const P = (dx, dy, w, h, c) => { g.fillStyle = c; g.fillRect(x + dx, y + dy, w, h); };
