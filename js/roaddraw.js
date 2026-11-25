@@ -95,8 +95,8 @@ function rdDrawWorld(g) {
   const mons = (R.mons || []).slice().sort((a, b2) => (RD_MONSTERS[a.type].fly ? 1 : 0) - (RD_MONSTERS[b2.type].fly ? 1 : 0));
   for (const m of mons) if (!RD_MONSTERS[m.type].fly) rdDrawMonster(g, m, gy);
   rdDrawVehicle(g, V.ax + (V.shakeX || 0), gy + 4, { world: true });
-  if (R.me.loc === 'out') rdDrawPerson(g, rdSX(R.me.wx), gy + 3, { pose: (R.search && R.search.phase !== 'in') ? 'walk' : 'stand', face: R.me.face, outside: true, swing: R.me.swing > 0 });
-  if (R.pet && R.me.loc === 'out') rdDrawPet(g, rdSX(R.me.wx) - R.me.face * 8, gy + 3, R.pet.type, true, R.me.face);
+  if (R.me.loc === 'out') rdhPerson(g, rdSX(R.me.wx), gy + 3, { pose: (R.search && R.search.phase !== 'in') ? 'walk' : 'stand', face: R.me.face, outside: true, swing: R.me.swing > 0 });
+  if (R.pet && R.me.loc === 'out') rdhPet(g, rdSX(R.me.wx) - R.me.face * 8, gy + 3, R.pet.type, true, R.me.face); // 精细像素主角和宠物（js/roadhero.js）
   for (const m of mons) if (RD_MONSTERS[m.type].fly) rdDrawMonster(g, m, gy);
   // ---- 子弹、特效 ----
   rdgProj(g, gy); // 子弹、光束、爆炸（js/roadguns.js）
@@ -536,7 +536,7 @@ function rdDrawInterior(g) {
   if (R.pet && R.me.loc !== 'out' && R.me.loc !== 'site') {
     const px = rdCellX(lay, ox, Math.floor(R.pet.ix), 'floor') - (R.pet.ix % 1) * RD_CELL;
     const PB = [-12, -18, 24, 20];
-    if (R.pet.sleep) { rdiFine(g, px, floorY, PB, (gg, ax, ay) => rdDrawPet(gg, ax, ay, R.pet.type, false, 1), 'floor'); rdZzz(g, px + 3, floorY - 8); } else rdiFine(g, px, floorY, PB, (gg, ax, ay) => rdDrawPet(gg, ax, ay, R.pet.type, R.pet.walking, R.pet.face), 'floor');
+    rdhPet(g, px, floorY, R.pet.type, !R.pet.sleep && R.pet.walking, R.pet.sleep ? 1 : R.pet.face, R.pet.sleep); if (R.pet.sleep) rdZzz(g, px + 3, floorY - 8);
   }
   // 主角
   rdDrawMeInside(g, lay, ox, floorY, ceil);

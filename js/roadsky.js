@@ -12,7 +12,7 @@
 const RDK = { flash: 0, bolt: null, next: 0, lastT: 0, clouds: {}, cloudCol: {} };
 function rdkSmooth(t) { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); }
 // 进入新地区时，上一个地区还剩多少（0~1，前 10% 路程平滑过渡）
-function rdkBlend(km) { const into = (km % RD_BIOME_LEN) / RD_BIOME_LEN; return into < 0.1 ? 1 - rdkSmooth(into / 0.1) : 0; }
+function rdkBlend(km) { if (km < RD_BIOME_LEN) return 0; /* 刚开局还在第一个地区：不和「上一个地区」混 */ const into = (km % RD_BIOME_LEN) / RD_BIOME_LEN; return into < 0.1 ? 1 - rdkSmooth(into / 0.1) : 0; }
 // 天气强度：刚来时慢慢变强，快结束时慢慢变弱
 function rdkWI() {
   const w = G.road && G.road.weather; if (!w) return 0;
