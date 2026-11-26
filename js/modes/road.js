@@ -789,6 +789,7 @@ function rdExplode(p, x, y) {
 function rdHitMon(m, dmg, fx, ram) {
   const R = rdR();
   if (RD_MONSTERS[m.type].ghostly && !(m.x > rdVehX() - 4 && m.x < rdVehX() + 130)) dmg *= 0.35; // 幽灵：只有被车灯照到时才吃满伤害
+  if (m.shieldUp) dmg *= 0.1; // 外星能量核心开着护盾
   m.hp -= dmg;
   m.hitT = 0.1;
   if (fx && fx.burn) { m.burn = 3; m.burnDps = fx.burn; }

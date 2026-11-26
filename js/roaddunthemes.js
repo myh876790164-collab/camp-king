@@ -318,3 +318,69 @@ Object.assign(RDX_THEMES, {
     },
   },
 });
+
+// ================= 外星人基地 =================
+function rdyAlienTiles() {
+  if (RDY_CACHE.abase) return RDY_CACHE.abase;
+  const s = 307, TW = RDS_TW, P = RDS_PAL[5], Mt = rdsR(['#8a84a8', '#6a6488', '#4e486a', '#36324c', '#24203a']);
+  // 后面：发光的外星尖塔和有机塔楼
+  const B = rdsPaper(270);
+  rdsTerrain(B, (x) => 20 + rdsN(x, 10, s) * 30, rdsR(['#3a2a5a', '#2e2048', '#221838']), { seed: s });
+  for (let k = 0; k < 9; k++) rdsSpire(B, rdsRand(s, k) * TW, 120 + rdsRand(s, k + 9) * 130, 18 + rdsRand(s, k + 19) * 16, (rdsRand(s, k + 29) - 0.5) * 50, rdsR(['#5a4a88', '#463872', '#342a5a', '#241c40']), P.glow, s + k, 2);
+  for (let k = 0; k < 4; k++) { const x = rdsRand(s, 40 + k) * TW, h = 150 + rdsRand(s, 44 + k) * 60; for (let y = -h; y < 0; y++) { const u = (y + h) / h, hw = 10 + Math.sin(u * 3.14) * 18; for (let dx = -hw; dx <= hw; dx++) rdsPx(B, x + dx, y, (Math.abs(dx) < 1.5 && (y % 9 < 5)) ? P.glow : rdsPick(rdsR(['#4a3a78', '#382a60', '#281e48']), 0.5 + dx / hw + u * 0.6, x + dx, y), Math.abs(dx) < 1.5 && y % 9 < 5 ? 3 : 2); } rdsLight(B, x, -h + 10, 'glow', '#73eff7', 8); }
+  rdsHaze(B, rdsC('#2a1e48'), 0.2, 0.3);
+  const back = rdyLayer(B);
+  // 中景：能量导管、外星路灯塔、水晶、坠毁的船体残片
+  const M = rdsPaper(170);
+  for (let x = 0; x < TW; x++) for (let k = 0; k < 2; k++) { const y = -20 - k * 10 + Math.round(Math.sin(x / 80 + k) * 3); rdsPx(M, x, y, Mt[1], 1); rdsPx(M, x, y + 1, Mt[2], 1); rdsPx(M, x, y + 2, Mt[3], 1); if ((x + k * 40) % 64 < 6) rdsPx(M, x, y + 1, P.glow, 3); }
+  for (let k = 0; k < 6; k++) { const x = (k + 0.5) * 256; rdsRect(M, x - 3, -110, 6, 110, Mt[2], 1); rdsRect(M, x - 2, -110, 1, 110, Mt[0], 1); rdtEllipse(M, x, -116, 10, 6, (px, py, d) => rdsPx(M, px, py, d < 0.35 ? 0xd8fdff : rdsPick(Mt, 1 + d, px, py), d < 0.35 ? 3 : 1)); rdsLight(M, x, -116, 'glow', '#73eff7', 10); }
+  for (let k = 0; k < 7; k++) { const x = rdsRand(s, 60 + k) * TW; for (let c = 0; c < 3; c++) rdsCrystal(M, x + c * 7, 0, 14 + rdsRand(s, 70 + k * 3 + c) * 26, -Math.PI / 2 + (c - 1) * 0.35, 6, c === 1 ? P.pink : P.cry, s + k * 3 + c); }
+  rdsOutline(M, rdsC(RDC_PAL.out), rdsC(RDC_PAL.out2));
+  const mid = rdyLayer(M);
+  // 地面：金属地板，板缝里流着青光
+  const F = rdtPaper(TW, 75, 400);
+  for (let x = 0; x < TW; x++) for (let y = -42; y < 400; y++) { const i = (y + F.base) * TW + x, seam = x % 64 === 0 || (y + 42) % 18 === 0; let v = 1.6 + (rdtN2(x, y, 64, 24, s) - 0.5) * 0.8 + (y > 30 ? 0.7 : 0) + (rdcHash(x, y, s) < 0.05 ? 0.5 : 0); if (seam) { F.c[i] = (x + y) % 40 < 14 && y > -30 && y < 26 ? P.glow : Mt[4]; F.m[i] = (x + y) % 40 < 14 && y > -30 && y < 26 ? 3 : 2; continue; } F.c[i] = rdsPick(Mt, v, x, y); F.m[i] = 2; }
+  const floor = rdyLayer(F);
+  return (RDY_CACHE.abase = { back, mid, floor });
+}
+function rdyCannon() { return rdySprite('doom', 300, 260, 150, 250, (B) => { const Mt = ['#6a6488', '#4e486a', '#36324c', '#24203a']; rdcPoly(B, [[-110, 0], [-70, -80], [70, -80], [110, 0]], Mt, 2); rdcPoly(B, [[-40, -80], [40, -80], [26, -170], [-26, -170]], Mt, 2); for (let k = 0; k < 6; k++) rdcLine(B, -30 + k * 12, -84, -20 + k * 8, -166, '#73eff7', 4); rdcPoly(B, [[-20, -170], [20, -170], [70, -236], [40, -246], [-6, -186]], Mt, 2); rdgBall(B, 0, -176, 18, ['#e0fcff', '#73eff7', '#2a7aa0'], 4); for (let k = 0; k < 4; k++) rdcPoly(B, [[-100 + k * 60, 0], [-90 + k * 60, -40], [-80 + k * 60, 0]], Mt, 2); }); }
+Object.assign(RDN_BUILD, {
+  core(B, fr) { const Mt = ['#8a84a8', '#6a6488', '#4e486a', '#36324c']; rdcPoly(B, [[-22, 0], [-14, -14], [14, -14], [22, 0]], Mt, 2); for (const x of [-12, 9]) rdcBox(B, x, -110, 4, 96, Mt, 2, 0, 1); rdcBox(B, -14, -116, 28, 6, Mt, 2, 0, 1);
+    for (let y = -100; y < -20; y++) for (let x = -8; x <= 8; x++) { const d = Math.abs(x) / 8; rdcPix(B, x, y, d < 0.3 ? '#e8fdff' : d < 0.7 ? '#73eff7' : '#2a7aa0', 4); }
+    for (let k = 0; k < 4; k++) { const y = -90 + k * 20 + ((fr * 5) % 20); rdcRect(B, -11, y, 22, 2, '#c8fcff', 4); } },
+  adrone(B, fr, atk) { rdcPoly(B, [[-16, -12], [16, -12], [10, -6], [-10, -6]], ['#a89cc8', '#7a6a98', '#54486e'], 2); rdgBall(B, 0, -14, 6, ['#9a8ab8', '#6a5a88', '#463a60']); rdcRect(B, -2, -15, 5, 3, atk ? '#ff6a6a' : '#73eff7', 4); for (const x of [-12, 12]) rdcRect(B, x - 2, -6, 4, 2, fr % 2 ? '#73eff7' : '#2a7aa0', 4); },
+});
+Object.assign(RDX_THEMES, {
+  abase: {
+    name: '外星人基地', dur: 240, color: '#73eff7', hour: 21.5, biomes: [4, 5], npcGoal: 1.2,
+    desc: ['外星人在这里造了一门「灭星炮」，正在充能', '路上有 4 个能量核心挡路——全部打爆才能阻止它', '核心每隔几秒开一次护盾（几乎打不动），抓住护盾关掉的时候'],
+    goals: '摧毁能量核心（每个 +150）、全部摧毁阻止发射（+300）、杀敌、活到最后',
+    pool: ['crawler', 'adrone', 'sentinel', 'adrone', 'crawler'], waveGap: [6, 9], hpMul: 0.7, dmgMul: 0.45,
+    slots: ['space', 'chassis'], partFilter: (p) => p.alien || p.tier >= 5,
+    res: { gold: { alien: 12, power: 40, scrap: 30 }, silver: { alien: 6, power: 20 }, bronze: { alien: 3, power: 10 }, fail: { alien: 1 } },
+    rewardMul: (D) => (D.saved ? 1 : 0.5),
+    enter(D) { D.cores = [10, 30, 50, 70].map((d, i) => rdxMon('core', (D.baseKm + d) * RD_PX_KM, { sPh: i * 1.5 })); D.saved = false; },
+    tick(D, dt) {
+      const left = D.cores.filter((c) => !c.dead && c.hp > 0); D.note = '';
+      for (const c of left) { const p = (D.t + c.sPh) % 6; c.shieldUp = p < 2; if (c.x - rdVehX() < 260) D.note = c.shieldUp ? '核心开着护盾！等护盾关掉' : '护盾关了——快打！'; }
+      if (!left.length && !D.saved) { D.saved = true; D.goal += 300; D.done = true; D.doneT = D.t; G.shake = 0.8; showBanner('灭星炮被摧毁了！', '+300 分，大家得救了', 3.5, '#73eff7'); rcSys('【副本播报】' + rcC().me + ' 打爆了最后一个能量核心，灭星炮瘫痪了！', 0.3); sfx('win'); }
+      if (D.t > D.dur - 0.2 && !D.saved && !D.fired) { D.fired = true; G.shake = 1; showBanner('灭星炮发射了……', '没能阻止它，奖励减半', 3, '#ef7d57'); rcSys('【副本播报】灭星炮发射了！整个区域被光吞没……', 0.3); }
+    },
+    drawBack(g, D, W, H, gy, day, scroll) {
+      const T = rdyAlienTiles(), lit = [], ch = Math.min(1, D.t / D.dur);
+      const gr = g.createLinearGradient(0, 0, 0, gy); gr.addColorStop(0, '#0e0820'); gr.addColorStop(1, rdMix('#3a2058', '#7a3a8a', ch)); g.fillStyle = gr; g.fillRect(0, 0, W, gy);
+      for (let k = 0; k < 50; k++) { g.fillStyle = k % 5 ? '#d8d0ff' : '#73eff7'; g.fillRect(Math.round(rdHash(k * 2) * W), Math.round(rdHash(k + 30) * gy * 0.6), 1 / RD_Q * 2, 1 / RD_Q * 2); }
+      // 灭星炮（很远，几乎不动）：越接近发射越亮，炮口往天上打一道越来越粗的光
+      const cx = W * 0.72 - (scroll * 0.03) % 60, cy = gy - 14; if (!D.saved) { g.globalAlpha = 0.25 + ch * 0.6; g.fillStyle = '#73eff7'; const bw = 1 + ch * 6; g.fillRect(cx + 16 - bw / 2, 0, bw, cy - 80); g.globalAlpha = 1; }
+      g.globalAlpha = 0.85; rdyDraw(g, rdyCannon(), cx, cy); g.globalAlpha = 1;
+      g.globalAlpha = D.saved ? 0.1 : 0.4 + ch * 0.5 + Math.sin(G.time * (3 + ch * 10)) * 0.1; g.drawImage(rdsGlow('#73eff7'), cx - 30, cy - 90, 60, 60); g.globalAlpha = 1;
+      rdyBlit(g, T.back, scroll * 0.15, gy - 12, W, lit); rdyBlit(g, T.mid, scroll * 0.5, gy - 12, W, lit); rdyBlit(g, T.floor, scroll, gy, W, lit);
+      rdyFillBelow(g, T.floor, gy, W, H, '#1e1a30');
+      if (D.fired) { const p = Math.max(0, 1 - (D.t - D.dur) / 1); g.fillStyle = 'rgba(220,255,255,' + (0.8 * p) + ')'; g.fillRect(0, 0, W, H); }
+      rdsDrawLights(g, lit, day); RDS_LIT = lit;
+    },
+    ambient(g, D, W, H, gy) { const t = G.time; for (let k = 0; k < 24; k++) { const p = (t * 0.25 + k / 24) % 1; g.globalAlpha = (1 - p) * 0.6; g.fillStyle = k % 3 ? '#73eff7' : '#f070ff'; g.fillRect((rdHash(k) * W + Math.sin(t + k) * 6) % W, gy - p * 90, 1, 1); } g.globalAlpha = 1; },
+    drawObjs(g, D, gy) { for (const c of D.cores || []) { if (c.dead || c.hp <= 0) continue; const x = rdSX(c.x); if (x < -60 || x > RDV.W + 60) continue; RDS_LIT.push({ x, y: gy - 20, r: 14, a2: 0.9, kind: 'glow' }); if (c.shieldUp) { g.globalAlpha = 0.35 + Math.sin(G.time * 10) * 0.1; g.strokeStyle = '#a8f8ff'; g.lineWidth = 1; g.beginPath(); g.ellipse(x, gy - 20, 14, 24, 0, 0, 7); g.stroke(); g.globalAlpha = 0.12; g.fillStyle = '#73eff7'; g.fill(); g.globalAlpha = 1; } } },
+    hud(ctx, D) { const left = (D.cores || []).filter((c) => !c.dead && c.hp > 0).length; drawText(ctx, '能量核心剩 ' + left + ' / 4 · 灭星炮充能 ' + Math.min(100, Math.round(D.t / D.dur * 100)) + '%', 10, G.sw < G.sh ? 160 : 122, 12, '#73eff7', 'left'); },
+  },
+});
