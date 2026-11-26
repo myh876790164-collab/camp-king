@@ -137,3 +137,82 @@ Object.assign(RDX_THEMES, {
 });
 // 世界坐标里写一个小数字（塌方倒计时等）
 function rdyTextW(g, s, x, y) { g.save(); g.font = 'bold 8px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 2; g.strokeStyle = '#24160f'; g.strokeText(s, x, y); g.fillStyle = '#ffd860'; g.fillText(s, x, y); g.restore(); }
+
+// ================= 鬼城 =================
+function rdyGhostTiles() {
+  if (RDY_CACHE.ghost) return RDY_CACHE.ghost;
+  const s = 133, TW = RDS_TW, slate = rdsR(['#4a5068', '#3a4058', '#2c3046', '#202434', '#161824']);
+  // 远处：残破的城（窗户里零星发出青绿色的鬼火）
+  const B = rdsPaper(260);
+  let x = 0, i = 0;
+  while (x < TW - 20) { const w = 40 + rdsRand(s, i) * 70, h = 70 + Math.pow(rdsRand(s, i + 50), 1.3) * 170; rdsBlock(B, Math.round(x), Math.round(w), Math.round(h), slate, s + i, { fh: 12, wx: 9, dark: 0x0c0e16, m: 2, lit: 0.07, antenna: true }); x += w + rdsRand(s, i + 90) * 26 - 4; i++; }
+  for (const l of B.lights) { l.col = rdsRand(s, l.x) > 0.5 ? '#90ffc0' : '#c0a0ff'; l.kind = 'neon'; }
+  rdsHaze(B, rdsC('#20263c'), 0.25, 0.4);
+  const back = rdyLayer(B);
+  // 中景：塌了一半的房子、歪路灯（闪烁）、枯树、矮墙
+  const M = rdsPaper(210), P = Object.assign({}, RDS_PAL[1], { paint: [rdsR(['#6a7888', '#566272', '#424c5a', '#30383f']), rdsR(['#7a7064', '#62584e', '#4a423a', '#34302a']), rdsR(['#5e6a5a', '#4a5648', '#384236', '#262e24'])] });
+  for (let k = 0; k < 4; k++) rdsHouse(M, (0.05 + k * 0.25 + rdsRand(s, 10 + k) * 0.06) * TW, 70 + rdsRand(s, 20 + k) * 40, 50 + rdsRand(s, 30 + k) * 30, s + k * 7, P);
+  for (const l of M.lights) { l.col = '#a0ffc8'; l.kind = 'neon'; }
+  for (let k = 0; k < 5; k++) rdsDeadTree(M, rdsRand(s, 40 + k) * TW, 90 + rdsRand(s, 45 + k) * 60, 4 + rdsRand(s, 48 + k) * 2, rdsR(['#5a5448', '#443e34', '#302c24', '#201c16']), s + k, { depth: 4, crow: 0.05, crowC: 0x14121a });
+  for (let k = 0; k < 6; k++) { const lx = (k + 0.5) * 256 + rdsRand(s, 60 + k) * 30, bend = (rdsRand(s, 66 + k) - 0.5) * 16; rdsStroke(M, lx, 0, lx + bend, -84, 1.6, 1.3, rdsR(['#6a6a74', '#4e4e58', '#36363e']), 1, s + k); rdsStroke(M, lx + bend, -84, lx + bend + 12, -90, 1.2, 1, rdsR(['#6a6a74', '#4e4e58', '#36363e']), 1, s); rdsRect(M, lx + bend + 10, -90, 8, 4, 0x2a2a30, 1); rdsRect(M, lx + bend + 11, -86, 6, 2, 0xd8ffe8, 3); rdsLight(M, lx + bend + 14, -85, 'neon', '#c8ffe0', 8); }
+  for (let k = 0; k < 8; k++) { const sx = rdsRand(s, 80 + k) * TW; rdsPoly(M, [[sx - 6, 0], [sx - 6, -16], [sx - 3, -20], [sx + 3, -20], [sx + 6, -16], [sx + 6, 0]], (px, py, t) => rdsPick(slate, 0.6 + t * 2 + (px > sx ? 0.8 : 0), px, py), 1); }
+  rdsOutline(M, rdsC(RDC_PAL.out), rdsC(RDC_PAL.out2));
+  rdsHaze(M, rdsC('#262c44'), 0.1, 0.35);
+  const mid = rdyLayer(M);
+  // 路面：老石板街，积水映着月光
+  const F = rdtPaper(TW, 75, 400), Gr = rdtRamp('#4a4c58');
+  for (let x2 = 0; x2 < TW; x2++) for (let y = -42; y < 400; y++) { const k = (y + F.base) * TW + x2, cob = ((x2 + (Math.floor((y + 60) / 9) & 1) * 8) % 16 === 0) || ((y + 60) % 9 === 0); let v = 2 + (rdtN2(x2, y, 48, 20, s + 6) - 0.5) * 1.4 + (cob && y > -28 && y < 22 ? 1.2 : 0); const h = rdcHash(x2, y, s); if (h < 0.06) v += 0.7; F.c[k] = rdsPick(Gr, v + (y > 24 ? 0.6 : 0), x2, y); F.m[k] = 2; }
+  for (let k = 0; k < 6; k++) rdtEllipse(F, rdsRand(s, 100 + k) * TW, -10 + rdsRand(s, 106 + k) * 26, 20 + rdsRand(s, 112 + k) * 24, 3, (px, py, d, nx, ny) => rdsPx(F, px, py, ny < -0.2 ? 0x8a9ab8 : (Math.abs(px % 9) < 2 ? 0xc8d4e8 : 0x3a4460), 2));
+  rdtGroundBits(F, 1, Gr, s);
+  const floor = rdyLayer(F);
+  return (RDY_CACHE.ghost = { back, mid, floor });
+}
+function rdyLantern() { return rdySprite('lantern', 30, 40, 15, 30, (B) => { rdcRect(B, -1, -30, 2, 4, '#3a3430', 2); rdcPoly(B, [[-6, -26], [6, -26], [8, -14], [6, -4], [-6, -4], [-8, -14]], ['#fff0c0', '#ffc860', '#e08a30', '#a85a1a'], 4); for (const y of [-20, -12]) rdcRect(B, -7, y, 14, 1, '#a85a1a', 4); rdcRect(B, -4, -4, 8, 3, '#3a3430', 2); rdcLine(B, 0, -1, 0, 4, '#c8a060', 2); }); }
+function rdyGate() { return rdySprite('gate', 140, 140, 70, 128, (B) => { for (const x of [-46, 34]) rdcBox(B, x, -110, 14, 110, ['#7a7488', '#5e586c', '#444052', '#2e2a38'], 2, 0, 1); rdcPoly(B, [[-50, -110], [0, -126], [50, -110], [50, -100], [-50, -100]], ['#7a7488', '#5e586c', '#444052'], 2); for (let y = -96; y < 0; y += 2) for (let x = -32; x < 34; x++) if ((x + y) % 7 === 0) rdcPix(B, x, y, '#c8ffe8', 3); rdcRect(B, -6, -120, 12, 8, '#ffe8a0', 4); }); }
+Object.assign(RDN_BUILD, {
+  ghost(B, fr, atk) { const lean = atk ? 5 : 0; for (let y = -30; y < 0; y++) { const u = (y + 30) / 30, hw = 6 + u * 5, cx = lean * (1 - u) + Math.sin(u * 4 + fr * 1.6) * 1.5; for (let x = -hw; x <= hw; x++) { if (y > -5 && (Math.floor((x + fr * 2 + 20) / 3) % 2)) continue; rdcPix(B, Math.round(cx + x), y, rdcRampAt(['#f4fcff', '#d0e4ec', '#a0b8c8', '#7890a4'], 0.1 + Math.abs(x) / hw * 0.4 + u * 0.3, x, y), 3); } }
+    rdnBlob(B, lean + 1, -34, 7, 7, ['#f4fcff', '#d0e4ec', '#a0b8c8'], 3); for (const ex of [-2, 3]) { rdcRect(B, lean + ex, -36, 2, 3, '#14201a', 3); rdcPix(B, lean + ex, -35, '#a0ffd0', 4); } rdcRect(B, lean, atk ? -31 : -30, 2, atk ? 3 : 1, '#14201a', 3); },
+  banshee(B, fr, atk) { for (let y = -44; y < 0; y++) { const u = (y + 44) / 44, hw = 4 + u * 9, cx = Math.sin(u * 5 + fr * 1.5) * 2; for (let x = -hw; x <= hw; x++) { if (y > -6 && (Math.floor((x + fr * 3 + 30) / 3) % 2)) continue; rdcPix(B, Math.round(cx + x), y, rdcRampAt(['#f0e4ff', '#c8b0e8', '#9a80c0', '#6a5494'], 0.1 + Math.abs(x) / hw * 0.4 + u * 0.35, x, y), 3); } }
+    for (let k = 0; k < 14; k++) rdcLine(B, -6 + k, -56, -10 + k - Math.round(Math.sin(fr + k) * 2), -30 + (k % 3) * 3, '#dcd0f0', 3);
+    rdnBlob(B, 0, -50, 6, 7, ['#f8f0ff', '#d8c8f0', '#a890c8'], 3); for (const ex of [-3, 2]) rdcRect(B, ex, -52, 2, 2, '#2a1a3a', 3); rdcRect(B, -1, atk ? -48 : -47, 3, atk ? 4 : 1, '#2a1a3a', 3);
+    rdnLimb(B, 6, -38, 14, atk ? -50 : -26, 2, ['#e8dcff', '#c8b0e8', '#9a80c0']); },
+});
+Object.assign(RDX_THEMES, {
+  ghost: {
+    name: '鬼城', dur: 210, color: '#90ffc0', hour: 0.3, biomes: [1, 2, 3], npcGoal: 0.8,
+    desc: ['一座永远是午夜的废城，雾里飘着幽灵', '幽灵只有被车灯照到时才吃满伤害', '收集路上的魂灯；冲出城门、撑到天亮'],
+    goals: '冲出城门（+300）、收集魂灯（每盏 +30）、撑到天亮',
+    pool: ['ghost', 'banshee', 'ghoul', 'ghost'], waveGap: [5, 8], hpMul: 0.9, dmgMul: 0.5,
+    slots: ['in'], partFilter: (p) => p.slot === 'in' && ['decor', 'fun', 'life'].includes(p.kind),
+    res: { gold: { food: 20, water: 20, med: 6, scrap: 30 }, silver: { food: 12, water: 12, med: 3 }, bronze: { food: 8, water: 8 }, fail: { food: 3 } },
+    enter(D) { const X = (d) => (D.baseKm + d) * RD_PX_KM; for (let d = 5; d < 150; d += rdyRnd(4, 7)) D.objs.push({ k: 'lantern', x: X(d), y: -18 - Math.random() * 20 }); D.gateX = X(110); D.objs.push({ k: 'gate', x: D.gateX }); D.lan = 0; D.h0 = G.road.t; },
+    tick(D, dt) {
+      const R = G.road, vx = rdVehX(); R.t = D.h0 + D.t / D.dur * 5.3; D.note = '';
+      for (const o of D.objs) {
+        if (o.k === 'lantern' && !o.got && vx > o.x && vx - rdVeh().len < o.x + 6) { o.got = true; D.goal += 30; D.lan++; rdFloat(o.x, o.y - 6, '魂灯 +30', '#ffd890'); sfx('coin'); }
+        if (o.k === 'gate' && !o.passed) { if (vx > o.x) { o.passed = true; D.goal += 300; showBanner('冲出城门！', '+300 分，再撑到天亮', 3, '#90ffc0'); rcSys('【副本播报】' + rcC().me + ' 冲出了城门！', 0.3); sfx('win'); } else if (o.x - vx < 600) D.note = '城门就在前面——冲过去！'; }
+      }
+      if (D.t > D.dur - 20 && !D.dawnSaid) { D.dawnSaid = true; showBanner('天快亮了', '再撑 20 秒', 2.5, '#ffcd75'); }
+    },
+    drawBack(g, D, W, H, gy, day, scroll) {
+      const T = rdyGhostTiles(), lit = [], p = D.t / D.dur, dawn = Math.max(0, (p - 0.72) / 0.28);
+      const gr = g.createLinearGradient(0, 0, 0, gy); gr.addColorStop(0, rdMix('#070914', '#2a2a48', dawn)); gr.addColorStop(1, rdMix('#1c2238', '#c07a68', dawn)); g.fillStyle = gr; g.fillRect(0, 0, W, gy);
+      g.globalAlpha = 1 - dawn; for (let k = 0; k < 60; k++) { g.fillStyle = '#e8ecff'; g.fillRect(Math.round(rdHash(k) * W), Math.round(rdHash(k + 9) * gy * 0.6), 1 / RD_Q * 2, 1 / RD_Q * 2); } g.globalAlpha = 1;
+      const mx = W * 0.78, my = gy * 0.22 + dawn * gy * 0.4; g.globalAlpha = 0.4; g.drawImage(rdsGlow('#c8d8ff'), mx - 40, my - 40, 80, 80); g.globalAlpha = 1; rdkCircle(g, mx, my, 12, '#e8ecf4'); g.fillStyle = '#c8ccd8'; g.fillRect(mx - 4, my - 3, 3, 3); g.fillRect(mx + 3, my + 2, 2, 2);
+      rdyBlit(g, T.back, scroll * 0.12, gy - 12, W, lit); rdyBlit(g, T.mid, scroll * 0.4, gy - 12, W, lit); rdyBlit(g, T.floor, scroll, gy, W, lit);
+      rdyFillBelow(g, T.floor, gy, W, H, '#202230');
+      rdsDrawLights(g, lit, day); RDS_LIT = lit;
+    },
+    ambient(g, D, W, H, gy) { const t = G.time; for (let k = 0; k < 5; k++) { const x = ((rdHash(k) * W * 2 - t * 6 - rdVehX() * 0.5) % (W + 160) + W + 160) % (W + 160) - 80; g.globalAlpha = 0.18; g.drawImage(rdsGlow('#c8d0e0'), x - 80, gy - 30 + k * 4, 160, 26); } g.globalAlpha = 1; for (let k = 0; k < 14; k++) { const p = (t * 0.2 + k / 14) % 1, x = (rdHash(k * 3) * W + Math.sin(t + k) * 10); g.globalAlpha = (1 - p) * 0.7; g.fillStyle = '#a0ffd0'; g.fillRect(x, gy - 10 - p * 60, 1, 1); } g.globalAlpha = 1; },
+    drawObjs(g, D, gy) {
+      const t = G.time;
+      for (const o of D.objs) {
+        const x = rdSX(o.x); if (x < -80 || x > RDV.W + 80) continue;
+        if (o.k === 'lantern' && !o.got) { const y = gy + o.y + Math.sin(t * 2 + o.x) * 2; g.globalAlpha = 0.5; g.drawImage(rdsGlow('#ffc860'), x - 8, y - 18, 16, 16); g.globalAlpha = 1; rdyDraw(g, rdyLantern(), x, y); RDS_LIT.push({ x, y: y - 6, r: 9, a2: 0.8, kind: 'glow' }); }
+        if (o.k === 'gate') { rdyDraw(g, rdyGate(), x, gy - 8); if (!o.passed) { g.globalAlpha = 0.25 + Math.sin(t * 3) * 0.1; g.drawImage(rdsGlow('#90ffc0'), x - 30, gy - 50, 60, 50); g.globalAlpha = 1; } }
+      }
+    },
+    hud(ctx, D) { drawText(ctx, '魂灯 ' + D.lan + (D.objs.find((o) => o.k === 'gate').passed ? ' · 已冲出城门' : ' · 城门还有 ' + Math.max(0, (D.gateX - rdVehX()) / RD_PX_KM).toFixed(0) + ' 公里'), 10, G.sw < G.sh ? 160 : 122, 12, '#90ffc0', 'left'); },
+    bonus(D, tier) { if (tier !== 'fail') G.road.me.mood = Math.min(100, G.road.me.mood + 10 + D.lan); },
+  },
+});

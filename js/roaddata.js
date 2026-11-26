@@ -476,6 +476,8 @@ const RD_MONSTERS = {
   // ---- 副本专用（dunOnly：公路上不会出现） ----
   digworm: { name: '地底钻虫', hp: 90, dmg: 5, spd: 40, w: 18, h: 12, swarm: [1, 2], color: '#7a5a6a', glow: '#ff9a50', drop: { scrap: 0.6 }, dunOnly: true },
   cavebug: { name: '矿洞甲虫', hp: 20, dmg: 1.5, spd: 70, w: 10, h: 6, swarm: [3, 6], color: '#5a4a3a', glow: '#ffd060', drop: { scrap: 0.4 }, dunOnly: true, chase: true },
+  ghost: { name: '游荡幽灵', hp: 40, dmg: 3, spd: 60, w: 12, h: 16, swarm: [2, 4], fly: true, color: '#c8d8e0', glow: '#a0ffd0', drop: { power: 0.3 }, dunOnly: true, ghostly: true, chase: true },
+  banshee: { name: '哭嚎女妖', hp: 120, dmg: 6, spd: 45, w: 14, h: 22, swarm: [1, 1], fly: true, ranged: 110, color: '#d8c8f0', glow: '#e070ff', drop: { med: 0.5 }, dunOnly: true, ghostly: true },
 };
 
 // ---------- 研究（需要车载电脑 + 外星晶体） ----------

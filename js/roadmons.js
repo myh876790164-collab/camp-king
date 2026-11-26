@@ -101,7 +101,7 @@ function rdnDraw(g, m, gy) {
   if (!M.fly) { g.fillStyle = 'rgba(20,12,8,0.3)'; g.fillRect(x - M.w / 2 - 1, gy + 3, M.w + 2, 1); }
   g.save(); g.translate(Math.round(x * Q) / Q, Math.round(y * Q) / Q); if (m.face < 0) g.scale(-1, 1);
   const w = S.cv.width / Q, h = S.cv.height / Q, ox = -S.ox / Q, oy = -S.oy / Q;
-  if (m.type === 'wraith') g.globalAlpha = 0.8 + Math.sin(m.ph * 3) * 0.1;
+  if (m.type === 'wraith' || M.ghostly) g.globalAlpha = (M.ghostly ? (m.x > rdVehX() - 4 && m.x < rdVehX() + 130 ? 0.9 : 0.5) : 0.8) + Math.sin(m.ph * 3) * 0.1; // 幽灵在车灯外面是半透明的
   g.drawImage(S.cv, ox, oy, w, h);
   if (m.hitT > 0) { g.globalAlpha = Math.min(1, m.hitT / 0.1); g.drawImage(S.white, ox, oy, w, h); }
   g.globalAlpha = 1;
