@@ -79,10 +79,10 @@ Object.assign(RDN_BUILD, {
 
 Object.assign(RDX_THEMES, {
   mine: {
-    name: '矿洞', dur: 210, color: '#e8a040', hour: 19.3, biomes: [0, 1, 4], npcGoal: 1.0,
+    name: '矿洞', dur: 210, color: '#e8a040', hour: 19.3, biomes: [0, 1, 4], npcGoal: 1.9,
     desc: ['一条废弃的地下矿道，铁轨一路通向深处', '矿点前「刹车」停下就会自动开采；矿车顶着往前推', '头顶出现裂缝说明要塌方——刹车或冲刺躲开'],
     goals: '挖矿（每处 +50）、推矿车（每辆 +100）、杀敌、活到最后',
-    pool: ['cavebug', 'digworm', 'roach', 'spider'], waveGap: [6, 9], hpMul: 0.9, dmgMul: 0.55,
+    pool: ['cavebug', 'digworm', 'roach', 'spider'], waveGap: [6, 9], hpMul: 0.85, dmgMul: 0.42,
     slots: ['engine', 'util'], partFilter: (p) => ['engine', 'util', 'tank'].includes(p.slot) || (p.slot === 'in' && p.kind === 'bench'),
     res: { gold: { scrap: 90, ammo: 20, power: 20 }, silver: { scrap: 55, ammo: 10 }, bronze: { scrap: 30 }, fail: { scrap: 8 } },
     enter(D) {
@@ -179,10 +179,10 @@ Object.assign(RDN_BUILD, {
 });
 Object.assign(RDX_THEMES, {
   ghost: {
-    name: '鬼城', dur: 210, color: '#90ffc0', hour: 0.3, biomes: [1, 2, 3], npcGoal: 0.8,
+    name: '鬼城', dur: 210, color: '#90ffc0', hour: 0.3, biomes: [1, 2, 3], npcGoal: 1.0,
     desc: ['一座永远是午夜的废城，雾里飘着幽灵', '幽灵只有被车灯照到时才吃满伤害', '收集路上的魂灯；冲出城门、撑到天亮'],
     goals: '冲出城门（+300）、收集魂灯（每盏 +30）、撑到天亮',
-    pool: ['ghost', 'banshee', 'ghoul', 'ghost'], waveGap: [5, 8], hpMul: 0.9, dmgMul: 0.5,
+    pool: ['ghost', 'banshee', 'ghoul', 'ghost'], waveGap: [6, 9], hpMul: 0.85, dmgMul: 0.33,
     slots: ['in'], partFilter: (p) => p.slot === 'in' && ['decor', 'fun', 'life'].includes(p.kind),
     res: { gold: { food: 20, water: 20, med: 6, scrap: 30 }, silver: { food: 12, water: 12, med: 3 }, bronze: { food: 8, water: 8 }, fail: { food: 3 } },
     enter(D) { const X = (d) => (D.baseKm + d) * RD_PX_KM; for (let d = 5; d < 150; d += rdyRnd(4, 7)) D.objs.push({ k: 'lantern', x: X(d), y: -18 - Math.random() * 20 }); D.gateX = X(110); D.objs.push({ k: 'gate', x: D.gateX }); D.lan = 0; D.h0 = G.road.t; },
@@ -272,10 +272,10 @@ Object.assign(RDN_BUILD, {
 });
 Object.assign(RDX_THEMES, {
   fort: {
-    name: '军阀基地', dur: 240, color: '#ef7d57', hour: 18.4, biomes: [2, 3, 4], npcGoal: 1.1,
+    name: '军阀基地', dur: 240, color: '#ef7d57', hour: 18.4, biomes: [2, 3, 4], npcGoal: 2.0,
     desc: ['铁颅军阀的废铁堡垒，墙头架着探照灯', '先轰开大门，再顶住打手和枪手', '最后军阀亲自上场：三个阶段，小心火箭弹'],
     goals: '轰开大门（+120）、打倒军阀（+400）、杀敌、活到最后',
-    pool: ['raider', 'gunner', 'raider', 'dog'], waveGap: [6, 9], hpMul: 0.85, dmgMul: 0.5,
+    pool: ['raider', 'gunner', 'raider', 'dog'], waveGap: [7, 10], hpMul: 0.65, dmgMul: 0.26,
     slots: ['weapon', 'hand'], res: { gold: { ammo: 80, scrap: 40, med: 4 }, silver: { ammo: 45, scrap: 20 }, bronze: { ammo: 25 }, fail: { ammo: 8 } },
     enter(D) { const R = G.road; D.gateM = rdxMon('gate', (D.baseKm + 9) * RD_PX_KM); D.bossT = 110; D.marks = []; },
     tick(D, dt) {
@@ -289,7 +289,7 @@ Object.assign(RDX_THEMES, {
         else {
           const f = b.hp / b.max, ph = f > 0.66 ? 1 : f > 0.33 ? 2 : 3;
           if (ph !== b.ph0) { b.ph0 = ph; showBanner(ph === 2 ? '军阀架起火箭炮！' : '军阀狂暴了！', ph === 2 ? '地上出现红圈就快躲开（刹车 / 冲刺）' : '速度和伤害都变高了', 2.5, '#e04a3a'); }
-          b.sumT = (b.sumT || 8) - dt; if (ph === 1 && b.sumT <= 0) { b.sumT = 12; for (let k = 0; k < 2; k++) rdxMon('raider', b.x + 20 + k * 12); }
+          b.sumT = (b.sumT || 8) - dt; if (ph === 1 && b.sumT <= 0) { b.sumT = 15; for (let k = 0; k < 2; k++) rdxMon('raider', b.x + 20 + k * 12); }
           if (ph === 2) { b.spd = 0; b.rkT = (b.rkT || 3) - dt; if (b.rkT <= 0) { b.rkT = 6; for (let k = 0; k < 3; k++) D.marks.push({ x: vx - L / 2 + (k - 1) * 46 + (Math.random() - 0.5) * 20, t: 1.7 }); } }
           if (ph === 3 && !b.rage) { b.rage = true; b.spd = RD_MONSTERS.warlord.spd * 1.7; b.dmg *= 1.4; }
           D.note = '军阀 ' + Math.ceil(f * 100) + '%';
@@ -297,7 +297,7 @@ Object.assign(RDX_THEMES, {
       }
       for (const mk of D.marks) { mk.t -= dt; if (mk.t <= 0 && !mk.hit) { mk.hit = true; R.fx.push({ kind: 'boom', x: mk.x, y: -6, r: 16, life: 0.4, max: 0.4 }); G.shake = 0.25; if (Math.abs(mk.x - (vx - L / 2)) < L / 2 + 14 && !D.out) rdHurtVehicle(18 * (1 + D.realKm / 2400)); } }
       D.marks = D.marks.filter((mk) => mk.t > -0.5);
-      if (D.gateM && D.gateM.x - vx < 300) D.note = '轰开大门！（武器会自动打它）';
+      if (D.gateM && D.gateM.x - vx < 300 && !D.note) D.note = '前面是堡垒大门：顶上去按「冲刺」猛撞';
     },
     drawBack(g, D, W, H, gy, day, scroll) {
       const T = rdyFortTiles(), lit = [];
@@ -352,10 +352,10 @@ Object.assign(RDN_BUILD, {
 });
 Object.assign(RDX_THEMES, {
   abase: {
-    name: '外星人基地', dur: 240, color: '#73eff7', hour: 21.5, biomes: [4, 5], npcGoal: 1.2,
+    name: '外星人基地', dur: 240, color: '#73eff7', hour: 21.5, biomes: [4, 5], npcGoal: 2.3,
     desc: ['外星人在这里造了一门「灭星炮」，正在充能', '路上有 4 个能量核心挡路——全部打爆才能阻止它', '核心每隔几秒开一次护盾（几乎打不动），抓住护盾关掉的时候'],
     goals: '摧毁能量核心（每个 +150）、全部摧毁阻止发射（+300）、杀敌、活到最后',
-    pool: ['crawler', 'adrone', 'sentinel', 'adrone', 'crawler'], waveGap: [6, 9], hpMul: 0.7, dmgMul: 0.45,
+    pool: ['crawler', 'adrone', 'sentinel', 'adrone', 'crawler'], waveGap: [6, 9], hpMul: 0.75, dmgMul: 0.38,
     slots: ['space', 'chassis'], partFilter: (p) => p.alien || p.tier >= 5,
     res: { gold: { alien: 12, power: 40, scrap: 30 }, silver: { alien: 6, power: 20 }, bronze: { alien: 3, power: 10 }, fail: { alien: 1 } },
     rewardMul: (D) => (D.saved ? 1 : 0.5),

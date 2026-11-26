@@ -11,7 +11,7 @@ const RDX_THEMES = {
     name: '试炼场', dur: 180, test: true, color: '#e04a3a',
     desc: ['系统的入门试炼：一条封锁的竞技公路', '一边往前开一边打怪，比谁的分高', '车被打瘫就淘汰'],
     goals: '杀敌、跑得远、活到最后',
-    slots: ['weapon', 'armor', 'ram', 'tires'], waveGap: [6, 10], hpMul: 0.75, dmgMul: 0.4, double: 999, // 教学关：怪少一点、弱一点
+    slots: ['weapon', 'armor', 'ram', 'tires'], waveGap: [6, 10], hpMul: 0.7, dmgMul: 0.3, double: 999, // 教学关：怪少一点、弱一点
     res: { gold: { scrap: 60, ammo: 40, food: 10, water: 10 }, silver: { scrap: 35, ammo: 20 }, bronze: { scrap: 20, ammo: 10 }, fail: { scrap: 5 } },
   },
 };
@@ -87,6 +87,7 @@ function rdxEnter(themeId) {
   if (T.hour != null) R.t = Math.floor(R.t / 24) * 24 + T.hour;
   R.km = R.dun.baseKm; R.sites = []; R.obs = []; R.mons = []; R.proj = []; R.fx = []; R.parts = []; R.floats = [];
   R.weather = null; R.reverse = null; R.search = null; R.view = 'out'; R.driving = false; R.speedNow = 0;
+  { const st0 = rdStats(); if (R.hpV < st0.hp * 0.6) { R.hpV = Math.round(st0.hp * 0.6); R.broken = false; } } // 公平起见：传送时把车修到 60% 以上
   if (T.enter) T.enter(R.dun);
   G.state = 'play';
   rcSys('【副本】「' + T.name + '」开启！参赛者：' + C.me + '、' + npcs.map((x) => x.name).join('、'), 0.5);
@@ -147,11 +148,16 @@ function rdxUpdate(dt) {
   let dkm = R.speedNow * RD_KM_RATE * dt;
   // 挡路的东西（大门、能量核心）：没打掉前过不去
   const vx0 = rdVehX();
-  for (const m of R.mons) { const M = RD_MONSTERS[m.type]; if (!M.block || m.dead || m.hp <= 0) continue; const lim = m.x - M.w / 2 - 3; if (m.x > vx0 - 5 && vx0 + dkm * RD_PX_KM > lim) { dkm = Math.max(0, (lim - vx0) / RD_PX_KM); R.speedNow = Math.min(R.speedNow, 3); D.blocked = M.name; } }
+  for (const m of R.mons) { const M = RD_MONSTERS[m.type]; if (!M.block || m.dead || m.hp <= 0) continue; const lim = m.x - M.w / 2 - 3; if (m.x > vx0 - 5 && vx0 + dkm * RD_PX_KM > lim) { dkm = Math.max(0, (lim - vx0) / RD_PX_KM); R.speedNow = Math.min(R.speedNow, 3); D.blocked = M.name; D.blockM = m; } }
+  // 顶着挡路的东西：一直慢慢撞；按「冲刺」猛撞（伤害翻倍、更快）
+  if (D.blockM && !D.blockM.dead && D.blockM.hp > 0 && vx0 >= D.blockM.x - RD_MONSTERS[D.blockM.type].w / 2 - 6 && !D.out) {
+    D.ramT = (D.ramT || 0) - dt;
+    if (D.ramT <= 0) { const hard = D.drive === 'boost'; D.ramT = hard ? 0.5 : 1.4; rdHitMon(D.blockM, (18 + (st.ram || 0) * 3) * (hard ? 2 : 1) * (1 + D.realKm / 1200), null, true); G.shake = hard ? 0.2 : 0.08; rdSpark(D.blockM.x - 8, -12, '#ffcd75'); sfx('hit'); if (D.blockM.type === 'core' && hard) rdHurtVehicle(4 * (1 + D.realKm / 2400)); /* 撞能量核心会被电回来 */ }
+  } else D.blockM = null;
   D.dist += dkm; R.km += dkm; R.driving = !D.out && target > 0;
   // 一波一波的怪
   D.waveT -= dt;
-  if (D.waveT <= 0 && !D.out && D.t < D.dur - 6) { D.waveT = T.waveGap[0] + Math.random() * (T.waveGap[1] - T.waveGap[0]); rdxSpawn(D, T); if (D.t > (T.double || 60) && Math.random() < 0.4) rdxSpawn(D, T); }
+  if (D.waveT <= 0 && !D.out && D.t < D.dur - 6) { D.waveT = (T.waveGap[0] + Math.random() * (T.waveGap[1] - T.waveGap[0])) * (D.blockM ? 1.7 : 1); /* 被挡住时怪来得慢一点 */ rdxSpawn(D, T); if (D.t > (T.double || 60) && Math.random() < 0.4) rdxSpawn(D, T); }
   // 战斗（武器自动开火）+ 算击杀分
   const before = R.mons.slice();
   rdCombat(dt, st); rdFxTick(dt);
@@ -199,7 +205,7 @@ function rdxNpcTick(D, dt) {
   for (const n of D.npcs) {
     if (n.out) continue;
     n.dist += (48 + n.skill * 18) * RD_KM_RATE * dt * (1 + n.lag * 0.1);
-    n.kAcc += dt * (0.1 + 0.2 * n.skill) * Math.min(1.6, 0.5 + D.t / 90);
+    n.kAcc += dt * (0.12 + 0.24 * n.skill) * Math.min(1.6, 0.5 + D.t / 90);
     while (n.kAcc >= 1) { n.kAcc -= 1; n.killN++; n.kill += 10 + (20 + Math.random() * 60) / 5; }
     n.goal = (n.goal || 0) + dt * (RDX_THEMES[D.id].npcGoal || 0) * n.skill * (0.5 + Math.random());
     if (Math.random() < dt * 0.012 && (D.chatT || 0) < D.t) { D.chatT = D.t + 14; rdxSay(D, n, 'goal'); } // 边打边在频道里说两句
@@ -311,7 +317,7 @@ function rdxHud(ctx, D, T) {
 function rdxDriveBtns(ctx, D, T) {
   const sw = G.sw, sh = G.sh, bw = Math.min(96, (sw - 32) / 3), x0 = sw / 2 - (bw * 3 + 16) / 2, y = sh - 56;
   [['stop', '■ 刹车'], ['go', '▶ 前进'], ['boost', '»» 冲刺']].forEach(([k, l], i) => drawButton(ctx, x0 + i * (bw + 8), y, bw, 42, l, () => { D.drive = k; }, { color: D.drive === k ? (k === 'boost' ? '#b13e53' : k === 'stop' ? '#566c86' : '#1f5e3a') : '#262b44', size: 13 }));
-  const note = D.blocked ? '前面的' + D.blocked + '挡住了路——武器会自动打它' : D.note;
+  const note = D.blocked ? D.blocked + '挡住了路——按「冲刺」猛撞它，武器也会帮着打' : D.note;
   if (note) { ctx.font = 'bold 13px ' + FONT; const w = ctx.measureText(note).width + 20; rdxPanel(ctx, sw / 2 - w / 2, y - 34, w, 26, T.color); drawText(ctx, note, sw / 2, y - 21, 13, '#ffcd75', 'center'); }
   D.blocked = null;
 }

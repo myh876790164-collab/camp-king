@@ -480,9 +480,9 @@ const RD_MONSTERS = {
   banshee: { name: '哭嚎女妖', hp: 120, dmg: 6, spd: 45, w: 14, h: 22, swarm: [1, 1], fly: true, ranged: 110, color: '#d8c8f0', glow: '#e070ff', drop: { med: 0.5 }, dunOnly: true, ghostly: true },
   raider: { name: '军阀打手', hp: 50, dmg: 4, spd: 72, w: 9, h: 16, swarm: [2, 4], color: '#8a5a3a', glow: '#ef7d57', drop: { ammo: 0.5, scrap: 0.3 }, dunOnly: true, chase: true },
   gunner: { name: '军阀枪手', hp: 40, dmg: 3.5, spd: 45, w: 9, h: 16, swarm: [1, 3], ranged: 130, color: '#5a6040', glow: '#ffcd75', drop: { ammo: 0.8 }, dunOnly: true },
-  gate: { name: '堡垒大门', hp: 900, dmg: 0, spd: 0, w: 22, h: 40, swarm: [1, 1], color: '#6a5a48', glow: '#ef7d57', drop: { scrap: 1 }, dunOnly: true, inert: true, block: true, score: 120, big: true },
-  warlord: { name: '铁颅军阀', hp: 2400, dmg: 14, spd: 32, w: 26, h: 40, swarm: [1, 1], color: '#4a4a52', glow: '#e04a3a', drop: { ammo: 1, scrap: 1 }, dunOnly: true, big: true, boss: true, score: 400 },
-  core: { name: '能量核心', hp: 600, dmg: 0, spd: 0, w: 18, h: 40, swarm: [1, 1], color: '#4b3378', glow: '#73eff7', drop: { alien: 1 }, dunOnly: true, inert: true, block: true, score: 150, big: true },
+  gate: { name: '堡垒大门', hp: 600, dmg: 0, spd: 0, w: 22, h: 40, swarm: [1, 1], color: '#6a5a48', glow: '#ef7d57', drop: { scrap: 1 }, dunOnly: true, inert: true, block: true, score: 120, big: true },
+  warlord: { name: '铁颅军阀', hp: 1800, dmg: 11, spd: 32, w: 26, h: 40, swarm: [1, 1], color: '#4a4a52', glow: '#e04a3a', drop: { ammo: 1, scrap: 1 }, dunOnly: true, big: true, boss: true, score: 400 },
+  core: { name: '能量核心', hp: 450, dmg: 0, spd: 0, w: 18, h: 40, swarm: [1, 1], color: '#4b3378', glow: '#73eff7', drop: { alien: 1 }, dunOnly: true, inert: true, block: true, score: 150, big: true },
   adrone: { name: '外星无人机', hp: 50, dmg: 3, spd: 80, w: 12, h: 8, swarm: [2, 3], fly: true, color: '#7a6a98', glow: '#73eff7', drop: { power: 0.4 }, dunOnly: true, chase: true },
 };
 
