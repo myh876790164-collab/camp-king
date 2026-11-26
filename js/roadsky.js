@@ -141,6 +141,7 @@ function rdkSky(g, W, gy, b, pb, blend, day, dusk, h) {
 
 // ---------- 天气 + 各地区的飘浮物 ----------
 function rdkWeather(g, W, H, gy, day, b, bi) {
+  { const D = G.road && G.road.dun, T = D && RDX_THEMES[D.id]; if (T && T.drawBack) { if (T.ambient) T.ambient(g, D, W, H, gy, day); return; } } // 副本主题自己的气氛粒子
   const R = G.road, t = G.time, w = R.weather, wi = rdkWI(), Q = RD_Q;
   const P = (i, s) => rdHash(i * 1.7 + s * 13.1);
   const fall = (i, s, spdX, spdY, ph) => { const x = ((P(i, s) * W * 3 + t * spdX * (0.6 + P(i, s + 1) * 0.8)) % W + W) % W, y = ((P(i, s + 2) * H * 3 + t * spdY * (0.6 + P(i, s + 3) * 0.8)) % H + H) % H; return [x + Math.sin(t * 1.3 + i + (ph || 0)) * 3 * (ph != null ? 1 : 0), y]; };

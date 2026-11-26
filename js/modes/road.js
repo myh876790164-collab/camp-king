@@ -525,6 +525,7 @@ function rdMonsterPool() {
   const R = rdR(), bi = rdBiomeIndex(R.km), b = rdBiomeAt(R.km);
   return Object.keys(RD_MONSTERS).filter((k) => {
     const m = RD_MONSTERS[k];
+    if (m.dunOnly) return false; // 副本专用怪
     if (m.minKm && R.km < m.minKm) return false;
     if (m.alienOnly && !b.alien) return false;
     if (m.biome !== undefined && m.biome !== bi) return false;

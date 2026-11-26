@@ -473,6 +473,9 @@ const RD_MONSTERS = {
   wraith: { name: '冰原游魂', hp: 70, dmg: 4.5, spd: 70, w: 12, h: 18, swarm: [1, 3], fly: true, color: '#cfe3f0', glow: '#73eff7', drop: { power: 0.6 }, minKm: 1080, biome: 4 },
   crawler: { name: '外星爬行者', hp: 130, dmg: 6, spd: 85, w: 18, h: 10, swarm: [2, 4], color: '#4b3378', glow: '#c27bd6', drop: { alien: 0.35 }, minKm: 900, alienOnly: true },
   sentinel: { name: '外星守卫', hp: 420, dmg: 12, spd: 26, w: 18, h: 30, swarm: [1, 1], ranged: 160, color: '#24183f', glow: '#73eff7', drop: { alien: 1, power: 1 }, minKm: 1100, alienOnly: true, big: true },
+  // ---- 副本专用（dunOnly：公路上不会出现） ----
+  digworm: { name: '地底钻虫', hp: 90, dmg: 5, spd: 40, w: 18, h: 12, swarm: [1, 2], color: '#7a5a6a', glow: '#ff9a50', drop: { scrap: 0.6 }, dunOnly: true },
+  cavebug: { name: '矿洞甲虫', hp: 20, dmg: 1.5, spd: 70, w: 10, h: 6, swarm: [3, 6], color: '#5a4a3a', glow: '#ffd060', drop: { scrap: 0.4 }, dunOnly: true, chase: true },
 };
 
 // ---------- 研究（需要车载电脑 + 外星晶体） ----------

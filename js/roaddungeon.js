@@ -20,7 +20,7 @@ const RDX_LINES = {
   win: ['恭喜恭喜', '大佬带带我', '下次我一定赢', '运气好而已吧', '羡慕了', '这分数有点东西', '服了'],
   out: ['我车废了……', '先走一步，你们加油', '救命！', '这怪太猛了', '淘汰了，气死'],
 };
-const RDX_STASH_KEYS = ['km', 'sites', 'obs', 'mons', 'proj', 'fx', 'parts', 'floats', 'weather', 'reverse', 'search', 'driving', 'speedNow', 'view'];
+const RDX_STASH_KEYS = ['km', 't', 'sites', 'obs', 'mons', 'proj', 'fx', 'parts', 'floats', 'weather', 'reverse', 'search', 'driving', 'speedNow', 'view'];
 function rdxEnsure(R) { if (R.dunNextKm == null) R.dunNextKm = Math.max(120, R.km) + 250 + Math.random() * 100; R.dunCount = R.dunCount || 0; }
 
 // ---------- 模式钩子（js/modes/road.js 里改走这里） ----------
@@ -77,9 +77,11 @@ function rdxEnter(themeId) {
       score: 0, kill: 0, killN: 0, dist: 0, out: false, kAcc: 0, lag: (Math.random() - 0.5) * 0.6 });
   }
   const bi = rdBiomeIndex(R.km);
-  R.dun = { id, phase: 'warpIn', pt: 0, t: 0, dur: T.dur, dist: 0, baseKm: bi * RD_BIOME_LEN + 30, realKm: R.km, kill: 0, killN: 0, out: false, npcs, waveT: 3, leadT: 0, lead: null };
+  R.dun = { id, phase: 'warpIn', pt: 0, t: 0, dur: T.dur, dist: 0, baseKm: (T.biome != null ? T.biome : bi) * RD_BIOME_LEN + 30, realKm: R.km, kill: 0, killN: 0, out: false, npcs, waveT: 3, leadT: 0, lead: null, goal: 0, objs: [], drive: 'go', note: '' };
+  if (T.hour != null) R.t = Math.floor(R.t / 24) * 24 + T.hour;
   R.km = R.dun.baseKm; R.sites = []; R.obs = []; R.mons = []; R.proj = []; R.fx = []; R.parts = []; R.floats = [];
   R.weather = null; R.reverse = null; R.search = null; R.view = 'out'; R.driving = false; R.speedNow = 0;
+  if (T.enter) T.enter(R.dun);
   G.state = 'play';
   rcSys('【副本】「' + T.name + '」开启！参赛者：' + C.me + '、' + npcs.map((x) => x.name).join('、'), 0.5);
   npcs.forEach((x, i) => rcQueue(P.byId[x.id], 'hello', {}, 2 + i * 1.7, { text: RDX_LINES.start[Math.floor(Math.random() * RDX_LINES.start.length)] }));
@@ -99,13 +101,29 @@ function rdxExit() {
 }
 
 // ---------- 副本里每帧 ----------
+// 放一只怪（副本专用：血量按真实里程算，再乘主题倍率）
+function rdxMon(type, x, extra) {
+  const R = G.road, D = R.dun, T = RDX_THEMES[D.id], M = RD_MONSTERS[type], hpMul = (1 + D.realKm / 800) * (T.hpMul || 1), dmgMul = (1 + D.realKm / 2400) * (T.dmgMul || 1);
+  const m = Object.assign({ type, x, y: M.fly ? -30 - Math.random() * 20 : 0, hp: M.hp * hpMul, max: M.hp * hpMul, dmg: M.dmg * dmgMul, patience: 999, spd: M.spd * (0.85 + Math.random() * 0.3), cd: 0, ramCd: 0, burn: 0, slow: 0, ph: Math.random() * 6, face: -1, atkT: 0 }, extra || {});
+  R.mons.push(m); return m;
+}
 function rdxSpawn(D, T) {
   const R = G.road, behind = Math.random() < 0.25, x = rdVehX() + (behind ? -150 : 160 + Math.random() * 60), keep = R.km, n0 = R.mons.length;
+  if (T.pool) {
+    let pool = T.pool.filter((k) => !behind || RD_MONSTERS[k].chase || RD_MONSTERS[k].fly); if (!pool.length) pool = T.pool;
+    let type = pool[Math.floor(Math.random() * pool.length)]; if (RD_MONSTERS[type].big && Math.random() < 0.6) type = pool[Math.floor(Math.random() * pool.length)];
+    const M = RD_MONSTERS[type], n = M.swarm[0] + Math.floor(Math.random() * (M.swarm[1] - M.swarm[0] + 1));
+    for (let i = 0; i < n; i++) rdxMon(type, x + (Math.random() - 0.5) * 40 + i * (behind ? -14 : 14));
+    return;
+  }
   R.km = D.realKm; // 用真实里程挑怪、算血量（越往后越难）
   rdSpawnGroup(x, false, behind);
   R.km = keep;
   for (let i = n0; i < R.mons.length; i++) { const m = R.mons[i]; m.hp *= T.hpMul; m.max *= T.hpMul; m.dmg *= T.dmgMul || 1; m.patience = 999; }
 }
+// 背景 / 目标物：主题有就交给主题画
+function rdxBack(g, W, H, gy, day, dusk, scroll) { const D = G.road && G.road.dun, T = D && RDX_THEMES[D.id]; if (!T || !T.drawBack) return false; T.drawBack(g, D, W, H, gy, day, scroll); return true; }
+function rdxObjs(g, gy) { const D = G.road && G.road.dun, T = D && RDX_THEMES[D.id]; if (T && T.drawObjs) T.drawObjs(g, D, gy); }
 function rdxUpdate(dt) {
   const R = G.road, D = R.dun, T = RDX_THEMES[D.id];
   D.pt += dt;
@@ -116,17 +134,23 @@ function rdxUpdate(dt) {
   D.t += dt;
   const st = rdStats(); R.st = st;
   // 开车（自动、不耗油）
-  const target = D.out ? 0 : Math.min(st.speed, 65);
-  R.speedNow += Math.sign(target - R.speedNow) * Math.min(Math.abs(target - R.speedNow), 30 * dt);
-  const dkm = R.speedNow * RD_KM_RATE * dt;
-  D.dist += dkm; R.km += dkm; R.driving = !D.out;
+  // 玩家可以刹车 / 冲刺（挖矿、躲塌方、抢时间）
+  let target = D.out || D.drive === 'stop' ? 0 : D.drive === 'boost' ? Math.min(st.speed * 1.35, 92) : Math.min(st.speed, 65);
+  if (D.drive === 'stop' && !D.out && D.creep) target = 14; // 刹车时前面有目标物：慢慢挪到跟前（主题设置 D.creep）
+  R.speedNow += Math.sign(target - R.speedNow) * Math.min(Math.abs(target - R.speedNow), (target < R.speedNow ? 70 : 30) * dt);
+  let dkm = R.speedNow * RD_KM_RATE * dt;
+  // 挡路的东西（大门、能量核心）：没打掉前过不去
+  const vx0 = rdVehX();
+  for (const m of R.mons) { const M = RD_MONSTERS[m.type]; if (!M.block || m.dead || m.hp <= 0) continue; const lim = m.x - M.w / 2 - 3; if (m.x > vx0 - 5 && vx0 + dkm * RD_PX_KM > lim) { dkm = Math.max(0, (lim - vx0) / RD_PX_KM); R.speedNow = Math.min(R.speedNow, 3); D.blocked = M.name; } }
+  D.dist += dkm; R.km += dkm; R.driving = !D.out && target > 0;
   // 一波一波的怪
   D.waveT -= dt;
   if (D.waveT <= 0 && !D.out && D.t < D.dur - 6) { D.waveT = T.waveGap[0] + Math.random() * (T.waveGap[1] - T.waveGap[0]); rdxSpawn(D, T); if (D.t > (T.double || 60) && Math.random() < 0.4) rdxSpawn(D, T); }
   // 战斗（武器自动开火）+ 算击杀分
   const before = R.mons.slice();
   rdCombat(dt, st); rdFxTick(dt);
-  for (const m of before) if (m.dead && !m._dc) { m._dc = 1; D.killN++; D.kill += 10 + RD_MONSTERS[m.type].hp / 5; }
+  for (const m of before) if (m.dead && !m._dc) { m._dc = 1; const M = RD_MONSTERS[m.type]; if (!M.block && !M.boss) D.killN++; D.kill += M.score != null ? M.score : 10 + M.hp / 5; if (T.onKill) T.onKill(D, m); }
+  if (T.tick) T.tick(D, dt, st);
   { const vx = rdVehX(); R.mons = R.mons.filter((m) => m.x > vx - 320); } // 被甩在后面太远的怪就不追了
   rcTick(dt / (G.speed || 1)); // 聊天室照常刷新（副本播报）
   // 淘汰
@@ -141,7 +165,7 @@ function rdxUpdate(dt) {
   D.leadT -= dt;
   const list = rdxRanking(D);
   if (D.t > 12 && D.leadT <= 0 && list[0].name !== D.lead) { D.lead = list[0].name; D.leadT = 25; rcSys('【副本播报】当前第一：' + list[0].name + '（' + Math.round(list[0].score) + ' 分）', 0); }
-  if (D.t >= D.dur || (D.out && D.t - D.outT > 4)) rdxFinish();
+  if (D.t >= D.dur || (D.out && D.t - D.outT > 4) || (D.done && D.t - D.doneT > 4)) rdxFinish();
 }
 function rdxNpcTick(D, dt) {
   const P = rcPeople();
@@ -150,6 +174,7 @@ function rdxNpcTick(D, dt) {
     n.dist += (48 + n.skill * 18) * RD_KM_RATE * dt * (1 + n.lag * 0.1);
     n.kAcc += dt * (0.1 + 0.2 * n.skill) * Math.min(1.6, 0.5 + D.t / 90);
     while (n.kAcc >= 1) { n.kAcc -= 1; n.killN++; n.kill += 10 + (20 + Math.random() * 60) / 5; }
+    n.goal = (n.goal || 0) + dt * (RDX_THEMES[D.id].npcGoal || 0) * n.skill * (0.5 + Math.random());
     if (Math.random() < dt * 0.0016 * (2.2 - n.skill) * (D.t / D.dur + 0.3)) {
       n.out = true;
       rcSys('【副本播报】' + n.name + ' 被淘汰！', 0.2);
@@ -160,8 +185,8 @@ function rdxNpcTick(D, dt) {
 // 分数：击杀 + 路程 ×2/公里 + 存活（结束时才加）
 function rdxRanking(D, final) {
   const R = G.road, st = R.st || rdStats(), me = { me: true, name: rcC().me, color: '#ffcd75', killN: D.killN, kill: D.kill, dist: D.dist, out: D.out };
-  me.score = D.kill + D.dist * 2 + (final && !D.out ? 150 + 50 * Math.max(0, R.hpV) / st.hp : 0);
-  for (const n of D.npcs) n.score = n.kill + n.dist * 2 + (final && !n.out ? 150 + 50 * (0.3 + n.skill * 0.4) : 0);
+  me.goal = D.goal; me.score = D.kill + D.dist * 2 + D.goal + (final && !D.out ? 150 + 50 * Math.max(0, R.hpV) / st.hp : 0);
+  for (const n of D.npcs) n.score = n.kill + n.dist * 2 + (n.goal || 0) + (final && !n.out ? 150 + 50 * (0.3 + n.skill * 0.4) : 0);
   return [me, ...D.npcs].sort((a, b) => b.score - a.score);
 }
 // ---------- 结算 + 发奖 ----------
@@ -170,15 +195,17 @@ function rdxFinish() {
   const list = rdxRanking(D, true).map((x) => Object.assign({}, x)), rank = list.findIndex((x) => x.me) + 1; // 拷一份：结算后分数不再变
   const tier = D.out ? 'fail' : rank === 1 ? 'gold' : rank <= 3 ? 'silver' : 'bronze';
   const rewards = [];
-  const res = T.res[tier];
-  for (const k in res) { const got = rdGain(k, res[k]); if (got > 0) rewards.push({ res: k, n: got }); }
+  const res = T.res[tier], mul = T.rewardMul ? T.rewardMul(D) : 1;
+  for (const k in res) { const got = rdGain(k, Math.max(1, Math.round(res[k] * mul))); if (got > 0) rewards.push({ res: k, n: got }); }
+  if (T.bonus) T.bonus(D, tier, rewards); // 主题的额外奖励（矿石、外星晶体……）
   // 零件：冠军必得一个高 2 品阶的主题零件，前三 50% 得高 1 品阶
   const inst = rdInstalled().filter((p) => p.slot !== 'in'), avg = inst.length ? inst.reduce((s, p) => s + p.tier, 0) / inst.length : 1;
   const want = tier === 'gold' ? 2 : tier === 'silver' && Math.random() < 0.5 ? 1 : -1;
   if (want > 0) {
     const tt = Math.max(1, Math.min(6, Math.round(avg) + want));
-    let pool = RD_PART_LIST.filter((p) => T.slots.includes(p.slot) && p.tier === tt);
-    if (!pool.length) pool = RD_PART_LIST.filter((p) => T.slots.includes(p.slot) && Math.abs(p.tier - tt) <= 1);
+    const ok = T.partFilter || ((p) => T.slots.includes(p.slot));
+    let pool = RD_PART_LIST.filter((p) => ok(p) && p.tier === tt);
+    if (!pool.length) pool = RD_PART_LIST.filter((p) => ok(p) && Math.abs(p.tier - tt) <= 1);
     if (pool.length) { const p = pool[Math.floor(Math.random() * pool.length)]; R.inv.push(p.id); rewards.push({ part: p.id }); if (tier === 'gold' && !R.bps[p.id] && Math.random() < 0.5) { R.bps[p.id] = 1; rewards.push({ bp: p.id }); } }
   }
   D.result = { list, rank, tier, rewards };
@@ -222,6 +249,8 @@ function rdxUI(ctx) {
   drawButton(ctx, sw - 94, 4, 44, 30, '×' + G.speed, () => { nextSpeed(); }, { size: 13 });
   for (const f of R.floats || []) rdFloatDraw(ctx, f);
   if (D.phase === 'run' || D.phase === 'result') rdxHud(ctx, D, T);
+  if (D.phase === 'run' && T.hud) T.hud(ctx, D);
+  if (D.phase === 'run' && !D.out) rdxDriveBtns(ctx, D, T);
   if (D.phase === 'warpIn' || D.phase === 'warpOut') rdxWarp(ctx, D.phase === 'warpIn' ? D.pt / 2.2 : 1 - D.pt / 2);
   if (D.phase === 'intro') rdxIntro(ctx, D, T);
   if (D.phase === 'result') rdxResult(ctx, D, T);
@@ -246,6 +275,14 @@ function rdxHud(ctx, D, T) {
   // 左下：自己的分数构成
   const me = list.find((x) => x.me);
   drawText(ctx, '击杀 ' + D.killN + ' · 路程 ' + D.dist.toFixed(1) + ' 公里 · 分数 ' + Math.round(me.score), 10, portrait ? 142 : 104, 12, '#ffcd75', 'left');
+}
+// 底部：刹车 / 前进 / 冲刺 + 当前提示（「停车挖矿」「打掉大门」……）
+function rdxDriveBtns(ctx, D, T) {
+  const sw = G.sw, sh = G.sh, bw = Math.min(96, (sw - 32) / 3), x0 = sw / 2 - (bw * 3 + 16) / 2, y = sh - 56;
+  [['stop', '■ 刹车'], ['go', '▶ 前进'], ['boost', '»» 冲刺']].forEach(([k, l], i) => drawButton(ctx, x0 + i * (bw + 8), y, bw, 42, l, () => { D.drive = k; }, { color: D.drive === k ? (k === 'boost' ? '#b13e53' : k === 'stop' ? '#566c86' : '#1f5e3a') : '#262b44', size: 13 }));
+  const note = D.blocked ? '前面的' + D.blocked + '挡住了路——武器会自动打它' : D.note;
+  if (note) { ctx.font = 'bold 13px ' + FONT; const w = ctx.measureText(note).width + 20; rdxPanel(ctx, sw / 2 - w / 2, y - 34, w, 26, T.color); drawText(ctx, note, sw / 2, y - 21, 13, '#ffcd75', 'center'); }
+  D.blocked = null;
 }
 function rdxWarp(ctx, p) { // 传送漩涡：一圈圈光环往外扩，最后满屏闪白
   const sw = G.sw, sh = G.sh, cx = sw / 2, cy = sh * 0.45, t = G.time;

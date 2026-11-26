@@ -80,13 +80,15 @@ function rdDrawWorld(g) {
   const scroll = rdVehX();
   // ---- 天空（js/roadsky.js：渐变、太阳月亮、星星、云、极光、闪电） ----
   const h = rdHour(), dusk = (h > 16.5 && h < 20) ? Math.max(0, 1 - Math.abs(h - 18.5) / 1.6) : (h > 4.5 && h < 7.5) ? Math.max(0, 1 - Math.abs(h - 6) / 1.4) : 0;
-  rdkSky(g, W, gy, b, prev, blend, day, dusk, h);
+  const themed = rdxBack(g, W, H, gy, day, dusk, scroll); // 副本主题自己画背景和路面（js/roaddunthemes.js）
+  if (!themed) rdkSky(g, W, gy, b, prev, blend, day, dusk, h);
   const dim = (c) => rdMix(c, '#10121f', (1 - day) * 0.7);
   // ---- 远景 + 中景（每个地区三层精细像素风景，见 js/roadscape.js） ----
-  rdsDrawScenery(g, bi, (bi + RD_BIOMES.length - 1) % RD_BIOMES.length, blend, scroll, gy, day, dusk);
+  if (!themed) rdsDrawScenery(g, bi, (bi + RD_BIOMES.length - 1) % RD_BIOMES.length, blend, scroll, gy, day, dusk);
   // ---- 近景 + 路面 + 护栏也在上面一起画了（js/roadstreet.js）；长条图下面不够的地方补地面色 ----
   const ground = dim(col('ground', 0));
   g.fillStyle = rdShade(ground, -0.3); g.fillRect(0, gy + Math.floor(RDT_DOWN / RD_Q) - 1, W, H);
+  rdxObjs(g, gy); // 副本里的目标物（矿点、矿车、灯笼、核心……）
   // ---- 建筑 ----
   for (const s of R.sites) rdDrawSite(g, s, gy, dim, day);
   // ---- 路障 ----
@@ -116,7 +118,7 @@ function rdDrawWorld(g) {
 function rdDrawForeground(g, b, scroll, gy, W, H, ground, dim) {
   // 前景杂物（视差 1.3，见 js/roadstreet.js）
   const R = G.road, bi = rdBiomeIndex(R.km), into = (R.km % RD_BIOME_LEN) / RD_BIOME_LEN;
-  rdtDrawFront(g, bi, (bi + RD_BIOMES.length - 1) % RD_BIOMES.length, rdkBlend(R.km), scroll, gy);
+  if (!(R.dun && RDX_THEMES[R.dun.id].drawBack)) rdtDrawFront(g, bi, (bi + RD_BIOMES.length - 1) % RD_BIOMES.length, rdkBlend(R.km), scroll, gy);
   // 越往下越暗
   const gr = g.createLinearGradient(0, gy + 12, 0, H);
   gr.addColorStop(0, 'rgba(10,10,25,0)'); gr.addColorStop(1, 'rgba(10,10,25,0.45)');
