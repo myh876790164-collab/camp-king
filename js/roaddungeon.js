@@ -19,7 +19,13 @@ const RDX_LINES = {
   start: ['冲冲冲！', '别抢我的怪啊', '这次第一是我的', '又来？我车还没修好……', '保佑别遇到大家伙', '都小心点', '开干！', '谁跟我组队？', '我先走一步了', '紧张死了'],
   win: ['恭喜恭喜', '大佬带带我', '下次我一定赢', '运气好而已吧', '羡慕了', '这分数有点东西', '服了'],
   out: ['我车废了……', '先走一步，你们加油', '救命！', '这怪太猛了', '淘汰了，气死'],
+  steal: ['这个人头我收下了', '谢谢你帮我打残血 😏', '手慢了吧', '不好意思，顺手的事', '抢怪？这叫配合'],
+  rescue: ['撑住！我拉你一把', '别死啊，我来了', '你欠我一次', '一起活着出去'],
+  thanks: ['谢了兄弟！', '救命之恩！', '欠你一次', '回头请你吃罐头'],
+  pass: ['超过你了哦', '让一让～', '第一我来了', '追上来了！'],
+  goal: { mine: ['挖到一块好矿！', '矿车送到了', '差点被落石砸到'], ghost: ['又收了一盏灯', '这幽灵怎么打不动', '城门在哪？'], fort: ['军阀那门炮好凶', '打手太多了', '大门快开了'], abase: ['打爆一个核心！', '护盾又开了……', '那门炮在充能，快点！'], trial: ['这波怪不少', '稳住'] },
 };
+function rdxSay(D, n, kind, delay) { const p = rcPeople().byId[n.id], L = Array.isArray(RDX_LINES[kind]) ? RDX_LINES[kind] : RDX_LINES.goal[D.id] || RDX_LINES.goal.trial; if (p) rcQueue(p, 'hello', {}, delay || 0.8, { text: L[Math.floor(Math.random() * L.length)] }); }
 const RDX_STASH_KEYS = ['km', 't', 'sites', 'obs', 'mons', 'proj', 'fx', 'parts', 'floats', 'weather', 'reverse', 'search', 'driving', 'speedNow', 'view'];
 function rdxEnsure(R) { if (R.dunNextKm == null) R.dunNextKm = Math.max(120, R.km) + 250 + Math.random() * 100; R.dunCount = R.dunCount || 0; }
 
@@ -149,11 +155,27 @@ function rdxUpdate(dt) {
   // 战斗（武器自动开火）+ 算击杀分
   const before = R.mons.slice();
   rdCombat(dt, st); rdFxTick(dt);
-  for (const m of before) if (m.dead && !m._dc) { m._dc = 1; const M = RD_MONSTERS[m.type]; if (!M.block && !M.boss) D.killN++; D.kill += M.score != null ? M.score : 10 + M.hp / 5; if (T.onKill) T.onKill(D, m); }
+  for (const m of before) if (m.dead && !m._dc) {
+    m._dc = 1; const M = RD_MONSTERS[m.type], val = M.score != null ? M.score : 10 + M.hp / 5;
+    // NPC 抢人头：普通怪偶尔被旁边的人补最后一枪（大门、核心、boss 不会被抢）
+    const thief = !M.block && !M.boss && Math.random() < (M.big ? 0.25 : 0.07) ? D.npcs.filter((n) => !n.out)[Math.floor(Math.random() * D.npcs.filter((n) => !n.out).length)] : null;
+    if (thief) { thief.kill += val; thief.killN++; rdFloat(m.x, -M.h - 10, '被 ' + thief.name + ' 抢了人头！', '#ef7d57'); if ((D.sayT || 0) < D.t) { D.sayT = D.t + 12; rdxSay(D, thief, 'steal'); } }
+    else { if (!M.block && !M.boss) D.killN++; D.kill += val; }
+    if (T.onKill) T.onKill(D, m);
+  }
   if (T.tick) T.tick(D, dt, st);
   { const vx = rdVehX(); R.mons = R.mons.filter((m) => m.x > vx - 320); } // 被甩在后面太远的怪就不追了
   rcTick(dt / (G.speed || 1)); // 聊天室照常刷新（副本播报）
   // 淘汰
+  // 快被淘汰时，可能有 NPC 来救（每场最多一次）
+  if (R.hpV <= 0 && !D.out && !D.rescued) {
+    const alive = D.npcs.filter((n) => !n.out), vip = alive.find((n) => { const p = rcPeople().byId[n.id]; return p && p.vip && p.role === 'friend'; });
+    if (alive.length && Math.random() < (vip ? 0.65 : 0.4)) {
+      const n = vip || alive[Math.floor(Math.random() * alive.length)];
+      D.rescued = true; R.hpV = Math.round(st.hp * 0.3); R.mons = R.mons.filter((m) => RD_MONSTERS[m.type].inert || RD_MONSTERS[m.type].boss || Math.abs(m.x - rdVehX()) > 80); n.goal = (n.goal || 0) + 60;
+      showBanner(n.name + ' 救了你！', '车修回 30%，附近的怪被清掉了', 3, '#a7f070'); rcSys('【副本播报】' + n.name + ' 冲过来救下了 ' + rcC().me + '！', 0.2); rdxSay(D, n, 'rescue', 0.6); rcC().q.push({ at: rcC().clk + 2.4, mine: true, t: RDX_LINES.thanks[Math.floor(Math.random() * RDX_LINES.thanks.length)] }); // 你自己道谢 sfx('win');
+    }
+  }
   if (R.hpV <= 0 && !D.out) {
     D.out = true; D.outT = D.t; R.mons = []; R.proj = [];
     showBanner('你被淘汰了', '车被打瘫了，等待本场结束', 3, '#ef7d57'); sfx('bad');
@@ -165,6 +187,11 @@ function rdxUpdate(dt) {
   D.leadT -= dt;
   const list = rdxRanking(D);
   if (D.t > 12 && D.leadT <= 0 && list[0].name !== D.lead) { D.lead = list[0].name; D.leadT = 25; rcSys('【副本播报】当前第一：' + list[0].name + '（' + Math.round(list[0].score) + ' 分）', 0); }
+  // 有人超过你时嘲讽一句；最后 30 秒播报前三
+  const myRank = list.findIndex((x) => x.me);
+  if (D.myRank != null && myRank > D.myRank && (D.passT || 0) < D.t) { const n = list[myRank - 1]; if (n && !n.me) { D.passT = D.t + 20; rdxSay(D, n, 'pass'); } }
+  D.myRank = myRank;
+  if (!D.last30 && D.dur - D.t < 30 && !D.done) { D.last30 = true; rcSys('【副本播报】最后 30 秒！前三：' + list.slice(0, 3).map((x) => x.name).join('、'), 0); showBanner('最后 30 秒！', '', 2, T.color); }
   if (D.t >= D.dur || (D.out && D.t - D.outT > 4) || (D.done && D.t - D.doneT > 4)) rdxFinish();
 }
 function rdxNpcTick(D, dt) {
@@ -175,7 +202,11 @@ function rdxNpcTick(D, dt) {
     n.kAcc += dt * (0.1 + 0.2 * n.skill) * Math.min(1.6, 0.5 + D.t / 90);
     while (n.kAcc >= 1) { n.kAcc -= 1; n.killN++; n.kill += 10 + (20 + Math.random() * 60) / 5; }
     n.goal = (n.goal || 0) + dt * (RDX_THEMES[D.id].npcGoal || 0) * n.skill * (0.5 + Math.random());
+    if (Math.random() < dt * 0.012 && (D.chatT || 0) < D.t) { D.chatT = D.t + 14; rdxSay(D, n, 'goal'); } // 边打边在频道里说两句
     if (Math.random() < dt * 0.0016 * (2.2 - n.skill) * (D.t / D.dur + 0.3)) {
+      // NPC 之间也会互相救
+      const helper = !n.saved && Math.random() < 0.25 ? D.npcs.find((o) => o !== n && !o.out) : null;
+      if (helper) { n.saved = true; helper.goal = (helper.goal || 0) + 40; rcSys('【副本播报】' + helper.name + ' 救下了 ' + n.name, 0.2); rdxSay(D, helper, 'rescue', 0.8); rdxSay(D, n, 'thanks', 2.2); continue; }
       n.out = true;
       rcSys('【副本播报】' + n.name + ' 被淘汰！', 0.2);
       rcQueue(P.byId[n.id], 'hello', {}, 1.5, { text: RDX_LINES.out[Math.floor(Math.random() * RDX_LINES.out.length)] });
