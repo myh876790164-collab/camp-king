@@ -525,6 +525,7 @@ function rdMonsterPool() {
   const R = rdR(), bi = rdBiomeIndex(R.km), b = rdBiomeAt(R.km);
   return Object.keys(RD_MONSTERS).filter((k) => {
     const m = RD_MONSTERS[k];
+    if (m.dunOnly) return false; // 副本专用怪
     if (m.minKm && R.km < m.minKm) return false;
     if (m.alienOnly && !b.alien) return false;
     if (m.biome !== undefined && m.biome !== bi) return false;
@@ -576,6 +577,7 @@ function rdCombat(dt, st) {
     if (m.burn > 0) { m.burn -= dt; m.hp -= m.burnDps * dt; }
     if (m.slow > 0) m.slow -= dt;
     m.cd -= dt; m.ramCd -= dt; m.atkT -= dt;
+    if (M.inert) { m.face = -1; continue; } // 副本里的大门、能量核心：不动也不攻击
     // 目标：车外的主角更近就追主角
     const tx = outside && Math.abs(me.wx - m.x) < Math.abs((vx - L / 2) - m.x) + 30 ? me.wx : vx - L / 2;
     const half = outside && tx === me.wx ? 4 : L / 2 + M.w / 2 - 2;
@@ -618,7 +620,7 @@ function rdCombat(dt, st) {
     if (R.speedNow > 8 && m.x < vx - L - 30) { m.lagT = (m.lagT || 0) + dt; if (m.lagT > 10) m.leave = true; } else m.lagT = 0;
   }
   // 太远的怪物消失（被甩掉了）
-  R.mons = R.mons.filter((m) => m.hp > 0 && m.x > vx - 700 && m.x < vx + 900);
+  R.mons = R.mons.filter((m) => m.hp > 0 && (m.x > vx - 700 && m.x < vx + 900 || RD_MONSTERS[m.type].inert)); // 副本的大门 / 核心离得远也保留
   // ---- 车载武器 ----
   const night = rdIsNight() && !st.light;
   for (const w of rdWeapons()) {
@@ -786,6 +788,8 @@ function rdExplode(p, x, y) {
 }
 function rdHitMon(m, dmg, fx, ram) {
   const R = rdR();
+  if (RD_MONSTERS[m.type].ghostly && !(m.x > rdVehX() - 4 && m.x < rdVehX() + 130)) dmg *= 0.35; // 幽灵：只有被车灯照到时才吃满伤害
+  if (m.shieldUp) dmg *= 0.1; // 外星能量核心开着护盾
   m.hp -= dmg;
   m.hitT = 0.1;
   if (fx && fx.burn) { m.burn = 3; m.burnDps = fx.burn; }
@@ -794,6 +798,7 @@ function rdHitMon(m, dmg, fx, ram) {
   if (m.hp <= 0 && !m.dead) {
     m.dead = true;
     R.stats.kills++;
+    { const MM = RD_MONSTERS[m.type]; R.fx = R.fx || []; R.fx.push({ kind: 'mdeath', type: m.type, x: m.x, y: MM.fly ? m.y : 3, face: m.face, fr: Math.floor((m.ph || 0) * 10) % 4, life: 0.7, max: 0.7, r: MM.w / 2 }); } // 死亡爆散
     const M = RD_MONSTERS[m.type], st = R.st || rdStats();
     rdBurst(m.x, M.fly ? m.y : -M.h / 2, M.glow, 8);
     const got = [];
@@ -1113,7 +1118,9 @@ function rdRandomEvent() {
     showBanner('补给箱', RD_RES[k].name + ' +' + n, 3, '#a7f070');
   } else if (ev === 'weather') {
     const w = [{ type: 'dust', name: '沙尘暴', d: '车速变慢，太阳能变弱' }, { type: 'rad', name: '辐射风暴', d: '辐射猛增，尽量待在车里' }, { type: 'storm', name: '暴雨', d: '雨水收集翻倍，太阳能变弱' }][Math.floor(Math.random() * 3)];
+    if (w.type === 'storm' && rdBiomeAt(R.km).snow) Object.assign(w, { name: '暴风雪', d: '雪水收集翻倍，太阳能变弱' });
     R.weather = Object.assign({ left: 4 + Math.random() * 6 }, w);
+    R.weather.dur = R.weather.left; // 用来算天气渐入渐出
     rdLog(w.name + '来了：' + w.d, '#ef7d57');
     rcWeather(w.type);
     showBanner(w.name, w.d, 4, '#ef7d57');
@@ -1185,7 +1192,8 @@ function rdLose(title, why) {
 // ---------- 存档 ----------
 function rdSaveData() {
   const R = rdR(), out = {};
-  for (const k in R) if (!['mons', 'proj', 'fx', 'parts', 'floats', '_fx', '_fxPow', 'st', 'wcd', 'aim', 'aimAt', 'aimS', 'trade', 'panel', 'search'].includes(k)) out[k] = R[k];
+  for (const k in R) if (!['mons', 'proj', 'fx', 'parts', 'floats', '_fx', '_fxPow', 'st', 'wcd', 'aim', 'aimAt', 'aimS', 'trade', 'panel', 'search', 'dun', 'dunStash', 'dunAlarm'].includes(k)) out[k] = R[k];
+  if (R.dun && R.dunStash) for (const k of RDX_STASH_KEYS) if (!['mons', 'proj', 'fx', 'parts', 'floats', 'search'].includes(k)) out[k] = R.dunStash[k]; // 副本里存档 = 存进副本前的公路
   return { road: out, res: G.res };
 }
 function rdLoadData(d) {
@@ -1215,11 +1223,11 @@ MODES.road = {
   speeds: [1, 2, 4],
   buildList: [], buildings: { core: { name: '车', size: 1, hp: 1 } }, techs: [], perks: [], nodes: {},
   hooks: {
-    update: (dt) => rdUpdate(dt),
+    update: (dt) => rdxHookUpdate(dt), // 副本进行中时走 js/roaddungeon.js
     render: (ctx) => rdRender(ctx),
-    tap: (sx, sy) => rdTap(sx, sy),
+    tap: (sx, sy) => rdxHookTap(sx, sy),
     drag: (dx, dy) => rdDrag(dx, dy),
-    key: (k) => rdKey(k),
+    key: (k) => { if (!(G.road && G.road.dun)) rdKey(k); },
     save: () => rdSaveData(),
     load: (d) => rdLoadData(d),
     dayText: (d) => '第 ' + (Math.floor((d.road.t || 0) / 24) + 1) + ' 天 · 已行驶 ' + Math.floor(d.road.km || 0) + ' 公里',

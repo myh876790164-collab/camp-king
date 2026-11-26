@@ -39,6 +39,7 @@ function rdPartLabel(p) { return '【' + RD_TIER_NAME[p.tier] + '】' + p.name; 
 function rdDrawUI(ctx) {
   uiButtons = []; scrollAreas = [];
   const R = G.road, sw = G.sw, sh = G.sh, st = R.st || rdStats();
+  if (R.dun) { rdxUI(ctx); return; } // 副本里换成副本的界面（js/roaddungeon.js）
   ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
   const playing = G.state === 'play';
   // ---- 左上角：仪表盘（车速、里程、油量、电量、弹药、警示灯；点它打开仓库看所有资源） ----
@@ -89,9 +90,12 @@ function rdDrawUI(ctx) {
   bars.forEach((b, i) => {
     const col = portrait ? i % 2 : 0, row = portrait ? Math.floor(i / 2) : i;
     const xx = bx + col * (bw + 8), yy = by + row * 16;
-    ctx.fillStyle = 'rgba(26,28,44,0.7)'; ctx.fillRect(xx, yy, bw, 13);
-    const bad = (b[0] === '辐射' ? b[1] > 0.5 : b[1] < 0.25);
-    ctx.fillStyle = b[2]; ctx.fillRect(xx + 34, yy + 3, Math.max(0, Math.min(1, b[1])) * (bw - 38), 7);
+    // 暖色像素风状态条：深褐底 + 描边 + 两段明暗的条（上亮下暗）
+    ctx.fillStyle = 'rgba(30,23,18,0.82)'; ctx.fillRect(xx, yy, bw, 13);
+    const bad = (b[0] === '辐射' ? b[1] > 0.5 : b[1] < 0.25), bl = Math.max(0, Math.min(1, b[1])) * (bw - 38);
+    ctx.fillStyle = '#120c08'; ctx.fillRect(xx + 33, yy + 2, bw - 36, 9);
+    ctx.fillStyle = rdShade(b[2], -0.25); ctx.fillRect(xx + 34, yy + 3, bl, 7); ctx.fillStyle = b[2]; ctx.fillRect(xx + 34, yy + 3, bl, 4); ctx.fillStyle = rdShade(b[2], 0.35); ctx.fillRect(xx + 34, yy + 3, bl, 1);
+    if (bad && Math.floor(G.time * 2.5) % 2) { ctx.fillStyle = 'rgba(239,125,87,0.25)'; ctx.fillRect(xx, yy, bw, 13); }
     drawText(ctx, b[0], xx + 3, yy + 7, 10, bad ? '#ef7d57' : '#c8d6e5', 'left', false);
     drawText(ctx, String(b[3]), xx + bw - 3, yy + 7, 10, '#f4f4f4', 'right', false);
   });
@@ -156,7 +160,7 @@ function rdDrawUI(ctx) {
     if (me.loc === 'out' || me.loc === 'site') drawText(ctx, '（你下车搜索去了，车里没人）', sw / 2, yb - 40, 12, '#94b0c2', 'center', false);
   }
   // 车外飘字
-  for (const f of R.floats || []) { const p = rdToScreen(rdSX(f.x), RDV.gy + f.y - f.t * 14); ctx.globalAlpha = Math.max(0, 1 - f.t / 1.4); drawText(ctx, f.text, p.x, p.y, 12, f.color, 'center'); }
+  for (const f of R.floats || []) rdFloatDraw(ctx, f); // 掉落物飘字（弹出 + 深褐描边 + 资源小图标）
   ctx.globalAlpha = 1;
   // ---- 横幅 ----
   if (G.banner) {
@@ -167,6 +171,7 @@ function rdDrawUI(ctx) {
     if (b.sub) wrapText(ctx, b.sub, Math.min(560, sw - 32), 13).forEach((ln, k) => drawText(ctx, ln, sw / 2, yy + 26 + k * 18, 13, '#c8d6e5', 'center'));
     ctx.globalAlpha = 1;
   }
+  if (R.dunAlarm) rdxDrawAlarm(ctx); // 副本传送警报
   if (G.state === 'rpanel') rdDrawPanel(ctx);
   if (G.state === 'dialog') drawDialog(ctx);
   if (G.state === 'over') drawEndOverlay(ctx, false);
@@ -260,8 +265,10 @@ function rdPartRow(c, label, p, btns, note) {
   const bw = btns.length ? btns.reduce((s, b) => s + (b.w || 60) + 4, 0) : 0;
   const tx = c.x + 8;
   if (label) drawText(ctx, label, tx, c.y + 13, 11, '#94b0c2', 'left', false);
-  const lx = label ? tx + Math.max(64, ctx.measureText(label).width + 10) : tx;
+  const lx0 = label ? tx + Math.max(64, ctx.measureText(label).width + 10) : tx;
+  const lx = p ? lx0 + 42 : lx0;
   if (p) {
+    rdoIcon(ctx, p, lx0, c.y + 5, 36); // 零件像素图标（js/roadicons.js）
     drawText(ctx, rdPartLabel(p), lx, c.y + 13, 13, RD_TIER_COLOR[p.tier]);
     const t = note || rdFxText(p);
     const lines = wrapText(ctx, t, c.w - (lx - c.x) - bw - 8, 10);
@@ -561,4 +568,22 @@ function rdDrawCarSelect(ctx) {
   });
   G.road = saved; G.res = savedRes;
   endScroll(ctx, maxY + 10);
+}
+
+// 掉落物飘字：先弹一下再慢慢上升变淡；文字有深褐描边；文字里提到的资源前面画小图标
+function rdFloatDraw(ctx, f) {
+  const ease = 1 - Math.pow(1 - Math.min(1, f.t / 0.5), 3), p = rdToScreen(rdSX(f.x), RDV.gy + f.y - ease * 12 - f.t * 4);
+  const pop = f.t < 0.15 ? 0.7 + f.t / 0.15 * 0.5 : f.t < 0.25 ? 1.2 - (f.t - 0.15) / 0.1 * 0.2 : 1, size = Math.round(12 * pop);
+  ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, (1.4 - f.t) / 0.5));
+  ctx.font = 'bold ' + size + 'px ' + FONT; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  const parts = String(f.text).split(' '), keys = Object.keys(RD_RES);
+  const widths = parts.map((s) => ctx.measureText(s).width + (keys.some((k) => s.indexOf(RD_RES[k].name) >= 0) ? size + 2 : 0));
+  let x = p.x - (widths.reduce((a, b) => a + b, 0) + (parts.length - 1) * 6) / 2;
+  parts.forEach((s, i) => {
+    const k = keys.find((kk) => s.indexOf(RD_RES[kk].name) >= 0);
+    if (k) { rdIcon(ctx, k, x, p.y - size / 2, size); x += size + 2; }
+    ctx.lineWidth = 3; ctx.strokeStyle = '#24160f'; ctx.strokeText(s, x, p.y); ctx.fillStyle = f.color; ctx.fillText(s, x, p.y);
+    x += ctx.measureText(s).width + 6;
+  });
+  ctx.restore();
 }

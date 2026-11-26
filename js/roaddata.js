@@ -473,6 +473,17 @@ const RD_MONSTERS = {
   wraith: { name: '冰原游魂', hp: 70, dmg: 4.5, spd: 70, w: 12, h: 18, swarm: [1, 3], fly: true, color: '#cfe3f0', glow: '#73eff7', drop: { power: 0.6 }, minKm: 1080, biome: 4 },
   crawler: { name: '外星爬行者', hp: 130, dmg: 6, spd: 85, w: 18, h: 10, swarm: [2, 4], color: '#4b3378', glow: '#c27bd6', drop: { alien: 0.35 }, minKm: 900, alienOnly: true },
   sentinel: { name: '外星守卫', hp: 420, dmg: 12, spd: 26, w: 18, h: 30, swarm: [1, 1], ranged: 160, color: '#24183f', glow: '#73eff7', drop: { alien: 1, power: 1 }, minKm: 1100, alienOnly: true, big: true },
+  // ---- 副本专用（dunOnly：公路上不会出现） ----
+  digworm: { name: '地底钻虫', hp: 90, dmg: 5, spd: 40, w: 18, h: 12, swarm: [1, 2], color: '#7a5a6a', glow: '#ff9a50', drop: { scrap: 0.6 }, dunOnly: true },
+  cavebug: { name: '矿洞甲虫', hp: 20, dmg: 1.5, spd: 70, w: 10, h: 6, swarm: [3, 6], color: '#5a4a3a', glow: '#ffd060', drop: { scrap: 0.4 }, dunOnly: true, chase: true },
+  ghost: { name: '游荡幽灵', hp: 40, dmg: 3, spd: 60, w: 12, h: 16, swarm: [2, 4], fly: true, color: '#c8d8e0', glow: '#a0ffd0', drop: { power: 0.3 }, dunOnly: true, ghostly: true, chase: true },
+  banshee: { name: '哭嚎女妖', hp: 120, dmg: 6, spd: 45, w: 14, h: 22, swarm: [1, 1], fly: true, ranged: 110, color: '#d8c8f0', glow: '#e070ff', drop: { med: 0.5 }, dunOnly: true, ghostly: true },
+  raider: { name: '军阀打手', hp: 50, dmg: 4, spd: 72, w: 9, h: 16, swarm: [2, 4], color: '#8a5a3a', glow: '#ef7d57', drop: { ammo: 0.5, scrap: 0.3 }, dunOnly: true, chase: true },
+  gunner: { name: '军阀枪手', hp: 40, dmg: 3.5, spd: 45, w: 9, h: 16, swarm: [1, 3], ranged: 130, color: '#5a6040', glow: '#ffcd75', drop: { ammo: 0.8 }, dunOnly: true },
+  gate: { name: '堡垒大门', hp: 600, dmg: 0, spd: 0, w: 22, h: 40, swarm: [1, 1], color: '#6a5a48', glow: '#ef7d57', drop: { scrap: 1 }, dunOnly: true, inert: true, block: true, score: 120, big: true },
+  warlord: { name: '铁颅军阀', hp: 1800, dmg: 11, spd: 32, w: 26, h: 40, swarm: [1, 1], color: '#4a4a52', glow: '#e04a3a', drop: { ammo: 1, scrap: 1 }, dunOnly: true, big: true, boss: true, score: 400 },
+  core: { name: '能量核心', hp: 450, dmg: 0, spd: 0, w: 18, h: 40, swarm: [1, 1], color: '#4b3378', glow: '#73eff7', drop: { alien: 1 }, dunOnly: true, inert: true, block: true, score: 150, big: true },
+  adrone: { name: '外星无人机', hp: 50, dmg: 3, spd: 80, w: 12, h: 8, swarm: [2, 3], fly: true, color: '#7a6a98', glow: '#73eff7', drop: { power: 0.4 }, dunOnly: true, chase: true },
 };
 
 // ---------- 研究（需要车载电脑 + 外星晶体） ----------

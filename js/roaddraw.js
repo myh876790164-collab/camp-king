@@ -74,266 +74,70 @@ function rdDrawWorld(g) {
   // 两个地区之间渐变
   const into = (R.km % RD_BIOME_LEN) / RD_BIOME_LEN;
   const prev = RD_BIOMES[(bi + RD_BIOMES.length - 1) % RD_BIOMES.length];
-  const blend = into < 0.06 ? 1 - into / 0.06 : 0;
+  const blend = rdkBlend(R.km);
   const col = (k, i) => blend > 0 ? rdMix((Array.isArray(b[k]) ? b[k][i] : b[k]), (Array.isArray(prev[k]) ? prev[k][i] : prev[k]), blend) : (Array.isArray(b[k]) ? b[k][i] : b[k]);
   const day = rdDaylight();
   const scroll = rdVehX();
-  // ---- 天空 ----
-  const nightTop = '#0b0d1c', nightBot = '#1f2346';
+  // ---- 天空（js/roadsky.js：渐变、太阳月亮、星星、云、极光、闪电） ----
   const h = rdHour(), dusk = (h > 16.5 && h < 20) ? Math.max(0, 1 - Math.abs(h - 18.5) / 1.6) : (h > 4.5 && h < 7.5) ? Math.max(0, 1 - Math.abs(h - 6) / 1.4) : 0;
-  let top = rdMix(nightTop, col('sky', 0), day), bot = rdMix(nightBot, col('sky', 1), day);
-  if (dusk > 0) bot = rdMix(bot, '#ef7d57', dusk * 0.6);
-  const sg = g.createLinearGradient(0, 0, 0, gy);
-  sg.addColorStop(0, top); sg.addColorStop(1, bot);
-  g.fillStyle = sg; g.fillRect(0, 0, W, gy);
-  // 星星
-  if (day < 0.6) {
-    g.globalAlpha = (0.6 - day) / 0.6;
-    for (let i = 0; i < 70; i++) { const x = rdHash(i) * W, y = rdHash(i + 99) * gy * 0.7; g.fillStyle = rdHash(i + 7) > 0.85 ? '#ffcd75' : '#f4f4f4'; g.fillRect(Math.round(x), Math.round(y), 1, (Math.sin(G.time * 2 + i) > 0.7) ? 1 : 1); }
-    g.globalAlpha = 1;
-  }
-  // 太阳 / 月亮（沿弧线走）
-  const sunT = ((h - 5) / 15);
-  if (sunT > 0 && sunT < 1) { const sx = W * (0.1 + sunT * 0.8), sy = gy * 0.75 - Math.sin(sunT * Math.PI) * gy * 0.6; g.fillStyle = dusk > 0.2 ? '#ef7d57' : '#ffcd75'; g.beginPath(); g.arc(sx, sy, 7, 0, 7); g.fill(); g.globalAlpha = 0.25; g.beginPath(); g.arc(sx, sy, 12, 0, 7); g.fill(); g.globalAlpha = 1; }
-  else { const mt = ((h + 24 - 19) % 24) / 10; const mx = W * (0.1 + mt * 0.8), my = gy * 0.7 - Math.sin(Math.min(1, mt) * Math.PI) * gy * 0.55; g.fillStyle = '#f4f4f4'; g.beginPath(); g.arc(mx, my, 5, 0, 7); g.fill(); g.fillStyle = top; g.beginPath(); g.arc(mx + 2, my - 1, 4, 0, 7); g.fill(); }
-  // 外星区：天上的裂缝
-  if (b.alien) { g.globalAlpha = 0.35 + Math.sin(G.time) * 0.1; g.strokeStyle = '#73eff7'; g.lineWidth = 1; g.beginPath(); g.moveTo(W * 0.2, gy * 0.15); g.lineTo(W * 0.32, gy * 0.22); g.lineTo(W * 0.4, gy * 0.18); g.lineTo(W * 0.55, gy * 0.28); g.stroke(); g.globalAlpha = 1; }
-  // 辐射区：天边绿光
-  if (b.rad >= 1 || (R.weather && R.weather.type === 'rad')) { const gg = g.createLinearGradient(0, gy * 0.5, 0, gy); gg.addColorStop(0, 'rgba(167,240,112,0)'); gg.addColorStop(1, 'rgba(167,240,112,0.25)'); g.fillStyle = gg; g.fillRect(0, gy * 0.5, W, gy * 0.5); }
+  const themed = rdxBack(g, W, H, gy, day, dusk, scroll); // 副本主题自己画背景和路面（js/roaddunthemes.js）
+  if (!themed) rdkSky(g, W, gy, b, prev, blend, day, dusk, h);
   const dim = (c) => rdMix(c, '#10121f', (1 - day) * 0.7);
-  // ---- 远山 ----
-  g.fillStyle = dim(col('far', 0));
-  for (let x = 0; x < W; x += 2) {
-    const wx = (x + scroll * 0.05) / 40;
-    const hh = 18 + rdNoise(wx) * 26 + rdNoise(wx * 3.1) * 8;
-    g.fillRect(x, gy - 12 - hh, 2, hh + 12);
-  }
-  // ---- 中景（城市废墟 / 枯树 / 仙人掌 / 水晶） ----
-  rdDrawMidLayer(g, b.deco, scroll * 0.25, dim(col('mid', 0)), gy, W, day);
-  // ---- 近景：电线杆、广告牌 ----
-  rdDrawNearLayer(g, scroll * 0.6, gy, W, dim, b);
-  // ---- 路面 ----
-  const ground = dim(col('ground', 0)), road = dim(col('road', 0));
-  g.fillStyle = ground; g.fillRect(0, gy - 14, W, H - gy + 14);
-  g.fillStyle = rdShade(ground, -0.15); for (let x = 0; x < W; x += 3) { const n = rdHash(Math.floor((x + scroll) / 3)); if (n > 0.7) g.fillRect(x, gy - 14 + Math.floor(n * 6), 1, 1); }
-  g.fillStyle = road; g.fillRect(0, gy - 9, W, 16);
-  g.fillStyle = rdShade(road, -0.25); g.fillRect(0, gy + 7, W, 2);
-  g.fillStyle = rdShade(road, 0.12); g.fillRect(0, gy - 9, W, 1);
-  // 裂缝
-  g.fillStyle = rdShade(road, -0.3);
-  for (let i = Math.floor(scroll / 30) - 1; i < (scroll + W) / 30 + 1; i++) { if (rdHash(i * 3.3) < 0.5) continue; const x = Math.round(i * 30 - scroll + (V.ax % 30) + rdHash(i) * 20); g.fillRect(x, gy - 5 + Math.floor(rdHash(i + 1) * 9), 4 + Math.floor(rdHash(i + 2) * 6), 1); }
-  // 中线
-  g.fillStyle = dim(b.snow ? '#94b0c2' : '#c9a86a');
-  const off = ((scroll % 24) + 24) % 24;
-  for (let x = -off + (V.ax % 24); x < W; x += 24) g.fillRect(Math.round(x), gy - 1, 10, 1);
-  // 护栏（路的后侧）
-  g.fillStyle = dim('#94b0c2');
-  for (let x = -((scroll % 18) + 18) % 18 + (V.ax % 18); x < W; x += 18) { const i = Math.floor((x + scroll) / 18); if (rdHash(i * 7.7) < 0.15) continue; g.fillRect(Math.round(x), gy - 15, 1, 6); }
-  for (let x = 0; x < W; x += 2) { const i = Math.floor((x + scroll) / 60); if (rdHash(i * 5.1) < 0.25) continue; g.fillRect(x, gy - 14, 2, 1); }
-  // 雪 / 发光水洼
-  if (b.snow) { g.fillStyle = dim('#f4f4f4'); for (let x = 0; x < W; x += 2) if (rdHash(Math.floor((x + scroll) / 2) * 1.3) > 0.6) g.fillRect(x, gy + 9, 2, 2); }
+  // ---- 远景 + 中景（每个地区三层精细像素风景，见 js/roadscape.js） ----
+  if (!themed) rdsDrawScenery(g, bi, (bi + RD_BIOMES.length - 1) % RD_BIOMES.length, blend, scroll, gy, day, dusk);
+  // ---- 近景 + 路面 + 护栏也在上面一起画了（js/roadstreet.js）；长条图下面不够的地方补地面色 ----
+  const ground = dim(col('ground', 0));
+  g.fillStyle = rdShade(ground, -0.3); g.fillRect(0, gy + Math.floor(RDT_DOWN / RD_Q) - 1, W, H);
+  rdxObjs(g, gy); // 副本里的目标物（矿点、矿车、灯笼、核心……）
   // ---- 建筑 ----
   for (const s of R.sites) rdDrawSite(g, s, gy, dim, day);
   // ---- 路障 ----
-  for (const o of R.obs) if (!o.hit) rdDrawObstacle(g, o, gy, dim);
+  for (const o of R.obs) if (!o.hit) rdtDrawObstacle(g, o, gy);
   // ---- 车 + 怪物 + 人 ----
   const mons = (R.mons || []).slice().sort((a, b2) => (RD_MONSTERS[a.type].fly ? 1 : 0) - (RD_MONSTERS[b2.type].fly ? 1 : 0));
   for (const m of mons) if (!RD_MONSTERS[m.type].fly) rdDrawMonster(g, m, gy);
   rdDrawVehicle(g, V.ax + (V.shakeX || 0), gy + 4, { world: true });
-  if (R.me.loc === 'out') rdDrawPerson(g, rdSX(R.me.wx), gy + 3, { pose: (R.search && R.search.phase !== 'in') ? 'walk' : 'stand', face: R.me.face, outside: true, swing: R.me.swing > 0 });
-  if (R.pet && R.me.loc === 'out') rdDrawPet(g, rdSX(R.me.wx) - R.me.face * 8, gy + 3, R.pet.type, true, R.me.face);
+  if (R.me.loc === 'out') rdhPerson(g, rdSX(R.me.wx), gy + 3, { pose: (R.search && R.search.phase !== 'in') ? 'walk' : 'stand', face: R.me.face, outside: true, swing: R.me.swing > 0 });
+  if (R.pet && R.me.loc === 'out') rdhPet(g, rdSX(R.me.wx) - R.me.face * 8, gy + 3, R.pet.type, true, R.me.face); // 精细像素主角和宠物（js/roadhero.js）
   for (const m of mons) if (RD_MONSTERS[m.type].fly) rdDrawMonster(g, m, gy);
   // ---- 子弹、特效 ----
-  rdDrawProj(g, gy);
+  rdgProj(g, gy); // 子弹、光束、爆炸（js/roadguns.js）
   // ---- 前景：路肩碎石 + 近处的杂物（比路面滚得快一点，有纵深感） ----
   rdDrawForeground(g, b, scroll, gy, W, H, ground, dim);
   // ---- 天气 ----
-  rdDrawWeather(g, W, H, gy);
+  rdkWeather(g, W, H, gy, day, b, bi);
   // ---- 夜晚（车灯照亮） ----
   rdDrawNight(g, day, gy);
+  rdkBeam(g, gy, day);
+  // ---- 整体色调（地区、黄昏、闪电、暗角） ----
+  rdkGrade(g, W, H, gy, bi, (bi + RD_BIOMES.length - 1) % RD_BIOMES.length, blend, day, dusk);
   // 怪物血条
   for (const m of R.mons || []) { const M = RD_MONSTERS[m.type]; if (m.hp < m.max && m.hp > 0) { const x = Math.round(rdSX(m.x) - M.w / 2), y = Math.round(gy + (M.fly ? m.y : 0) - M.h - 4); g.fillStyle = '#1a1c2c'; g.fillRect(x, y, M.w, 2); g.fillStyle = '#b13e53'; g.fillRect(x, y, Math.max(1, Math.round(M.w * m.hp / m.max)), 2); } }
 }
 
 function rdDrawForeground(g, b, scroll, gy, W, H, ground, dim) {
-  // 路肩
-  g.fillStyle = dim(rdShade(ground, -0.08)); g.fillRect(0, gy + 9, W, 4);
-  g.fillStyle = dim(rdShade(ground, -0.25));
-  for (let x = 0; x < W; x += 2) { const n = rdHash(Math.floor((x + scroll) / 2) * 3.1); if (n > 0.55) g.fillRect(x, gy + 9 + Math.floor(n * 4), 1, 1); }
+  // 前景杂物（视差 1.3，见 js/roadstreet.js）
+  const R = G.road, bi = rdBiomeIndex(R.km), into = (R.km % RD_BIOME_LEN) / RD_BIOME_LEN;
+  if (!(R.dun && RDX_THEMES[R.dun.id].drawBack)) rdtDrawFront(g, bi, (bi + RD_BIOMES.length - 1) % RD_BIOMES.length, rdkBlend(R.km), scroll, gy);
   // 越往下越暗
   const gr = g.createLinearGradient(0, gy + 12, 0, H);
   gr.addColorStop(0, 'rgba(10,10,25,0)'); gr.addColorStop(1, 'rgba(10,10,25,0.45)');
-  // 近处杂物（视差 1.3）
-  const sc = scroll * 1.3, seg = 28;
-  for (let i = Math.floor(sc / seg) - 1; i < (sc + W) / seg + 1; i++) {
-    const n = rdHash(i * 5.3), x = Math.round(i * seg - sc + rdHash(i) * 12), y = gy + 18 + Math.floor(rdHash(i + 3) * Math.max(4, H - gy - 30));
-    if (y > H - 4) continue;
-    const c = dim(rdShade(ground, -0.35)), c2 = dim(rdShade(ground, -0.15));
-    g.fillStyle = c;
-    if (b.deco === 'crystal') { if (n > 0.6) { g.fillStyle = dim('#4b3378'); g.fillRect(x, y - 6, 2, 6); g.fillRect(x + 2, y - 3, 2, 3); g.globalAlpha = 0.6; g.fillStyle = '#73eff7'; g.fillRect(x, y - 6, 1, 3); g.globalAlpha = 1; } continue; }
-    if (b.snow) { if (n > 0.5) { g.fillStyle = dim('#f4f4f4'); g.fillRect(x - 4, y - 2, 10, 2); g.fillRect(x - 2, y - 3, 6, 1); } continue; }
-    if (n < 0.25) { g.fillRect(x, y - 2, 4, 2); g.fillStyle = c2; g.fillRect(x + 1, y - 3, 2, 1); } // 石头
-    else if (n < 0.4) { for (let k = 0; k < 4; k++) g.fillRect(x + k * 2 - 3, y - 2 - (k % 2) * 2, 1, 2 + (k % 2) * 2); } // 枯草
-    else if (n < 0.47) { g.fillStyle = dim('#1a1c2c'); g.fillRect(x, y - 3, 5, 3); g.fillStyle = dim('#333c57'); g.fillRect(x + 1, y - 2, 3, 1); } // 旧轮胎
-    else if (n < 0.52) { g.fillStyle = dim(b.rad >= 1 ? '#5a7a3a' : '#b13e53'); g.fillRect(x, y - 5, 4, 5); g.fillStyle = dim('#333c57'); g.fillRect(x, y - 4, 4, 1); } // 油桶
-    else if (n < 0.56) { g.fillStyle = dim('#c8d6e5'); g.fillRect(x, y - 1, 5, 1); g.fillRect(x + 4, y - 2, 2, 2); } // 骨头
-    else if (n < 0.62 && b.rad >= 0.6) { g.globalAlpha = 0.5 + Math.sin(G.time * 2 + i) * 0.2; g.fillStyle = '#a7f070'; g.fillRect(x - 3, y - 1, 9, 1); g.globalAlpha = 1; } // 辐射水洼
-    else if (n < 0.7 && b.deco === 'cactus') { g.fillStyle = dim('#5f8a4a'); g.fillRect(x, y - 5, 2, 5); g.fillRect(x - 2, y - 4, 2, 1); }
-  }
   g.fillStyle = gr; g.fillRect(0, gy + 12, W, H - gy);
-}
-
-// 中景：每段 40 像素按种子随机放一样东西
-function rdDrawMidLayer(g, deco, sc, c, gy, W, day) {
-  const seg = 34;
-  for (let i = Math.floor(sc / seg) - 2; i < (sc + W) / seg + 2; i++) {
-    const n = rdHash(i * 1.37), x = Math.round(i * seg - sc + n * 10);
-    g.fillStyle = c;
-    if (deco === 'ruin') {
-      const hh = 20 + Math.floor(rdHash(i + 5) * 40), w = 12 + Math.floor(rdHash(i + 9) * 14);
-      g.fillRect(x, gy - 12 - hh, w, hh);
-      // 断裂的楼顶
-      g.fillStyle = rdShade(c, 0.05);
-      for (let k = 0; k < w; k += 3) if (rdHash(i * 9 + k) > 0.5) g.fillRect(x + k, gy - 12 - hh - 2 - Math.floor(rdHash(i + k) * 4), 3, 3);
-      // 窗
-      g.fillStyle = day < 0.4 ? (rdHash(i + 3) > 0.8 ? '#ffcd75' : rdShade(c, -0.2)) : rdShade(c, -0.25);
-      for (let yy = gy - 10 - hh + 4; yy < gy - 16; yy += 5) for (let xx = x + 2; xx < x + w - 2; xx += 4) if (rdHash(xx * 0.3 + yy) > 0.45) g.fillRect(xx, yy, 2, 2);
-    } else if (deco === 'deadtree' || deco === 'snow') {
-      if (n < 0.3) continue;
-      const hh = 16 + Math.floor(rdHash(i + 2) * 22);
-      if (deco === 'snow') { // 雪松
-        for (let k = 0; k < hh; k += 2) { const ww = Math.max(1, Math.floor((hh - k) / 2.5)); g.fillRect(x - ww, gy - 12 - k, ww * 2 + 1, 2); }
-        g.fillStyle = rdShade(c, 0.6); for (let k = 4; k < hh; k += 6) g.fillRect(x - Math.floor((hh - k) / 3), gy - 12 - k, Math.floor((hh - k) / 1.5), 1);
-      } else {
-        g.fillRect(x, gy - 12 - hh, 2, hh);
-        for (let k = 6; k < hh; k += 5) { const dir = rdHash(i + k) > 0.5 ? 1 : -1, len = 3 + Math.floor(rdHash(i * k) * 5); for (let j = 0; j < len; j++) g.fillRect(x + dir * (j + 1), gy - 12 - k - Math.floor(j / 2), 1, 1); }
-      }
-    } else if (deco === 'cactus') {
-      if (n < 0.45) { if (n < 0.2) { g.fillRect(x, gy - 18, 14, 6); g.fillRect(x + 3, gy - 22, 8, 4); } continue; } // 石头
-      const hh = 10 + Math.floor(rdHash(i + 2) * 12);
-      g.fillRect(x, gy - 12 - hh, 3, hh); g.fillRect(x - 3, gy - 12 - hh + 4, 3, 2); g.fillRect(x - 3, gy - 12 - hh + 1, 2, 4); g.fillRect(x + 3, gy - 12 - hh + 6, 3, 2); g.fillRect(x + 5, gy - 12 - hh + 3, 2, 4);
-    } else if (deco === 'glow') {
-      if (n < 0.35) continue;
-      const hh = 8 + Math.floor(rdHash(i + 2) * 30);
-      g.fillRect(x, gy - 12 - hh, 6, hh); g.fillRect(x + 6, gy - 12 - hh * 0.6, 4, hh * 0.6); // 冷却塔 / 废墟
-      if (rdHash(i + 4) > 0.6) { g.globalAlpha = 0.5 + Math.sin(G.time * 2 + i) * 0.2; g.fillStyle = '#a7f070'; g.fillRect(x - 4, gy - 13, 14, 1); g.globalAlpha = 1; }
-    } else if (deco === 'crystal') {
-      if (n < 0.3) continue;
-      const hh = 10 + Math.floor(rdHash(i + 2) * 34);
-      g.beginPath(); g.moveTo(x, gy - 12); g.lineTo(x + 3, gy - 12 - hh); g.lineTo(x + 7, gy - 12); g.fill();
-      g.globalAlpha = 0.6 + Math.sin(G.time * 1.5 + i) * 0.3; g.fillStyle = '#73eff7'; g.fillRect(x + 3, gy - 12 - hh + 2, 1, hh * 0.5); g.globalAlpha = 1;
-    }
-  }
-}
-function rdDrawNearLayer(g, sc, gy, W, dim, b) {
-  const seg = 90;
-  for (let i = Math.floor(sc / seg) - 1; i < (sc + W) / seg + 1; i++) {
-    const x = Math.round(i * seg - sc), n = rdHash(i * 4.1);
-    if (b.alien) continue;
-    // 电线杆 + 电线
-    g.fillStyle = dim('#4a3a2e');
-    g.fillRect(x, gy - 46, 2, 34); g.fillRect(x - 4, gy - 44, 10, 1);
-    if (rdHash(i * 2.2) > 0.2) { g.fillStyle = dim('#2c2838'); for (let k = 0; k < seg; k += 2) { const sag = Math.sin(k / seg * Math.PI) * 6; g.fillRect(x + k, Math.round(gy - 44 + sag), 2, 1); } }
-    // 广告牌
-    if (n > 0.72) {
-      const bx = x + 40;
-      g.fillStyle = dim('#4a3a2e'); g.fillRect(bx + 4, gy - 30, 2, 18); g.fillRect(bx + 20, gy - 30, 2, 18);
-      g.fillStyle = dim(['#b13e53', '#3b5dc9', '#ffcd75', '#38b764'][Math.floor(rdHash(i) * 4)]); g.fillRect(bx, gy - 44, 26, 15);
-      g.fillStyle = dim('#f4f4f4'); g.fillRect(bx + 3, gy - 41, 12, 2); g.fillRect(bx + 3, gy - 37, 18, 2);
-      g.fillStyle = dim('#1a1c2c'); if (rdHash(i + 1) > 0.5) g.fillRect(bx + 16, gy - 44, 10, 6); // 撕破的角
-    } else if (n < 0.15) { // 路牌
-      g.fillStyle = dim('#94b0c2'); g.fillRect(x + 50, gy - 26, 1, 14); g.fillStyle = dim('#38b764'); g.fillRect(x + 44, gy - 32, 14, 7); g.fillStyle = dim('#f4f4f4'); g.fillRect(x + 46, gy - 30, 8, 1);
-    } else if (n < 0.3) { // 废弃汽车
-      g.fillStyle = dim('#6e4a2e'); g.fillRect(x + 30, gy - 18, 20, 5); g.fillRect(x + 34, gy - 22, 11, 4); g.fillStyle = dim('#1a1c2c'); g.fillRect(x + 33, gy - 14, 3, 2); g.fillRect(x + 45, gy - 14, 3, 2);
-    }
-  }
 }
 
 // ---------- 路边建筑 ----------
 function rdDrawSite(g, s, gy, dim, day) {
-  const S = RD_SITES[s.type], x = Math.round(rdSX(s.km * RD_PX_KM)), w = S.w, h = S.h;
-  if (x + w < -10 || x - w > RDV.W + 10) return;
-  const left = x - Math.round(w / 2), base = gy - 13, r = (k) => rdHash(s.seed + k);
-  const wall = dim(rdMix(S.color, '#8a8070', 0.55)), dark = rdShade(wall, -0.3);
-  if (s.searched) g.globalAlpha = 0.75;
-  if (s.type === 'alien') { // 坠落舱：斜插在地里的发光舱体
-    g.fillStyle = dim('#2e1f50'); g.beginPath(); g.ellipse(x, base - 14, 30, 14, -0.25, 0, 7); g.fill();
-    g.fillStyle = dim('#4b3378'); g.beginPath(); g.ellipse(x - 4, base - 18, 22, 9, -0.25, 0, 7); g.fill();
-    g.globalAlpha = (s.searched ? 0.3 : 0.7) + Math.sin(G.time * 3) * 0.2; g.fillStyle = '#73eff7';
-    for (let k = 0; k < 5; k++) g.fillRect(x - 18 + k * 8, base - 16 - k * 2, 3, 2);
-    g.fillRect(x + 6, base - 4, 3, 4); g.globalAlpha = 1;
-    g.fillStyle = dim('#5a4a6e'); g.fillRect(x - 36, base - 1, 72, 2); // 撞出的土堆
-  } else if (s.type === 'camp') { // 帐篷 + 篝火 + 栅栏
-    g.fillStyle = dim('#6e4a2e'); for (let k = 0; k < w; k += 4) g.fillRect(left + k, base - 8, 1, 8); g.fillRect(left, base - 7, w, 1);
-    g.fillStyle = dim('#c9a86a'); g.beginPath(); g.moveTo(left + 10, base); g.lineTo(left + 24, base - 18); g.lineTo(left + 38, base); g.fill();
-    g.fillStyle = dim('#5f8a4a'); g.beginPath(); g.moveTo(left + 50, base); g.lineTo(left + 62, base - 15); g.lineTo(left + 74, base); g.fill();
-    const fh = 3 + Math.sin(G.time * 12) * 1.5; g.fillStyle = '#ef7d57'; g.fillRect(x - 1, base - fh - 1, 3, fh); g.fillStyle = '#ffcd75'; g.fillRect(x, base - fh, 1, fh - 1);
-    g.fillStyle = dim('#ffcd75'); g.fillRect(left + 4, base - 30, 1, 22); g.fillRect(left + 5, base - 30, 8, 5); // 旗子
-    rdDrawPerson(g, left + 44, base, { pose: 'stand', face: -1, shirt: '#3b5dc9', tiny: true });
-  } else {
-    // 主体
-    g.fillStyle = wall; g.fillRect(left, base - h, w, h);
-    g.fillStyle = dark; g.fillRect(left, base - h, w, 2);
-    // 屋顶 / 招牌
-    const sign = dim(S.color);
-    if (s.type === 'gas') { // 加油站：雨棚 + 油泵
-      g.fillStyle = wall; g.fillRect(left, base - h, w * 0.45, h);
-      g.fillStyle = dim('#c8d6e5'); g.fillRect(left + w * 0.4, base - h + 4, w * 0.6, 4); g.fillStyle = sign; g.fillRect(left + w * 0.4, base - h + 8, w * 0.6, 2);
-      g.fillStyle = dim('#94b0c2'); g.fillRect(left + w * 0.55, base - h + 10, 2, h - 10); g.fillRect(left + w * 0.95 - 2, base - h + 10, 2, h - 10);
-      g.fillStyle = sign; g.fillRect(left + w * 0.7, base - 12, 5, 12); g.fillStyle = dim('#1a1c2c'); g.fillRect(left + w * 0.7 + 1, base - 10, 3, 3);
-      g.fillStyle = dim('#94b0c2'); g.fillRect(left + w + 2, base - h - 14, 2, h + 14); g.fillStyle = sign; g.fillRect(left + w - 4, base - h - 22, 14, 10);
-    } else {
-      g.fillStyle = sign; g.fillRect(left + 4, base - h - 6, w - 8, 7);
-      g.fillStyle = dim('#f4f4f4'); for (let k = 0; k < (w - 16) / 5; k++) if (r(k + 50) > 0.25) g.fillRect(left + 8 + k * 5, base - h - 4, 3, 3);
-      if (s.type === 'factory') { g.fillStyle = dark; g.fillRect(left + w - 14, base - h - 26, 6, 26); g.fillRect(left + w - 26, base - h - 18, 5, 18); if (!s.searched) { g.globalAlpha = 0.3; g.fillStyle = '#94b0c2'; g.fillRect(left + w - 15 + Math.sin(G.time) * 2, base - h - 34, 8, 6); g.globalAlpha = s.searched ? 0.75 : 1; } }
-      if (s.type === 'military') { g.fillStyle = dim('#4c5a36'); for (let k = 0; k < w; k += 6) g.fillRect(left + k, base - 8, 5, 8); g.fillStyle = dim('#c9a86a'); g.fillRect(left + w - 10, base - h - 18, 2, 18); g.fillRect(left + w - 16, base - h - 22, 14, 6); }
-      if (s.type === 'farm') { g.fillStyle = dim('#b13e53'); g.beginPath(); g.moveTo(left, base - h); g.lineTo(left + w / 2, base - h - 16); g.lineTo(left + w, base - h); g.fill(); g.fillStyle = dim('#c9a86a'); g.fillRect(left + w + 4, base - 30, 10, 30); g.beginPath(); g.arc(left + w + 9, base - 30, 5, Math.PI, 0); g.fill(); }
-      if (s.type === 'house') { g.fillStyle = dim('#6e4a2e'); g.beginPath(); g.moveTo(left - 3, base - h); g.lineTo(left + w / 2, base - h - 14); g.lineTo(left + w + 3, base - h); g.fill(); }
-      if (s.type === 'junkyard') { for (let k = 0; k < 5; k++) { g.fillStyle = dim(['#6e4a2e', '#566c86', '#b13e53', '#38b764'][k % 4]); g.fillRect(left + k * 18, base - 8 - (k % 2) * 7, 16, 7); } }
-      if (s.type === 'rvpark') { g.fillStyle = dim('#e8e4d8'); g.fillRect(left + 8, base - 16, 30, 13); g.fillRect(left + 48, base - 14, 26, 11); g.fillStyle = dim('#1a1c2c'); g.fillRect(left + 12, base - 4, 4, 4); g.fillRect(left + 52, base - 4, 4, 4); g.fillStyle = dim('#41a6f6'); g.fillRect(left + 12, base - 13, 6, 4); g.fillRect(left + 52, base - 11, 6, 4); }
-      if (s.type === 'lab') { g.fillStyle = dim('#c8d6e5'); g.beginPath(); g.arc(left + w / 2, base - h, 14, Math.PI, 0); g.fill(); g.fillStyle = dim('#94b0c2'); g.fillRect(left + w - 10, base - h - 20, 1, 20); g.beginPath(); g.arc(left + w - 10, base - h - 20, 4, 0, Math.PI); g.fill(); }
-      // 窗户：破的、暗的、晚上偶尔有光
-      const rows = Math.max(1, Math.floor((h - 16) / 12));
-      for (let ry = 0; ry < rows; ry++) for (let k = 0; k < Math.floor((w - 10) / 12); k++) {
-        if (s.type === 'junkyard' || s.type === 'rvpark') continue;
-        const wx = left + 6 + k * 12, wy = base - h + 6 + ry * 12, rr = r(k * 7 + ry);
-        g.fillStyle = rr > 0.8 ? dim('#41a6f6') : rr > 0.3 ? dim('#1a1c2c') : dark;
-        if (day < 0.3 && rr > 0.93 && !s.searched) g.fillStyle = '#ffcd75';
-        g.fillRect(wx, wy, 6, 6);
-        if (rr > 0.5 && rr < 0.7) { g.fillStyle = wall; g.fillRect(wx + 3, wy + 2, 3, 4); } // 碎玻璃
-      }
-      // 门
-      g.fillStyle = dim('#1a1c2c'); g.fillRect(x - 4, base - 12, 8, 12);
-      if (!s.searched) { g.fillStyle = dim('#3a2a22'); g.fillRect(x - 4, base - 12, 3, 12); }
-      // 裂缝、藤蔓
-      g.fillStyle = dark; for (let k = 0; k < 4; k++) { const cx = left + Math.floor(r(k + 30) * w); for (let j = 0; j < 6; j++) g.fillRect(cx + Math.floor(Math.sin(j + k) * 2), base - h + 4 + j * 3, 1, 3); }
-      if (rdBiomeAt(s.km).deco === 'deadtree') { g.fillStyle = dim('#38b764'); for (let k = 0; k < w; k += 3) if (r(k + 90) > 0.6) g.fillRect(left + k, base - h + Math.floor(r(k) * 10), 1, 4 + Math.floor(r(k + 1) * 8)); }
-      if (rdBiomeAt(s.km).snow) { g.fillStyle = dim('#f4f4f4'); g.fillRect(left - 1, base - h - 2, w + 2, 2); }
-    }
-  }
-  g.globalAlpha = 1;
-  // 正在搜索：门口的进度条
+  // 建筑本身在 js/roadsites.js 里画（和远景一起，在护栏后面）；这里只画搜索进度条
   const R = G.road;
-  if (R.search && R.search.site === s && R.search.phase === 'in') {
-    const p = R.search.t / R.search.dur;
-    g.fillStyle = '#1a1c2c'; g.fillRect(x - 15, base - h - 14, 30, 4); g.fillStyle = '#ffcd75'; g.fillRect(x - 14, base - h - 13, Math.round(28 * p), 2);
-    // 手电筒在窗户里晃
-    g.fillStyle = '#ffcd75'; g.globalAlpha = 0.6; g.fillRect(left + 6 + Math.floor((Math.sin(G.time * 1.3) * 0.5 + 0.5) * (w - 14)), base - h + 7, 3, 3); g.globalAlpha = 1;
-  }
+  if (!(R.search && R.search.site === s && R.search.phase === 'in')) return;
+  const S = RD_SITES[s.type], x = Math.round(rdSX(s.km * RD_PX_KM)), top = gy - 13 - S.h, p = R.search.t / R.search.dur;
+  g.fillStyle = '#1a1c2c'; g.fillRect(x - 15, top - 14, 30, 4); g.fillStyle = '#ffcd75'; g.fillRect(x - 14, top - 13, Math.round(28 * p), 2);
 }
 
-function rdDrawObstacle(g, o, gy, dim) {
-  const x = Math.round(rdSX(o.km * RD_PX_KM)), y = gy;
-  if (x < -30 || x > RDV.W + 30) return;
-  if (o.type === 'car') { g.fillStyle = dim('#6e4a2e'); g.fillRect(x - 10, y - 10, 22, 7); g.fillRect(x - 6, y - 14, 12, 4); g.fillStyle = dim('#1a1c2c'); g.fillRect(x - 8, y - 4, 4, 3); g.fillRect(x + 5, y - 4, 4, 3); g.fillStyle = dim('#41a6f6'); g.fillRect(x - 4, y - 13, 3, 2); }
-  else if (o.type === 'barrier') { g.fillStyle = dim('#f4f4f4'); g.fillRect(x - 8, y - 9, 16, 4); g.fillStyle = dim('#b13e53'); for (let k = 0; k < 16; k += 4) g.fillRect(x - 8 + k, y - 9, 2, 4); g.fillStyle = dim('#566c86'); g.fillRect(x - 7, y - 5, 2, 5); g.fillRect(x + 5, y - 5, 2, 5); }
-  else if (o.type === 'crater') { g.fillStyle = dim('#1a1c2c'); g.beginPath(); g.ellipse(x, y + 1, 10, 3, 0, 0, 7); g.fill(); g.fillStyle = dim('#566c86'); g.fillRect(x - 12, y - 1, 3, 2); g.fillRect(x + 9, y - 1, 3, 2); }
-  else if (o.type === 'pole') { g.fillStyle = dim('#4a3a2e'); g.save(); g.translate(x, y - 2); g.rotate(-0.15); g.fillRect(-16, -2, 32, 3); g.restore(); }
-  else { g.fillStyle = dim('#566c86'); g.fillRect(x - 8, y - 6, 7, 6); g.fillRect(x - 2, y - 9, 8, 9); g.fillRect(x + 5, y - 4, 5, 4); }
-}
 
 // ---------- 怪物 ----------
 function rdDrawMonster(g, m, gy) {
+  if (rdnHas(m.type)) { rdnDraw(g, m, gy); return; } // 精细像素怪物（js/roadmons.js）
   const M = RD_MONSTERS[m.type], x = Math.round(rdSX(m.x)), y = Math.round(gy + (M.fly ? m.y : 0) + (M.fly ? 0 : 3) + (m.lunge > 0 ? -2 : 0));
   if (x < -40 || x > RDV.W + 40) return;
   const f = m.face, c = m.hitT > 0 ? '#f4f4f4' : M.color, gl = M.glow, t = m.ph;
@@ -355,64 +159,11 @@ function rdDrawMonster(g, m, gy) {
 }
 
 // ---------- 子弹、爆炸、粒子 ----------
-function rdDrawProj(g, gy) {
-  const R = G.road;
-  for (const p of R.proj || []) {
-    const x = Math.round(rdSX(p.x)), y = Math.round(gy + p.y);
-    const k = p.kind;
-    if (k === 'spit') { g.fillStyle = p.color; g.fillRect(x - 1, y - 1, 3, 3); continue; }
-    if (k === 'bullet' || k === 'nail') { g.fillStyle = '#ffcd75'; g.fillRect(x - 2, y, 3, 1); }
-    else if (k === 'pellet') { g.fillStyle = '#f4f4f4'; g.fillRect(x, y, 1, 1); }
-    else if (k === 'rock') { g.fillStyle = '#94b0c2'; g.fillRect(x - 1, y - 1, 2, 2); }
-    else if (k === 'harpoon') { g.fillStyle = '#c8d6e5'; g.fillRect(x - 5, y, 7, 1); g.fillRect(x + 1, y - 1, 2, 3); }
-    else if (k === 'flame') { const r = 2 + Math.random() * 2; g.fillStyle = Math.random() < 0.5 ? '#ef7d57' : '#ffcd75'; g.fillRect(x - r / 2, y - r / 2, r, r); }
-    else if (k === 'shell' || k === 'mortar') { g.fillStyle = '#566c86'; g.fillRect(x - 1, y - 1, 3, 3); g.fillStyle = '#ffcd75'; g.fillRect(x, y, 1, 1); }
-    else if (k === 'rocket') { g.fillStyle = '#c8d6e5'; g.fillRect(x - 3, y, 4, 2); g.fillStyle = '#ef7d57'; g.fillRect(x - 5, y, 2, 2); }
-    else if (k === 'missile') { const a = Math.atan2(p.vy, p.vx), cx = Math.cos(a), cy = Math.sin(a); g.fillStyle = '#c8d6e5'; for (let s = 0; s < 3; s++) g.fillRect(Math.round(x - cx * s), Math.round(y - cy * s), 1, 1); g.fillStyle = '#b13e53'; g.fillRect(Math.round(x + cx), Math.round(y + cy), 1, 1); g.fillStyle = '#ffcd75'; g.fillRect(Math.round(x - cx * 4), Math.round(y - cy * 4), 2, 2); }
-    else if (k === 'plasma') { g.fillStyle = '#c27bd6'; g.fillRect(x - 2, y - 2, 5, 5); g.fillStyle = '#f4f4f4'; g.fillRect(x - 1, y - 1, 3, 3); }
-    else if (k === 'grav') { g.strokeStyle = '#c27bd6'; g.beginPath(); g.arc(x, y, 3 + Math.sin(G.time * 20), 0, 7); g.stroke(); g.fillStyle = '#1a1c2c'; g.fillRect(x - 1, y - 1, 3, 3); }
-    else if (k === 'acid') { g.fillStyle = '#a7f070'; g.fillRect(x - 1, y - 1, 3, 2); }
-    else { g.fillStyle = '#f4f4f4'; g.fillRect(x, y, 2, 1); }
-  }
-  for (const f of R.fx || []) {
-    const a = Math.max(0, f.life / f.max);
-    const x = rdSX(f.x), y = gy + f.y;
-    if (f.kind === 'laser' || f.kind === 'beam' || f.kind === 'rail') {
-      g.globalAlpha = a; g.strokeStyle = f.kind === 'laser' ? '#ef7d57' : f.kind === 'beam' ? '#c27bd6' : '#73eff7'; g.lineWidth = f.kind === 'rail' ? 3 : 1;
-      g.beginPath(); g.moveTo(x, y); g.lineTo(rdSX(f.x2), gy + f.y2); g.stroke();
-      g.strokeStyle = '#f4f4f4'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(rdSX(f.x2), gy + f.y2); g.stroke(); g.globalAlpha = 1;
-    } else if (f.kind === 'arc') {
-      g.globalAlpha = a; g.strokeStyle = '#73eff7'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y);
-      const x2 = rdSX(f.x2), y2 = gy + f.y2;
-      for (let k = 1; k < 6; k++) g.lineTo(x + (x2 - x) * k / 6 + (Math.random() - 0.5) * 6, y + (y2 - y) * k / 6 + (Math.random() - 0.5) * 6);
-      g.lineTo(x2, y2); g.stroke(); g.globalAlpha = 1;
-    } else {
-      const r = f.r * (1 - a * 0.5);
-      g.globalAlpha = a;
-      g.fillStyle = f.kind === 'gravboom' ? '#5d275d' : f.kind === 'plasmaboom' ? '#c27bd6' : '#ef7d57';
-      g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
-      g.fillStyle = f.kind === 'gravboom' ? '#1a1c2c' : '#ffcd75'; g.beginPath(); g.arc(x, y, r * 0.55, 0, 7); g.fill();
-      g.globalAlpha = 1;
-    }
-  }
-  for (const p of R.parts || []) {
-    g.globalAlpha = p.fade ? Math.max(0, p.life / 0.4) * 0.6 : Math.min(1, p.life * 3);
-    g.fillStyle = p.c; const s = p.s || 1; g.fillRect(Math.round(rdSX(p.x)), Math.round(gy + p.y), s, s);
-  }
-  g.globalAlpha = 1;
-}
 
-function rdDrawWeather(g, W, H, gy) {
-  const R = G.road, w = R.weather;
-  if (!w) return;
-  if (w.type === 'dust') { g.fillStyle = 'rgba(201,148,100,0.35)'; g.fillRect(0, 0, W, H); g.fillStyle = 'rgba(232,190,140,0.6)'; for (let i = 0; i < 60; i++) { const x = (rdHash(i) * W * 2 - G.time * 140 * (0.5 + rdHash(i + 3))) % W; g.fillRect(Math.round((x + W) % W), Math.round(rdHash(i + 9) * H), 4, 1); } }
-  if (w.type === 'rad') { g.fillStyle = 'rgba(167,240,112,' + (0.12 + Math.sin(G.time * 3) * 0.05) + ')'; g.fillRect(0, 0, W, H); g.fillStyle = 'rgba(167,240,112,0.7)'; for (let i = 0; i < 30; i++) { const y = (rdHash(i) * H + G.time * 20 * (1 + rdHash(i + 1))) % H; g.fillRect(Math.round(rdHash(i + 5) * W), Math.round(y), 1, 1); } }
-  if (w.type === 'storm') { g.fillStyle = 'rgba(41,54,111,0.25)'; g.fillRect(0, 0, W, H); g.fillStyle = 'rgba(148,176,194,0.7)'; for (let i = 0; i < 90; i++) { const y = (rdHash(i) * H + G.time * 300) % H, x = (rdHash(i + 2) * W - G.time * 60) % W; g.fillRect(Math.round((x + W) % W), Math.round(y), 1, 4); } }
-}
 
 // 夜晚：整体变暗，车灯和建筑的灯光照亮
 function rdDrawNight(g, day, gy) {
-  const dark = (1 - day) * 0.62;
+  const dark = (1 - day) * 0.62 * (1 - RDK.flash * 0.7);
   if (dark <= 0.02) return;
   const V = RDV, lg = V.lg, R = G.road;
   lg.setTransform(RD_Q, 0, 0, RD_Q, 0, 0);
@@ -434,6 +185,9 @@ function rdDrawNight(g, day, gy) {
   for (const f of R.fx || []) hole(rdSX(f.x), gy + f.y, (f.r || 10) * 2, 0.8);
   for (const m of R.mons || []) { const M = RD_MONSTERS[m.type]; hole(rdSX(m.x), gy + (M.fly ? m.y : -M.h / 2), 6, 0.35); } // 怪物身上的辐射荧光
   for (const s of R.sites) if (s.type === 'camp' || s.type === 'alien') hole(rdSX(s.km * RD_PX_KM), gy - 16, 40, 0.7);
+  // 远景里的灯（窗户、红灯、荧光）：挖一个小亮点
+  for (const l of RDS_LIT) if (l.a2 > 0.08) { lg.globalAlpha = Math.min(1, l.a2 * 0.7); const r = Math.min(8, l.r / RD_Q * 2.2); lg.drawImage(rdsGlow('#000000'), l.x - r, l.y - r, r * 2, r * 2); }
+  lg.globalAlpha = 1;
   lg.globalCompositeOperation = 'source-over';
   g.drawImage(V.light, 0, 0, V.W, V.H);
 }
@@ -457,7 +211,7 @@ function rdDrawVehicle(g, x0, y0, opt) {
   if (!fine) { g.fillStyle = 'rgba(10,10,25,0.35)'; g.fillRect(x - L - 2, Math.round(y0) + (hover ? 2 : 0), L + 4, 2); }
   // 挂车
   const tr = part('trailer');
-  if (tr) rdDrawTrailer(g, x - L - 4, y, tr, hover, moving);
+  if (tr) rdpTrailer(g, x - L - 4, y, tr, hover, moving); // 精细像素挂车（js/roadparts.js）
   // 反重力光
   if (hover && !fine) { g.globalAlpha = 0.35 + Math.sin(G.time * 6) * 0.15; g.fillStyle = part('chassis').id === 'chs6' ? '#c27bd6' : '#73eff7'; g.fillRect(x - L + 3, Math.round(y0) - 2, L - 6, 2); g.fillRect(x - L + 6, Math.round(y0) - 4, L - 12, 1); g.globalAlpha = stealth ? 0.7 : 1; }
   // 轮子
@@ -513,16 +267,14 @@ function rdDrawVehicle(g, x0, y0, opt) {
   // 前撞角
   const ram = part('ram');
   if (ram && !fine) rdDrawRam(g, x, y, ram);
-  // 车身外挂
-  const ut = part('util');
-  if (ut) rdDrawUtil(g, x, y, L, ut, v);
-  // 油箱（侧挂油桶）
-  const tk = part('tank');
-  if (tk) { const n = Math.min(3, tk.tier); for (let k = 0; k < n; k++) { P(-L + 4 + k * 5, -12, 4, 5, tk.alien ? '#4b3378' : '#b13e53'); P(-L + 5 + k * 5, -13, 2, 1, '#333c57'); if (tk.alien) P(-L + 5 + k * 5, -10, 2, 1, '#73eff7'); } }
-  // 车顶
-  const rf = part('roof');
+  // 车顶高度、车身外挂、油箱、车顶（精细像素，js/roadparts.js）
   const roofY = fine && rdcCarRoof(R.veh) ? rdcCarRoof(R.veh) : R.veh === 'garbage' ? -34 : R.veh === 'pickup' ? -26 : v.tent ? -16 : fine ? -26 : -32;
-  if (rf) rdDrawRoof(g, x, y, L, rf, roofY);
+  const ut = part('util');
+  if (ut) rdpUtil(g, x, y, L, ut, v, roofY);
+  const tk = part('tank');
+  if (tk) rdpTank(g, x, y, L, tk, v);
+  const rf = part('roof');
+  if (rf) rdpRoof(g, x, y, L, rf, roofY);
   // 引擎特效：排气、火焰、光
   const en = part('engine');
   rdDrawEngineFx(g, x, y, L, en, moving, v);
@@ -530,12 +282,11 @@ function rdDrawVehicle(g, x0, y0, opt) {
   const ws = rdWeapons();
   ws.forEach((w) => {
     const mp = rdMountPos(w.i), gx = x + mp.x, gy = y + mp.y + (R.veh === 'pickup' && w.i < 2 ? 6 : 0) + (R.veh === 'garbage' ? -2 : 0);
-    if (w.p.fx.turret) rdDrawTurret(g, gx, gy, w.p, 'w' + w.i, w.i);
-    else rdDrawGun(g, gx, gy, w.p, (R.aim && R.aim['w' + w.i]) || 0);
+    rdgDraw(g, gx, gy, w, 'w' + w.i, w.i); // 精细像素武器（js/roadguns.js）
   });
   // 空间核心：车门处的空间涟漪
   const sp = part('space');
-  if (sp) { g.globalAlpha = 0.4 + Math.sin(G.time * 3) * 0.2; g.strokeStyle = '#c27bd6'; g.strokeRect(x - L + 2.5, y - 30.5, 6, 18); g.globalAlpha = stealth ? 0.7 : 1; }
+  if (sp) { rdpSpace(g, x, y, L, sp); g.globalAlpha = stealth ? 0.7 : 1; }
   // 护盾
   if (R.shield > 1) { g.globalAlpha = 0.15 + 0.15 * (R.shield / Math.max(1, st.shieldMax)); g.strokeStyle = '#73eff7'; g.beginPath(); g.ellipse(x - L / 2, y - 16, L / 2 + 6, 22, 0, 0, 7); g.stroke(); g.globalAlpha = 1; }
   if (fine) g.restore();
@@ -593,33 +344,6 @@ function rdDrawRam(g, x, y, p) {
   else if (id === 'ram10') { g.globalAlpha = 0.4 + Math.sin(G.time * 5) * 0.15; g.fillStyle = '#73eff7'; g.beginPath(); g.moveTo(x, y - 24); g.lineTo(x + 12, y - 8); g.lineTo(x, y - 2); g.fill(); g.globalAlpha = 1; }
 }
 function R_RAMPOS() { return Math.sin(G.time * 6) > 0.8 ? 3 : 0; }
-function rdDrawUtil(g, x, y, L, p, v) {
-  const P = (dx, dy, w, h, c) => { g.fillStyle = c; g.fillRect(x + dx, y + dy, w, h); };
-  const id = p.id, top = v.tent ? -16 : -30;
-  if (id === 'util1') { P(-2, -11, 3, 3, '#566c86'); P(1, -10, 2, 1, '#94b0c2'); }
-  else if (id === 'util2' || id === 'util6' || id === 'util9') { const c = id === 'util2' ? '#94b0c2' : '#41a6f6'; for (let k = 0; k < L - 4; k += 3) P(-L + 2 + k, top - 1 + (k % 2), 2, 1, c); if (id !== 'util2' && Math.random() < 0.3) P(-L + Math.floor(Math.random() * L), top - 2, 1, 2, '#73eff7'); }
-  else if (id === 'util3' || id === 'util12') { P(-L - 3, -24, 4, 10, '#6e4a2e'); P(-L - 3, -24, 4, 1, '#a8794f'); }
-  else if (id === 'util4') { P(-16, top - 3, 4, 3, '#333c57'); P(-15, top - 2, 2, 1, '#94b0c2'); if (G.road.speedNow > 1 || true) { g.fillStyle = '#ffcd75'; const t = (G.time * 2) % 1; g.globalAlpha = 1 - t; g.fillRect(x - 13 + t * 8, y + top - 6 - t * 4, 1, 2); g.globalAlpha = 1; } }
-  else if (id === 'util5') { P(-L + 2, top - 4, 3, 4, '#566c86'); P(-L + 6, top - 4, 3, 4, '#566c86'); }
-  else if (id === 'util7') { P(-L + 4, -20, 3, 7, '#b13e53'); P(-L + 4, -21, 3, 1, '#1a1c2c'); }
-  else if (id === 'util8') { const a = Math.sin(G.time * 2) * 0.5; g.save(); g.translate(x - L / 2, y + top); g.rotate(-0.6 + a); g.fillStyle = '#ffcd75'; g.fillRect(0, -1, 12, 2); g.fillStyle = '#566c86'; g.fillRect(11, -2, 3, 4); g.restore(); }
-  else if (id === 'util10') { /* 隐形：车身半透明（rdDrawVehicle 里处理） */ }
-  else if (id === 'util11') { g.fillStyle = '#73eff7'; for (let k = 0; k < 8; k++) { const t = G.time * 1.5 + k; g.globalAlpha = 0.5; g.fillRect(Math.round(x - L / 2 + Math.cos(t) * L * 0.6), Math.round(y - 16 + Math.sin(t * 1.3) * 14), 1, 1); } g.globalAlpha = 1; }
-}
-function rdDrawRoof(g, x, y, L, p, ry) {
-  const P = (dx, dy, w, h, c) => { g.fillStyle = c; g.fillRect(x + dx, y + dy, w, h); };
-  const id = p.id, rx = -L + 3, rw = L - 18;
-  if (id === 'roof1') { P(rx, ry - 2, rw, 1, '#566c86'); P(rx, ry - 4, 1, 3, '#566c86'); P(rx + rw - 1, ry - 4, 1, 3, '#566c86'); P(rx + 3, ry - 6, 7, 4, '#a8794f'); P(rx + 12, ry - 5, 6, 3, '#38b764'); P(rx + 20, ry - 7, 5, 5, '#8f6a42'); }
-  else if (id === 'roof2') { P(rx, ry - 6, rw, 2, '#b13e53'); for (let k = 0; k < rw; k += 4) P(rx + k, ry - 6, 2, 2, '#f4f4f4'); P(rx, ry - 4, 1, 4, '#566c86'); P(rx + rw - 1, ry - 4, 1, 4, '#566c86'); }
-  else if (id === 'roof3' || id === 'roof9' || id === 'roof13') { const big = id !== 'roof3', c = id === 'roof13' ? '#c27bd6' : '#29366f'; P(rx, ry - 3, big ? rw : rw / 2, 2, c); for (let k = 0; k < (big ? rw : rw / 2); k += 3) P(rx + k, ry - 3, 1, 2, '#41a6f6'); if (big) { P(rx + 2, ry - 6, rw - 4, 2, c); for (let k = 2; k < rw - 2; k += 3) P(rx + k, ry - 6, 1, 2, id === 'roof13' ? '#73eff7' : '#41a6f6'); } }
-  else if (id === 'roof4') { P(rx + 2, ry - 4, 5, 3, '#333c57'); P(rx + 9, ry - 4, 5, 3, '#333c57'); P(rx + 6, ry - 3, 1, 1, '#ffcd75'); P(rx + 13, ry - 3, 1, 1, '#ffcd75'); P(-14, ry + 7, 3, 2, '#333c57'); P(-12, ry + 7, 1, 1, '#ffcd75'); }
-  else if (id === 'roof5') { P(rx + 4, ry - 14, 1, 14, '#6e4a2e'); P(rx + 12, ry - 14, 1, 14, '#6e4a2e'); P(rx + 2, ry - 16, 13, 3, '#8f6a42'); P(rx + 2, ry - 19, 1, 3, '#8f6a42'); P(rx + 14, ry - 19, 1, 3, '#8f6a42'); }
-  else if (id === 'roof6' || id === 'roof12') { const a = G.time * 2; P(rx + 8, ry - 6, 1, 6, '#94b0c2'); g.fillStyle = id === 'roof12' ? '#c27bd6' : '#c8d6e5'; g.fillRect(Math.round(x + rx + 8 - Math.cos(a) * 4), y + ry - 9, Math.max(1, Math.round(Math.abs(Math.cos(a)) * 8)), 3); if (id === 'roof12') { g.globalAlpha = 0.5; g.fillStyle = '#73eff7'; g.fillRect(x + rx + 8, y + ry - 12, 1, 3); g.globalAlpha = 1; } }
-  else if (id === 'roof7' || id === 'roof14') { P(rx + 6, ry - 2, 10, 2, '#566c86'); if (id === 'roof14') P(rx + 20, ry - 2, 10, 2, '#566c86'); }
-  else if (id === 'roof8') { P(rx + 6, ry - 12, 1, 12, '#94b0c2'); const a = G.time * (G.road.speedNow > 1 ? 14 : 2); g.fillStyle = '#f4f4f4'; for (let k = 0; k < 3; k++) { const b = a + k * 2.094; g.fillRect(Math.round(x + rx + 6 + Math.cos(b) * 5), Math.round(y + ry - 12 + Math.sin(b) * 5), 1, 1); g.fillRect(Math.round(x + rx + 6 + Math.cos(b) * 3), Math.round(y + ry - 12 + Math.sin(b) * 3), 1, 1); } }
-  else if (id === 'roof10') { P(rx + 2, ry - 6, 14, 6, '#333c57'); P(rx + 3, ry - 5, 12, 1, '#566c86'); const R = G.road; if (R.search && R.search.phase === 'in') { const s = R.search.site, dx = rdSX(s.km * RD_PX_KM) + Math.sin(G.time * 2) * 20, dy = RDV.gy - RD_SITES[s.type].h - 26 + Math.sin(G.time * 3) * 4; g.fillStyle = '#c8d6e5'; g.fillRect(Math.round(dx - 3), Math.round(dy), 6, 1); g.fillStyle = '#566c86'; g.fillRect(Math.round(dx - 1), Math.round(dy + 1), 2, 1); } else { P(rx + 6, ry - 8, 6, 1, '#c8d6e5'); } }
-  else if (id === 'roof11') { P(rx + 4, ry - 6, 10, 1, '#41a6f6'); P(rx + 4, ry - 6, 1, 6, '#94b0c2'); P(rx + 13, ry - 6, 1, 6, '#94b0c2'); P(rx + 7, ry - 4, 4, 4, '#29366f'); }
-}
 function rdDrawEngineFx(g, x, y, L, en, moving, v) {
   const R = G.road;
   if (!moving) return;
@@ -629,80 +353,6 @@ function rdDrawEngineFx(g, x, y, L, en, moving, v) {
   if (id === 'eng10') { const f = 4 + Math.random() * 5; g.fillStyle = '#ef7d57'; g.fillRect(x - L - f, y - 14, f, 4); g.fillStyle = '#ffcd75'; g.fillRect(x - L - f * 0.6, y - 13, f * 0.6, 2); g.fillStyle = '#566c86'; g.fillRect(x - L - 1, y - 15, 2, 6); return; }
   if (id === 'eng6') { g.fillStyle = '#c8d6e5'; g.fillRect(x - 10, y - 18, 2, 3); g.fillRect(x - 13, y - 18, 2, 3); if (Math.random() < 0.15) { g.fillStyle = '#ef7d57'; g.fillRect(x - L - 3, y - 8, 2, 2); } }
   if (Math.random() < (id === 'eng1' ? 0.15 : 0.35)) rdSmoke(rdVehX() - L - 1, -7, id === 'eng5' ? '#a7f070' : '#566c86');
-}
-function rdDrawGun(g, x, y, p, ang) {
-  const fx = p.fx, k = fx.proj, alien = p.alien;
-  g.fillStyle = '#333c57'; g.fillRect(x - 3, y - 2, 6, 3); g.fillStyle = '#566c86'; g.fillRect(x - 2, y - 4, 4, 2);
-  // 炮管朝向目标：前后上下都能转（朝后时把图翻过来，炮管不会倒着）
-  const aa = ang || -0.1;
-  g.save(); g.translate(x, y - 3); g.rotate(aa); if (Math.cos(aa) < 0) g.scale(1, -1);
-  const B = (dx, dy, w, h, c) => { g.fillStyle = c; g.fillRect(dx, dy, w, h); };
-  if (k === 'rock') { B(-2, -2, 6, 3, '#8f6a42'); B(3, -3, 1, 5, '#6e4a2e'); }
-  else if (k === 'nail') { B(-2, -2, 6, 4, '#ffcd75'); B(4, -1, 3, 1, '#566c86'); }
-  else if (k === 'bullet') { const n = p.id === 'wpn12' ? 3 : p.id === 'wpn7' ? 2 : 1; B(-3, -2, 6, 4, '#333c57'); for (let i = 0; i < n; i++) B(3, -1 + i * 1 - (n - 1) / 2, p.id === 'wpn3' ? 7 : 9, 1, '#94b0c2'); if (p.id === 'wpn12') B(3, -2, 2, 4, '#566c86'); }
-  else if (k === 'pellet') { B(-3, -2, 6, 4, '#333c57'); B(3, -2, 6, 3, '#566c86'); B(8, -2, 1, 3, '#1a1c2c'); }
-  else if (k === 'harpoon') { B(-3, -2, 6, 3, '#6e4a2e'); B(3, -1, 9, 1, '#c8d6e5'); B(11, -2, 2, 3, '#c8d6e5'); }
-  else if (k === 'flame') { B(-3, -3, 5, 5, '#b13e53'); B(2, -1, 6, 2, '#566c86'); if (Math.random() < 0.5) B(8, -1, 2, 2, '#ef7d57'); }
-  else if (k === 'arc') { B(-1, -8, 2, 8, '#566c86'); for (let i = 0; i < 3; i++) B(-3 + i, -7 + i * 2, 6 - i * 2, 1, '#41a6f6'); if (Math.random() < 0.4) B(-2 + Math.floor(Math.random() * 4), -10, 1, 2, '#73eff7'); }
-  else if (k === 'shell' || k === 'mortar') { B(-3, -3, 6, 5, '#4c5a36'); B(2, -2, k === 'mortar' ? 7 : 8, 3, '#566c86'); B(k === 'mortar' ? 8 : 9, -2, 1, 3, '#1a1c2c'); }
-  else if (k === 'rocket') { B(-4, -4, 9, 7, '#4c5a36'); B(4, -3, 1, 2, '#1a1c2c'); B(4, 0, 1, 2, '#1a1c2c'); B(2, -3, 1, 2, '#b13e53'); }
-  else if (k === 'rail') { B(-3, -2, 6, 4, '#29366f'); B(3, -2, 12, 1, '#c8d6e5'); B(3, 1, 12, 1, '#c8d6e5'); g.globalAlpha = 0.5 + Math.sin(G.time * 8) * 0.3; B(4, -1, 10, 2, '#73eff7'); g.globalAlpha = 1; }
-  else if (k === 'laser' || k === 'beam') { B(-3, -2, 6, 4, '#4b3378'); B(3, -1, 5, 2, '#c27bd6'); B(8, -2, 2, 4, k === 'laser' ? '#ef7d57' : '#c27bd6'); }
-  else if (k === 'plasma') { B(-3, -3, 6, 5, '#4b3378'); B(3, -2, 5, 3, '#2e1f50'); g.fillStyle = '#c27bd6'; g.beginPath(); g.arc(9, -0.5, 2 + Math.sin(G.time * 10) * 0.5, 0, 7); g.fill(); }
-  else if (k === 'grav') { B(-3, -3, 6, 5, '#2e1f50'); g.strokeStyle = '#c27bd6'; g.beginPath(); g.arc(7, -0.5, 3, 0, 7); g.stroke(); B(6, -1, 2, 2, '#1a1c2c'); }
-  else if (k === 'acid') { g.fillStyle = '#5a7a3a'; g.beginPath(); g.ellipse(1, -1, 5, 3, 0, 0, 7); g.fill(); B(5, -1, 4, 2, '#a7f070'); }
-  else { B(-3, -2, 6, 4, '#333c57'); B(3, -1, 7, 2, '#94b0c2'); }
-  if (alien) { g.globalAlpha = 0.4; B(-3, 2, 6, 1, '#73eff7'); g.globalAlpha = 1; }
-  g.restore();
-}
-// 车外自瞄炮塔：底座 + 会转的炮塔头；没目标时左右巡视，开火时转向目标
-function rdDrawTurret(g, x, y, p, key, i) {
-  const R = G.road, t = p.fx.turret;
-  R.aimS = R.aimS || {};
-  const last = R.aimAt && R.aimAt[key], busy = last != null && G.time - last < 1.5 && last <= G.time;
-  const want = busy ? R.aim[key] : -Math.PI / 2 + Math.sin(G.time * 0.7 + i * 1.7) * 1.15;
-  let cur = R.aimS[key] != null ? R.aimS[key] : want;
-  let diff = Math.atan2(Math.sin(want - cur), Math.cos(want - cur));
-  cur += diff * Math.min(1, (busy ? 0.35 : 0.06));
-  R.aimS[key] = cur;
-  const P = (dx, dy, w, h, c) => { g.fillStyle = c; g.fillRect(x + dx, y + dy, w, h); };
-  const flash = busy && G.time - last < 0.06;
-  const hy = t === 'alien' ? -9 + Math.sin(G.time * 2.5 + i) * 1.5 : -5; // 炮塔头的高度
-  // 底座
-  if (t === 'alien') {
-    g.globalAlpha = 0.35 + Math.sin(G.time * 4) * 0.15; P(-4, -1, 8, 1, '#73eff7'); P(-2, hy + 4, 4, -hy - 4, '#c27bd6'); g.globalAlpha = 1;
-  } else {
-    P(-6, -1, 12, 2, '#262b44'); P(-5, -3, 10, 2, '#566c86'); P(-5, -3, 10, 1, '#94b0c2'); P(-1, -5, 2, 2, '#333c57');
-    if (t === 'aa') { const ra = G.time * 3; P(4, -7, 1, 4, '#566c86'); P(4 + Math.round(Math.cos(ra) * 2), -8, 1, 1, '#c8d6e5'); }
-  }
-  g.save(); g.translate(x, y + hy); g.rotate(cur); if (Math.cos(cur) < 0) g.scale(1, -1);
-  const B = (dx, dy, w, h, c) => { g.fillStyle = c; g.fillRect(dx, dy, w, h); };
-  let muzzle = 10;
-  if (t === 'mg') { B(-4, -3, 7, 5, '#4c5a36'); B(-4, -3, 7, 1, '#6e7d4a'); B(3, -2, 8, 1, '#94b0c2'); B(3, 0, 8, 1, '#94b0c2'); B(-3, -4, 3, 1, '#333c57'); if (Math.floor(G.time * 2) % 2) B(-1, -4, 1, 1, '#ef7d57'); muzzle = 11; }
-  else if (t === 'cannon') { B(-5, -4, 9, 7, '#3b4a5a'); B(-5, -4, 9, 1, '#566c86'); B(4, -3, 10, 2, '#566c86'); B(4, 1, 10, 2, '#566c86'); B(13, -3, 2, 2, '#1a1c2c'); B(13, 1, 2, 2, '#1a1c2c'); B(-3, -2, 2, 2, '#ffcd75'); muzzle = 15; }
-  else if (t === 'aa') { B(-4, -3, 7, 6, '#5a6a3a'); B(-4, -3, 7, 1, '#7a8a5a'); for (let k = 0; k < 4; k++) B(3, -3 + k * 2, 11, 1, '#c8d6e5'); muzzle = 14; }
-  else if (t === 'missile') { B(-4, -4, 10, 8, '#4c5a36'); B(-4, -4, 10, 1, '#6e7d4a'); for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) { B(1 + a * 3, -3 + b * 4, 2, 2, '#1a1c2c'); B(5 + a * 0, -3 + b * 4, 1, 2, '#b13e53'); } muzzle = 7; }
-  else if (t === 'laser') { B(-3, -3, 6, 6, '#29366f'); B(-3, -3, 6, 1, '#41a6f6'); B(3, -1, 6, 2, '#c8d6e5'); g.globalAlpha = 0.6 + Math.sin(G.time * 9) * 0.3; B(9, -2, 2, 4, '#73eff7'); g.globalAlpha = 1; muzzle = 11; }
-  else if (t === 'alien') { g.fillStyle = '#4b3378'; g.beginPath(); g.arc(0, 0, 4, 0, 7); g.fill(); g.strokeStyle = '#c27bd6'; g.beginPath(); g.arc(0, 0, 4.5, 0, 7); g.stroke(); B(1, -1, 3, 2, '#73eff7'); B(4, -1, 2, 2, '#f4f4f4'); muzzle = 6; }
-  if (flash) { B(muzzle, -2, 3, 4, '#ffcd75'); B(muzzle + 1, -1, 2, 2, '#f4f4f4'); }
-  g.restore();
-}
-function rdDrawTrailer(g, x, y, p, hover, moving) {
-  const P = (dx, dy, w, h, c) => { g.fillStyle = c; g.fillRect(x + dx, y + dy, w, h); };
-  const id = p.id;
-  P(-2, -9, 6, 1, '#333c57'); // 挂钩
-  let L = 24, H = 14, col = '#8f6a42';
-  if (id === 'trl2') { L = 32; H = 22; col = '#e8e4d8'; } else if (id === 'trl3') { L = 44; H = 26; col = '#b13e53'; } else if (id === 'trl4') { L = 46; H = 32; col = '#f4f4f4'; } else if (id === 'trl5') { L = 44; H = 26; col = '#4c5a36'; } else if (id === 'trl6') { L = 20; H = 18; col = '#4b3378'; }
-  if (!hover) { const r = 4, wx = x - L / 2; g.fillStyle = '#1a1c2c'; g.beginPath(); g.arc(wx, y - r, r, 0, 7); g.fill(); g.fillStyle = '#94b0c2'; g.beginPath(); g.arc(wx, y - r, 1.5, 0, 7); g.fill(); }
-  else { g.globalAlpha = 0.35; g.fillStyle = '#73eff7'; g.fillRect(x - L + 2, y + 4, L - 4, 2); g.globalAlpha = 1; }
-  if (id === 'trl1') { P(-L, -12, L, 6, col); P(-L, -12, L, 1, '#a8794f'); P(-L + 3, -16, 6, 4, '#38b764'); P(-L + 11, -17, 7, 5, '#a8794f'); return; }
-  P(-L, -7 - H, L, H, col); P(-L, -7 - H, L, 1, rdShade(col, 0.3)); P(-L, -8, L, 1, rdShade(col, -0.3));
-  if (id === 'trl3') for (let k = 2; k < L; k += 4) P(-L + k, -6 - H, 1, H - 2, rdShade(col, -0.2));
-  if (id === 'trl2' || id === 'trl4') { P(-L + 4, -3 - H, 8, 6, '#73b8d8'); P(-L + 18, -3 - H, 8, 6, '#73b8d8'); P(-L, -12, L, 2, '#41a6f6'); if (id === 'trl4') { P(-L + 4, -3 - H + 12, 8, 5, '#73b8d8'); P(-L + 30, -3 - H, 8, 6, '#73b8d8'); } }
-  if (id === 'trl5') { for (let k = 0; k < L; k += 8) P(-L + k, -7 - H, 7, H, rdShade(col, (k / 8) % 2 ? -0.1 : 0)); P(-L + 4, -3 - H, 10, 2, '#1a1c2c'); }
-  if (id === 'trl6') { g.globalAlpha = 0.5 + Math.sin(G.time * 2) * 0.3; P(-L + 3, -4 - H, L - 6, 1, '#73eff7'); P(-L + 3, -10, L - 6, 1, '#c27bd6'); g.globalAlpha = 1; }
-  // 窗户里的灯（晚上）
-  if (rdDaylight() < 0.5 && id !== 'trl3' && id !== 'trl5') { g.globalAlpha = 0.7; P(-L + 5, -2 - H, 6, 4, '#ffcd75'); g.globalAlpha = 1; }
 }
 // 电单车停车时：帐篷 + 篝火
 // x：营地右边（世界像素），帐篷在左、篝火在右；画成精细像素（js/roadcar.js 的 rdcTent / rdcCampfire）
@@ -881,17 +531,18 @@ function rdDrawInterior(g) {
   });
   // 家具
   const items = R.inner.map((it, i) => ({ it, i, p: RD_PARTS[it.id] }));
-  // 家具先「自动精细化」（js/roadin.js 的 rdiFine），以后再逐个手绘
-  for (const o of items) if ((o.p.layer || 'floor') === 'wall') { const iw = (o.p.w || 1) * RD_CELL; rdiFine(g, rdCellX(lay, ox, o.it.cell, 'wall'), ceil + 6, [-iw - 3, -14, iw + 6, 48], (gg, ax, ay) => rdDrawItem(gg, o, ax, ay, true, lay), 'wall'); }
-  for (const o of items) if ((o.p.layer || 'floor') !== 'wall') { const iw = (o.p.w || 1) * RD_CELL; rdiFine(g, rdCellX(lay, ox, o.it.cell, 'floor'), floorY, [-iw - 3, -46, iw + 6, 50], (gg, ax, ay) => rdDrawItem(gg, o, ax, ay, false, lay), 'floor'); }
+  // 家具：手绘过的用 js/roadfurn.js，其余先「自动精细化」（js/roadin.js 的 rdiFine）
+  for (const o of items) if ((o.p.layer || 'floor') === 'wall') { if (rdfHas(o.p.v)) { rdfDraw(g, o, rdCellX(lay, ox, o.it.cell, 'wall'), ceil + 6, true); continue; } const iw = (o.p.w || 1) * RD_CELL; rdiFine(g, rdCellX(lay, ox, o.it.cell, 'wall'), ceil + 6, [-iw - 3, -14, iw + 6, 48], (gg, ax, ay) => rdDrawItem(gg, o, ax, ay, true, lay), 'wall'); }
+  for (const o of items) if ((o.p.layer || 'floor') !== 'wall') { if (rdfHas(o.p.v)) { rdfDraw(g, o, rdCellX(lay, ox, o.it.cell, 'floor'), floorY, false); continue; } const iw = (o.p.w || 1) * RD_CELL; rdiFine(g, rdCellX(lay, ox, o.it.cell, 'floor'), floorY, [-iw - 3, -46, iw + 6, 50], (gg, ax, ay) => rdDrawItem(gg, o, ax, ay, false, lay), 'floor'); }
   // 宠物
   if (R.pet && R.me.loc !== 'out' && R.me.loc !== 'site') {
     const px = rdCellX(lay, ox, Math.floor(R.pet.ix), 'floor') - (R.pet.ix % 1) * RD_CELL;
     const PB = [-12, -18, 24, 20];
-    if (R.pet.sleep) { rdiFine(g, px, floorY, PB, (gg, ax, ay) => rdDrawPet(gg, ax, ay, R.pet.type, false, 1), 'floor'); rdZzz(g, px + 3, floorY - 8); } else rdiFine(g, px, floorY, PB, (gg, ax, ay) => rdDrawPet(gg, ax, ay, R.pet.type, R.pet.walking, R.pet.face), 'floor');
+    rdhPet(g, px, floorY, R.pet.type, !R.pet.sleep && R.pet.walking, R.pet.sleep ? 1 : R.pet.face, R.pet.sleep); if (R.pet.sleep) rdZzz(g, px + 3, floorY - 8);
   }
   // 主角
   rdDrawMeInside(g, lay, ox, floorY, ceil);
+  rdfOverlay(g); // 睡觉时盖在身上的被子（js/roadfurn.js）
   rdiGradeScreen(g, vw, vh);
   // 没开空间核心但外面看着一样大：提示
   g.setTransform(RD_Q, 0, 0, RD_Q, 0, 0);

@@ -56,6 +56,7 @@ function rdcMat(B, x, y) { const px = x + B.ox, py = y + B.oy; if (px < 0 || py 
 function rdcRect(B, x, y, w, h, col, mat) { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) rdcPix(B, x + i, y + j, col, mat); }
 // 竖向渐变（ramp 从亮到暗），色带交界处用棋盘格抖点过渡
 function rdcRampAt(ramp, t, x, y) {
+  t = t > 1 ? 1 : t > 0 ? t : 0; // 超出范围时取两头的颜色
   const v = t * (ramp.length - 1), i = Math.floor(v), f = v - i;
   const k = Math.min(ramp.length - 1, i + ((f > 0.66 || (f > 0.33 && ((x + y) & 1))) ? 1 : 0));
   return ramp[k];
