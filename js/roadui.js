@@ -39,6 +39,7 @@ function rdPartLabel(p) { return '【' + RD_TIER_NAME[p.tier] + '】' + p.name; 
 function rdDrawUI(ctx) {
   uiButtons = []; scrollAreas = [];
   const R = G.road, sw = G.sw, sh = G.sh, st = R.st || rdStats();
+  if (R.dun) { rdxUI(ctx); return; } // 副本里换成副本的界面（js/roaddungeon.js）
   ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
   const playing = G.state === 'play';
   // ---- 左上角：仪表盘（车速、里程、油量、电量、弹药、警示灯；点它打开仓库看所有资源） ----
@@ -170,6 +171,7 @@ function rdDrawUI(ctx) {
     if (b.sub) wrapText(ctx, b.sub, Math.min(560, sw - 32), 13).forEach((ln, k) => drawText(ctx, ln, sw / 2, yy + 26 + k * 18, 13, '#c8d6e5', 'center'));
     ctx.globalAlpha = 1;
   }
+  if (R.dunAlarm) rdxDrawAlarm(ctx); // 副本传送警报
   if (G.state === 'rpanel') rdDrawPanel(ctx);
   if (G.state === 'dialog') drawDialog(ctx);
   if (G.state === 'over') drawEndOverlay(ctx, false);

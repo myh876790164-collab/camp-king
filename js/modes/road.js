@@ -1188,7 +1188,8 @@ function rdLose(title, why) {
 // ---------- 存档 ----------
 function rdSaveData() {
   const R = rdR(), out = {};
-  for (const k in R) if (!['mons', 'proj', 'fx', 'parts', 'floats', '_fx', '_fxPow', 'st', 'wcd', 'aim', 'aimAt', 'aimS', 'trade', 'panel', 'search'].includes(k)) out[k] = R[k];
+  for (const k in R) if (!['mons', 'proj', 'fx', 'parts', 'floats', '_fx', '_fxPow', 'st', 'wcd', 'aim', 'aimAt', 'aimS', 'trade', 'panel', 'search', 'dun', 'dunStash', 'dunAlarm'].includes(k)) out[k] = R[k];
+  if (R.dun && R.dunStash) for (const k of RDX_STASH_KEYS) if (!['mons', 'proj', 'fx', 'parts', 'floats', 'search'].includes(k)) out[k] = R.dunStash[k]; // 副本里存档 = 存进副本前的公路
   return { road: out, res: G.res };
 }
 function rdLoadData(d) {
@@ -1218,11 +1219,11 @@ MODES.road = {
   speeds: [1, 2, 4],
   buildList: [], buildings: { core: { name: '车', size: 1, hp: 1 } }, techs: [], perks: [], nodes: {},
   hooks: {
-    update: (dt) => rdUpdate(dt),
+    update: (dt) => rdxHookUpdate(dt), // 副本进行中时走 js/roaddungeon.js
     render: (ctx) => rdRender(ctx),
-    tap: (sx, sy) => rdTap(sx, sy),
+    tap: (sx, sy) => rdxHookTap(sx, sy),
     drag: (dx, dy) => rdDrag(dx, dy),
-    key: (k) => rdKey(k),
+    key: (k) => { if (!(G.road && G.road.dun)) rdKey(k); },
     save: () => rdSaveData(),
     load: (d) => rdLoadData(d),
     dayText: (d) => '第 ' + (Math.floor((d.road.t || 0) / 24) + 1) + ' 天 · 已行驶 ' + Math.floor(d.road.km || 0) + ' 公里',
