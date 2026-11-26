@@ -295,7 +295,7 @@ Object.assign(RDX_THEMES, {
           D.note = '军阀 ' + Math.ceil(f * 100) + '%';
         }
       }
-      for (const mk of D.marks) { mk.t -= dt; if (mk.t <= 0 && !mk.hit) { mk.hit = true; R.fx.push({ kind: 'boom', x: mk.x, y: -6, r: 16, life: 0.4, max: 0.4 }); G.shake = 0.25; if (Math.abs(mk.x - (vx - L / 2)) < L / 2 + 14 && !D.out) rdHurtVehicle(18 * (1 + D.realKm / 2400)); } }
+      for (const mk of D.marks) { mk.t -= dt; if (mk.t <= 0 && !mk.hit) { mk.hit = true; R.fx.push({ kind: 'boom', x: mk.x, y: -6, r: 16, life: 0.45, max: 0.45 }); rdpxRift(mk.x, 16); G.shake = 0.25; if (Math.abs(mk.x - (vx - L / 2)) < L / 2 + 14 && !D.out) rdHurtVehicle(18 * (1 + D.realKm / 2400)); } }
       D.marks = D.marks.filter((mk) => mk.t > -0.5);
       if (D.gateM && D.gateM.x - vx < 300 && !D.note) D.note = '前面是堡垒大门：顶上去按「冲刺」猛撞';
     },

@@ -95,6 +95,7 @@ function rdDrawWorld(g) {
   for (const o of R.obs) if (!o.hit) rdtDrawObstacle(g, o, gy);
   // ---- 车 + 怪物 + 人 ----
   const mons = (R.mons || []).slice().sort((a, b2) => (RD_MONSTERS[a.type].fly ? 1 : 0) - (RD_MONSTERS[b2.type].fly ? 1 : 0));
+  rdpxGround(g, gy); // 地上的岩浆裂谷（js/roadvfx.js）
   for (const m of mons) if (!RD_MONSTERS[m.type].fly) rdDrawMonster(g, m, gy);
   rdDrawVehicle(g, V.ax + (V.shakeX || 0), gy + 4, { world: true });
   if (R.me.loc === 'out') rdhPerson(g, rdSX(R.me.wx), gy + 3, { pose: (R.search && R.search.phase !== 'in') ? 'walk' : 'stand', face: R.me.face, outside: true, swing: R.me.swing > 0 });
@@ -102,6 +103,7 @@ function rdDrawWorld(g) {
   for (const m of mons) if (RD_MONSTERS[m.type].fly) rdDrawMonster(g, m, gy);
   // ---- 子弹、特效 ----
   rdgProj(g, gy); // 子弹、光束、爆炸（js/roadguns.js）
+  rdpxOver(g, gy); // 着火怪物身上的火焰龙卷风（js/roadvfx.js）
   // ---- 前景：路肩碎石 + 近处的杂物（比路面滚得快一点，有纵深感） ----
   rdDrawForeground(g, b, scroll, gy, W, H, ground, dim);
   // ---- 天气 ----

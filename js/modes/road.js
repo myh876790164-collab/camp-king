@@ -782,7 +782,8 @@ function rdExplode(p, x, y) {
       if (p.fx.pull) m.x += (x - m.x) * 0.6;
     }
   }
-  R.fx.push({ kind: p.kind === 'grav' ? 'gravboom' : p.kind === 'plasma' ? 'plasmaboom' : 'boom', x, y, r, life: 0.4, max: 0.4 });
+  R.fx.push({ kind: p.kind === 'grav' ? 'gravboom' : p.kind === 'plasma' ? 'plasmaboom' : 'boom', x, y, r, life: p.kind === 'grav' ? 0.7 : 0.45, max: p.kind === 'grav' ? 0.7 : 0.45 });
+  if (y > -14 && p.kind !== 'grav' && p.kind !== 'plasma') rdpxRift(x, r); // 落地炸出岩浆裂谷（js/roadvfx.js）
   G.shake = Math.max(G.shake || 0, 0.12);
   sfx('hit');
 }

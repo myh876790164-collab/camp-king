@@ -125,10 +125,11 @@ function rdgDraw(g, x, y, w, key, i) {
 function rdgProj(g, gy) {
   const R = G.road, t = G.time, q = 1 / RD_Q;
   for (const p of R.proj || []) {
+    if (rdpxProj(g, p, gy)) continue; // 程序化像素特效（js/roadvfx.js）
     const x = rdSX(p.x), y = gy + p.y, k = p.kind, a = Math.atan2(p.vy || 0, p.vx || 1), ca = Math.cos(a), sa = Math.sin(a);
     const streak = (len, c1, c2) => { for (let s = 0; s < len * 3; s++) { g.fillStyle = s < 2 ? c1 : c2; g.globalAlpha = 1 - s / (len * 3); g.fillRect(x - ca * s * q, y - sa * s * q, q * 2, q * 2); } g.globalAlpha = 1; };
     if (k === 'spit') { g.fillStyle = p.color; g.fillRect(x - 1, y - 1, 3, 3); g.fillStyle = '#ffffff'; g.globalAlpha = 0.5; g.fillRect(x - 0.67, y - 0.67, 1, 1); g.globalAlpha = 1; }
-    else if (k === 'bullet' || k === 'nail') { g.globalAlpha = 0.35; g.drawImage(rdsGlow('#ffcd75'), x - 2, y - 2, 4, 4); g.globalAlpha = 1; streak(k === 'nail' ? 2 : 4, '#fff8d8', '#ffcd75'); }
+    else if (k === 'bullet' || k === 'nail') { streak(k === 'nail' ? 2 : 4, '#fff8d8', '#ffcd75'); }
     else if (k === 'pellet') { g.fillStyle = '#f4efe0'; g.fillRect(x, y, q * 2, q * 2); g.fillStyle = '#ffcd75'; g.fillRect(x - ca * q * 3, y - sa * q * 3, q, q); }
     else if (k === 'rock') { const r = t * 12 + p.x; g.fillStyle = '#8a8070'; g.fillRect(x - 1, y - 1, 2, 2); g.fillStyle = '#b8ac98'; g.fillRect(x - 1 + (Math.sin(r) > 0 ? q : 0), y - 1, q * 2, q * 2); g.fillStyle = '#5a5248'; g.fillRect(x + 1 - q, y + 1 - q, q, q); }
     else if (k === 'harpoon') { g.fillStyle = '#c8d0d8'; for (let s = 0; s < 18; s++) g.fillRect(x - ca * s * q, y - sa * s * q, q, q); g.fillStyle = '#e8f0f8'; g.fillRect(x - q, y - q, q * 3, q * 3); g.globalAlpha = 0.6; g.fillStyle = '#7a6448'; for (let s = 18; s < 60; s += 2) g.fillRect(x - ca * s * q, y - sa * s * q + Math.sin(s * 0.3 + t * 10) * q, q, q); g.globalAlpha = 1; }
@@ -142,6 +143,7 @@ function rdgProj(g, gy) {
   }
   for (const f of R.fx || []) {
     if (f.kind === 'mdeath') { rdnDeath(g, f, gy); continue; } // 怪物死亡爆散（js/roadmons.js）
+    if (rdpxFx(g, f, gy)) continue; // 爆炸、黑洞、闪电、光束（js/roadvfx.js）
     const a = Math.max(0, f.life / f.max), x = rdSX(f.x), y = gy + f.y;
     if (f.kind === 'laser' || f.kind === 'beam' || f.kind === 'rail') {
       const x2 = rdSX(f.x2), y2 = gy + f.y2, col = f.kind === 'laser' ? '#ff7a50' : f.kind === 'beam' ? '#c27bd6' : '#73eff7', wd = f.kind === 'rail' ? 3 : f.kind === 'beam' ? 2 : 1.33;
