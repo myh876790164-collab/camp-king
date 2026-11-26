@@ -7,7 +7,7 @@ function gotoTitle() { G.state = 'play'; G.buildMode = null; G.selected = null; 
 function askConfirm(text, onYes) { G.confirm = { text, onYes }; }
 
 function drawScene(ctx) {
-  uiButtons = [];
+  uiButtons = []; scrollAreas = [];
   ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
   drawTitleBackground(ctx);
   if (G.scene === 'title') drawTitle(ctx);

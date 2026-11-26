@@ -77,7 +77,14 @@ function setupInput(canvas) {
     if (e.pointerType === 'mouse' && G.cam) G.hover = screenToTile(p.x, p.y);
     if (!pointers.has(e.pointerId)) return;
     pointers.set(e.pointerId, p);
-    if (G.scene !== 'game') return;
+    if (G.scene !== 'game') { // 菜单界面（比如选车）：只处理拖动滚动
+      if (drag && pointers.size === 1) {
+        if (!drag.moved && Math.hypot(p.x - drag.sx, p.y - drag.sy) > 8) drag.moved = true;
+        if (drag.moved && drag.scroll) scrollBy(drag.scroll, drag.scroll.horiz ? -(p.x - drag.lx) : -(p.y - drag.ly));
+        drag.lx = p.x; drag.ly = p.y;
+      }
+      return;
+    }
     if (pointers.size === 2 && pinch) {
       const [a, b] = [...pointers.values()];
       zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, pinch.zoom * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d);
@@ -120,10 +127,10 @@ function setupInput(canvas) {
 
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
-    if (G.scene !== 'game' || !G.cam) return;
     const p = getPos(e);
     const area = scrollAreaAt(p.x, p.y);
-    if (area) { scrollBy(area, e.deltaY > 0 ? 48 : -48); return; } // 滚轮滚动面板
+    if (area) { scrollBy(area, e.deltaY > 0 ? 48 : -48); return; } // 滚轮滚动面板（菜单界面也能用）
+    if (G.scene !== 'game' || !G.cam) return;
     if (G.def.custom) { if (G.def.hooks.drag && G.state === 'play') G.def.hooks.drag(e.deltaY > 0 ? -40 : 40, 0); return; }
     if (G.state !== 'play') return; // 打开面板时不缩放地图
     zoomAt(p.x, p.y, G.cam.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15));

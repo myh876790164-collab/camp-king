@@ -333,8 +333,8 @@ rdFamily('in', 'pow', { v: 'battery' }, [
 ]);
 // ---- 电脑 ----  research 研究等级 · autopilot 自动驾驶（主角开车时也能在车里活动） · nav 导航
 rdFamily('in', 'pc', { act: 'pc', v: 'pc' }, [
-  { n: '旧笔记本电脑', t: 1, layer: 'wall', pw: 0.2, fx: { research: 1, fun: 3 }, v: 'laptop' },
-  { n: '车载电脑', t: 2, layer: 'wall', pw: 0.3, fx: { research: 2, lookout: 1, fun: 3 }, v: 'carpc' },
+  { n: '旧笔记本电脑', t: 1, pw: 0.2, fx: { research: 1, fun: 3 }, v: 'laptop', d: '小桌子 + 凳子，笔记本放在桌上' },
+  { n: '车载电脑', t: 2, pw: 0.3, fx: { research: 2, lookout: 1, fun: 3 }, v: 'carpc', d: '电脑桌：显示器 + 主机' },
   { n: '军用战术终端', t: 3, pw: 0.5, fx: { research: 3, autopilot: 1, lookout: 1, radar: 1 }, v: 'terminal', d: '能自动驾驶！开车时你也能在车里休息' },
   { n: '量子计算机', t: 5, w: 2, pw: 1.5, fx: { research: 4, autopilot: 1, radar: 1 }, v: 'quantum' },
   { n: '外星AI核心', t: 6, pw: 1, fx: { research: 5, autopilot: 1, aim: 0.3, radar: 2 }, v: 'aicore', d: '自动驾驶，所有车载武器伤害 +30%' },

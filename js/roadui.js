@@ -447,10 +447,13 @@ function rdPanelCraft(c) {
 function rdPanelResearch(c) {
   const R = G.road, st = rdStats();
   if (!st.research) rdLine(c, '车上没有电脑。装上「旧笔记本电脑」「车载电脑」等才能研究（改装 → 车内布置）。', 13, '#ef7d57');
-  else rdLine(c, '电脑研究等级 ' + st.research + '。研究需要主角坐在电脑前（停车或自动驾驶时），心情好研究更快。外星科技需要外星晶体——在外星坠落舱和外星怪物身上找。', 12, '#c8d6e5');
+  else rdLine(c, '电脑研究等级 ' + st.research + '。电脑有电就会自己运算（开车时也算，速度一半）；主角坐在电脑前时全速，心情好更快。外星科技需要外星晶体——在外星坠落舱和外星怪物身上找。', 12, '#c8d6e5');
   if (R.research.cur) {
-    const r = RD_RESEARCH.find((x) => x.id === R.research.cur.id);
-    rdHead(c, '正在研究：' + r.name + '（还要 ' + R.research.cur.left.toFixed(1) + ' 小时）');
+    const r = RD_RESEARCH.find((x) => x.id === R.research.cur.id), me = R.me;
+    const at = me.act && me.act.type === 'research' && me.loc === 'in', pc = rdResearchPC(st);
+    rdHead(c, '正在研究：' + r.name);
+    rdLine(c, '还要 ' + R.research.cur.left.toFixed(1) + ' 小时 · ' + (!pc ? (st.research < r.lv ? '电脑等级不够，暂停' : '没电，暂停') : at ? '主角在电脑前，全速' : '电脑自己算，半速'), 12, pc ? '#a7f070' : '#ef7d57');
+    if (pc && !at) { drawButton(c.ctx, c.x, c.y, 150, 32, '让主角去研究', () => rdGoResearch(), { color: '#29366f', size: 12 }); c.y += 38; }
   }
   rdHead(c, '研究项目');
   for (const r of RD_RESEARCH) {

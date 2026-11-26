@@ -520,7 +520,7 @@ function rdDrawInterior(g) {
       // 墙面格：没挂东西的地方是窗户
       const usedW = new Set();
       for (const it of R.inner) { const p = RD_PARTS[it.id]; if (p.layer === 'wall') for (let k = 0; k < (p.w || 1); k++) usedW.add(it.cell + k); }
-      for (let c = 0; c < r.wcells; c++) {
+      for (let c = 0; c < (rdiOpenTop(r.trailer) ? 0 : r.wcells); c++) { // 敞开的皮卡后斗没有墙，也就没有窗
         if (usedW.has(c + r.wstart)) continue;
         const wx = x - (c + 1) * RD_CELL;
         rdiWindow(g, wx + 4, ceil + 9, RD_CELL - 8, 13, R, day, b, c + r.wstart);
@@ -696,7 +696,7 @@ function rdDrawMeInside(g, lay, ox, floorY, ceil) {
       case 'coffee': hold = 'cup'; break;
       case 'heal': if (v === 'medbed') { pose = 'lie'; y = floorY - 10; } break;
       case 'shower': break;
-      case 'research': if (v === 'terminal' || v === 'quantum' || v === 'aicore') hold = 'arms'; else { pose = 'sitfloor'; } break;
+      case 'research': if (v === 'laptop' || v === 'carpc') { pose = 'sit'; y = floorY - 7; } hold = 'arms'; break; // 笔记本 / 车载电脑：坐在凳子上对着桌上的电脑打字
       case 'craft': hold = 'arms'; break;
       case 'plant': hold = 'can'; break;
       case 'pet': pose = 'sitfloor'; break;
@@ -704,7 +704,7 @@ function rdDrawMeInside(g, lay, ox, floorY, ceil) {
       case 'window': break;
       case 'fun': {
         const an = a.anim;
-        if (an === 'sit' || an === 'sofa' || an === 'watch' || an === 'game') { pose = 'sit'; y = floorY - (an === 'sofa' ? 6 : an === 'sit' ? 3 : 0); if (an === 'game') hold = 'arms'; }
+        if (an === 'sit' || an === 'sofa' || an === 'watch' || an === 'game') { pose = 'sit'; y = floorY - (an === 'sofa' ? 6 : an === 'sit' ? 3 : 0); if (an === 'game') hold = 'arms'; if (v === 'laptop' || v === 'carpc') y = floorY - 7; }
         else if (an === 'sitfloor' || an === 'read') { pose = 'sitfloor'; }
         else if (an === 'guitar' || an === 'music') { pose = 'sit'; hold = 'arms'; }
         else if (an === 'run') { pose = 'run'; y = floorY - 4; }
@@ -728,7 +728,7 @@ function rdDrawMeInside(g, lay, ox, floorY, ceil) {
   if (a && !me.walking) {
     if (a.type === 'sleep') rdZzz(g, px + 4, y - 8);
     if (a.type === 'fun' && (a.anim === 'guitar' || a.anim === 'music' || a.anim === 'sing' || a.anim === 'dance')) { rdNotes(g, px + 6, y - 14); if (a.anim === 'guitar') { g.fillStyle = '#a8794f'; g.fillRect(px - 1, y - 8, 6, 4); g.fillStyle = '#6e4a2e'; g.fillRect(px + 4, y - 11, 6, 1); } }
-    if (a.type === 'fun' && a.anim === 'read' || a.type === 'research' && pose === 'sitfloor') { g.fillStyle = '#b13e53'; g.fillRect(px + 2, y - 8, 4, 3); g.fillStyle = '#f4f4f4'; g.fillRect(px + 3, y - 8, 1, 3); }
+    if (a.type === 'fun' && a.anim === 'read') { g.fillStyle = '#b13e53'; g.fillRect(px + 2, y - 8, 4, 3); g.fillStyle = '#f4f4f4'; g.fillRect(px + 3, y - 8, 1, 3); }
     if (a.type === 'cook') { g.globalAlpha = 0.5; g.fillStyle = '#f4f4f4'; g.fillRect(px - 6 + Math.round(Math.sin(G.time * 3)), y - 22, 1, 3); g.globalAlpha = 1; }
     if (a.type === 'mope') { g.fillStyle = '#566c86'; g.fillRect(px - 3, y - 20, 8, 2); g.fillStyle = '#41a6f6'; if (Math.sin(G.time * 5) > 0) g.fillRect(px - 1, y - 17, 1, 2); }
     if (a.type === 'window') { /* 看着窗外 */ }

@@ -144,6 +144,21 @@ function rdPlace(id) {
   rdFxDirty();
   return true;
 }
+// 读档检查：家具改过摆放层（比如电脑从挂墙改成放地上）后，旧存档的格子可能重叠或越界，重新排一遍
+function rdFixLayout() {
+  const R = rdR(), used = { floor: new Set(), wall: new Set() };
+  const n = { floor: rdCellCount('floor'), wall: rdCellCount('wall') };
+  for (const it of R.inner) {
+    const p = RD_PARTS[it.id];
+    if (!p) continue;
+    const L = p.layer || 'floor';
+    for (let i = 0; i < (p.w || 1); i++) {
+      const c = it.cell + i;
+      if (c < 0 || c >= n[L] || used[L].has(c)) { rdRefit(); return; }
+      used[L].add(c);
+    }
+  }
+}
 // 空间变小后（卸了挂车/空间核心）放不下的家具收回仓库
 function rdRefit() {
   const R = rdR(), keep = R.inner.slice();
@@ -287,6 +302,7 @@ function rdUpdate(dt) {
   rdNeedsTick(dh, st);
   rdProduceTick(dh, st);
   rdAI(dt, dh, st);
+  rdResearchAutoTick(dh, st);
   rdPetTick(dt);
   // ---- 天气 / 事件 / 遭遇 ----
   if (R.weather) { R.weather.left -= dh; if (R.weather.left <= 0) { rdLog(R.weather.name + '过去了', '#94b0c2'); R.weather = null; } }
@@ -899,7 +915,7 @@ function rdChooseAct(st) {
   if (me.rad > 35) { const sh = rdFindItem((p) => p.fx.radClean || 0); if (sh) return go(RD_PARTS[sh.id].act === 'shower' ? 'shower' : 'heal', sh, 1.5); }
   if (me.hp < rdMaxHp() * 0.8) { const md = rdFindItem((p) => p.act === 'heal' ? p.fx.heal : 0); if (md) return go('heal', md, 2); }
   if (me.energy < 55) { const cf = rdFindItem((p) => p.fx.coffee ? 1 : 0); if (cf && !(R.coffeeT > R.t - 6)) { R.coffeeT = R.t; return go('coffee', cf, 0.4); } }
-  if (R.research.cur && st.research >= (RD_RESEARCH.find((x) => x.id === R.research.cur.id) || { lv: 9 }).lv) { const pc = rdFindItem((p) => p.fx.research || 0); if (pc) return go('research', pc, 2); }
+  if (R.research.cur && rdResearchPC(st)) return go('research', rdResearchPC(st), 2);
   if (R.craftQ.length) { const bn = rdFindItem((p) => p.fx.craft >= RD_PARTS[R.craftQ[0].id].tier ? p.fx.craft : 0); if (bn) return go('craft', bn, 2); }
   // 植物
   const plant = rdFindItem((p) => p.act === 'plant' ? 1 : 0);
@@ -982,12 +998,39 @@ function rdPetTick(dt) {
 }
 
 // ---------- 研究 / 制作 ----------
+// 能用来做当前研究的电脑（等级够、有电），没有返回 null
+function rdResearchPC(st) {
+  const R = rdR(), cur = R.research.cur;
+  if (!cur) return null;
+  const r = RD_RESEARCH.find((x) => x.id === cur.id);
+  if (!r || (st || rdStats()).research < r.lv) return null;
+  return rdFindItem((p) => p.fx.research || 0);
+}
+// 电脑自己挂机运算：主角不在电脑前（开车、睡觉、干别的）时，研究按一半速度慢慢推进
+function rdResearchAutoTick(dh, st) {
+  const R = rdR(), me = R.me;
+  if (!R.research.cur || !rdResearchPC(st)) return;
+  if (me.act && me.act.type === 'research' && !me.walking && me.loc === 'in') return; // 主角正坐在电脑前，按全速算（rdActTick）
+  R.research.cur.left -= dh * 0.5;
+  if (R.research.cur.left <= 0) rdFinishResearch();
+}
+// 研究面板里的「去研究」：让主角放下手上的事，马上去电脑前
+function rdGoResearch() {
+  const R = rdR(), me = R.me, st = rdStats(), pc = rdResearchPC(st);
+  if (!pc) { showBanner('没法研究', !R.research.cur ? '先选一个研究项目' : '电脑等级不够或者没电', 3, '#ef7d57'); return; }
+  if (me.loc !== 'in' && me.loc !== 'drive') { showBanner('主角不在车上', '回到车里才能坐到电脑前', 3, '#ef7d57'); return; }
+  if (R.driving && !st.autopilot) { showBanner('正在开车', '停车（或装自动驾驶）后主角才能坐到电脑前；电脑会自己慢慢算', 4, '#ffcd75'); return; }
+  me.loc = 'in';
+  me.act = { type: 'research', it: pc, t: 2, tx: rdItemAt(pc) };
+  G.state = 'play'; R.view = 'in';
+  rdLog('主角去电脑前研究了', '#73eff7');
+}
 function rdStartResearch(r) {
   const R = rdR();
   if (R.research.cur) return;
   if (!rdPay(r.cost)) return;
   R.research.cur = { id: r.id, left: r.hours };
-  rdLog('开始研究：' + r.name + '（需要坐在电脑前 ' + r.hours + ' 小时）', '#73eff7');
+  rdLog('开始研究：' + r.name + '（坐在电脑前 ' + r.hours + ' 小时；没人看着时电脑自己算，慢一半）', '#73eff7');
 }
 function rdFinishResearch() {
   const R = rdR(), cur = R.research.cur, r = RD_RESEARCH.find((x) => x.id === cur.id);
@@ -1206,6 +1249,7 @@ function rdLoadData(d) {
   if (R.me.loc === 'out' || R.me.loc === 'site') { R.me.loc = 'in'; R.me.ix = 0.6; }
   R.me.act = null;
   R.powered = undefined;
+  rdFixLayout();
   rdFxDirty();
 }
 

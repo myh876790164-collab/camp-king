@@ -158,12 +158,14 @@ function rdfOverlay(g) {
 }
 
 // =============== 第 9 步：电脑、工作台、娱乐、装饰、生活、储物 ===============
+function rdfPcStool(B, x) { rdfBx(B, x, -22, 22, 4, RDF.dark, 2); rdfRound(B, x + 1, -26, 20, 5, 2, RDF.red, 1, 0.1); for (const lx of [x + 2, x + 17]) rdfLeg(B, lx, -18, 0, RDF.steel); rdfRc(B, x + 4, -8, 14, 2, RDF.steel[2], 2); }
 function rdfShelf(B, x, y, w) { rdfBx(B, x, y, w, 4, RDF.wood); rdfLn(B, x + 4, y + 4, x + 10, y + 10, RDF.wood[3]); rdfLn(B, x + w - 4, y + 4, x + w - 10, y + 10, RDF.wood[3]); }
 function rdfScreen(B, x, y, w, h, frame) { rdfBx(B, x, y, w, h, frame || RDF.dark, 2); rdfRc(B, x + 2, y + 2, w - 4, h - 4, '#1a2a30', 3); rdfLn(B, x + 3, y + 3, x + 8, y + 3, '#4a6a74', 3); }
 Object.assign(RDF_B, {
   // ---- 电脑 ----
-  laptop: (B, W) => { const c = W / 2; rdfShelf(B, c - 24, 50, 48); rdfScreen(B, c - 15, 28, 30, 20, RDF.steel); rdfBx(B, c - 18, 47, 36, 3, RDF.steel, 2); },
-  carpc: (B, W) => { const c = W / 2; rdfBx(B, c - 26, 8, 52, 38, RDF.dark, 2); rdfScreen(B, c - 22, 12, 34, 24); for (let k = 0; k < 4; k++) rdfKnob(B, c + 16, 14 + k * 6); rdfRc(B, c - 20, 40, 30, 2, '#3a3632', 2); rdfLn(B, c, 2, c, 8, RDF.steel[3], 2); },
+  // 电脑放在桌上：左边一张凳子（主角坐着，面朝右边的桌子），右边是小桌 + 电脑
+  laptop: (B, W) => { rdfBx(B, 44, -40, W - 44, 5, RDF.wood); for (const x of [48, W - 5]) rdfBx(B, x, -35, 4, 35, RDF.wood); rdfRc(B, 52, -14, W - 57, 2, RDF.wood[2]); rdfBx(B, 52, -43, 24, 3, RDF.steel, 2); rdfScreen(B, 56, -60, 19, 17, RDF.steel); rdfPcStool(B, 30); },
+  carpc: (B, W) => { rdfBx(B, 44, -40, W - 44, 5, RDF.wood); for (const x of [48, W - 5]) rdfBx(B, x, -35, 4, 35, RDF.wood); rdfBx(B, 58, -32, 14, 32, RDF.dark, 2); for (let y = -28; y < -18; y += 3) rdfRc(B, 61, y, 8, 1, '#3a3632', 2); rdcPix(B, 64, -8, '#a7f070', 4); rdfBx(B, 62, -46, 6, 6, RDF.dark, 2); rdfScreen(B, 52, -72, 26, 26); rdfBx(B, 46, -43, 12, 3, ['#3a3632', '#2a2622'], 2); rdfPcStool(B, 30); },
   terminal: (B, W) => { const c = W / 2; rdfBx(B, c - 26, -30, 52, 30, RDF.olive); for (const x of [c - 22, c + 18]) rdfBx(B, x, -26, 4, 4, RDF.dark, 2); rdfBx(B, c - 22, -72, 44, 40, RDF.olive, 2); rdfScreen(B, c - 18, -68, 36, 26); rdfBx(B, c - 20, -38, 40, 6, RDF.dark, 2); for (let x = c - 18; x < c + 18; x += 3) rdcPix(B, x, -36, RDF.dark[0], 2); },
   quantum: (B, W) => { rdfBx(B, 4, -96, W - 8, 96, RDF.white); for (let k = 0; k < 5; k++) { const x = 10 + k * (W - 20) / 5; rdfBx(B, x, -90, (W - 20) / 5 - 4, 84, ['#3a4a64', '#2a3850', '#1e283a'], 2); for (let y = -84; y < -10; y += 6) rdfRc(B, x + 2, y, (W - 20) / 5 - 8, 1, '#4a5a78', 2); } rdfBx(B, 2, -100, W - 4, 5, RDF.steel, 2); },
   aicore: (B, W) => { const c = W / 2; rdfBx(B, c - 18, -16, 36, 16, ['#3e2c64', '#2e1f50', '#20143a'], 2); rdfBx(B, c - 12, -22, 24, 6, RDF.purple, 2); for (let x = c - 14; x < c + 14; x += 5) rdcPix(B, x, -8, RDF.glow2, 4); },
@@ -224,8 +226,8 @@ Object.assign(RDF_B, {
 function rdfAnim2(g, v, W, c, using, off, wall, t, F, steam) {
   const on = using && !off, scr = (x, y, w, h, kind) => { const fr = Math.floor(t * 4); if (kind === 'code') { for (let k = 0; k < Math.floor(h / 3); k++) F(x, y + k * 3, 3 + ((k * 7 + fr) % (w - 4)), 1, '#a7f070'); } else if (kind === 'game') { F(x, y + h - 4, w, 4, '#3a7a3a'); F(x + ((t * 20) % (w - 4)), y + h - 8 - Math.abs(Math.sin(t * 6)) * 6, 4, 4, '#ffcd75'); F(x + w - 10, y + h - 10, 4, 6, '#d84a3a'); } else { for (let k = 0; k < 3; k++) F(x, y + k * h / 3, w, Math.ceil(h / 3), ['#5a88b4', '#8ab45e', '#e8a040', '#c86a54', '#a07cc8'][(k + fr) % 5]); F(x + ((t * 15) % (w - 6)), y + h / 2 - 2, 6, 4, '#f4f0e4'); } g.globalAlpha = 0.25; g.drawImage(rdsGlow('#a0d0ff'), x - 6, y - 6, w + 12, h + 12); g.globalAlpha = 1; };
   switch (v) {
-    case 'laptop': if (on) scr(c - 13, 30, 26, 16, 'code'); break;
-    case 'carpc': if (!off) scr(c - 20, 14, 30, 20, using ? 'code' : 'tv'); break;
+    case 'laptop': if (on) scr(58, -58, 15, 13, 'code'); break;
+    case 'carpc': if (!off) scr(54, -70, 22, 22, using ? 'code' : 'tv'); break;
     case 'terminal': if (!off) scr(c - 16, -66, 32, 22, 'code'); break;
     case 'quantum': if (!off) for (let k = 0; k < 5; k++) for (let y = -84; y < -10; y += 6) if (Math.sin(t * 5 + k * 3 + y) > 0.3) F(12 + k * (W - 20) / 5, y, 3, 1, (y + k) % 4 ? '#73eff7' : '#a7f070'); break;
     case 'aicore': if (!off) { const fy = -46 + Math.sin(t * 1.5) * 4; g.globalAlpha = 0.6; g.drawImage(rdsGlow('#c27bd6'), c - 20, fy - 20, 40, 40); g.globalAlpha = 1; rdkCircle(g, c, fy, 9, '#9e74d4'); rdkCircle(g, c - 2, fy - 2, 5, '#e0c8ff'); g.strokeStyle = '#73eff7'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(c, fy, 16, 5, t, 0, 7); g.stroke(); } break;
