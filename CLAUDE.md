@@ -26,5 +26,6 @@
   停止：`Get-CimInstance Win32_Process | ? { $_.CommandLine -like '*serve.ps1*' } | % { Stop-Process -Id $_.ProcessId -Force }`
 - 内置浏览器面板里用 JS 直接驱动：`startGame('road',{veh:'courier'})`、循环调用 `update(dt)` 快进（修仙：`update(0.25)` = 1.5 天，240 次 = 1 年；公路：10 秒 = 1 小时），再 `render()` 后截图（截图可能是旧的，先 render）。
 - 用 `window.onerror` 收集报错；改完要把其他模式也各跑几百步确认没坏；手机竖屏用 resize_window mobile 检查，测完改回 desktop。
-- 公路求生调数值：把 `tools/rdsim.js` 的内容在页面里执行，然后 `rdSim('courier', 60)`。
+- 公路求生调数值：把 `tools/rdsim.js` 的内容在页面里执行，然后 `rdSim('courier', 60)`。返回结果里的 `dun` 列表是自动打的每场副本（里程、主题、名次、等级、分数），用来看副本难度。
+- 副本：`rdxDebug('fort')` 马上进一场指定主题（trial / mine / ghost / fort / abase）。主题配置在 `js/roaddunthemes.js` 的 `RDX_THEMES.xxx`（hpMul / dmgMul / waveGap / npcGoal 调难度）；副本专用怪在 `roaddata.js` 里标 `dunOnly`，不会出现在公路上。
 - 内置浏览器不支持 service worker（会报 "unknown error fetching the script"，正常）；要验证离线功能用 headless Edge + `--remote-debugging-port`，读 `/json` 里的页面标题。
