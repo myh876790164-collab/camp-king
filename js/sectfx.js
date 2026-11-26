@@ -50,6 +50,7 @@ function daoFx(p) { return (p && p.dao && DAO_FX[p.dao]) || PLAIN_FX; }
 function drawDaoAura(ctx, p) {
   const F = daoFx(p);
   if (!F.aura) return;
+  if (sectpxAura(ctx, p, F)) return; // 像素版光环（js/sectvfx.js）
   const t = G.time + p.id * 1.37, x = p.x, y = p.y - 7, R = 9 + p.realm * 1.2, lv = p.realm;
   const n = 3 + lv;
   ctx.save();
@@ -107,6 +108,7 @@ function castDaoFx(kind, F, x, y, tx, ty, power) {
 }
 const CAST_LIFE = { sword: 0.6, sword3: 0.8, needles: 0.5, gemburst: 0.7, pillar: 1.1, claw: 0.45, shock: 0.6, crescent: 0.6, vine: 0.9, treant: 1, thorns: 0.9, petalstorm: 1.1, bolt: 0.5, bolt3: 0.7, roar: 0.8, mist: 1.1, wave: 0.9, vortex: 1.1, icebolt: 0.6, shield: 1, maw: 0.9, shadow: 0.9, dragon: 1.1, fireball: 0.6, firerain: 1.1, sunburst: 1, beam: 0.6, feather: 0.7, serpent: 0.9, charge: 0.6, fist: 0.4, boulder: 0.9, quake: 0.9, moonfall: 1.1, breakthrough: 2.2, failsmoke: 1.4, heal: 1 };
 function drawCastFx(ctx, e) {
+  if (sectpxCast(ctx, e)) return; // 像素版法术（js/sectvfx.js）
   const k = e.t / e.life, x = e.x, y = e.y - 8, tx = e.tx, ty = e.ty - 6, c1 = e.c1, c2 = e.c2, s = e.s;
   const lerp = (a, b, f) => a + (b - a) * f, ang = Math.atan2(ty - y, tx - x);
   const fly = Math.min(1, k * 1.6), px = lerp(x, tx, fly), py = lerp(y, ty, fly) - Math.sin(fly * Math.PI) * 4;

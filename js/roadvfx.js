@@ -74,8 +74,8 @@ function rdpxGlow(g, col, x, y, rw, a) {
 // ---------- 噪声溶解火球（爆炸 / 喷火团）：火球膨胀 → 由内向外冷却 → 噪声把边缘咬碎成烟 ----------
 const RDPX_BOOM_N = 10;
 function rdpxBoomSheet(D, pal, ring) {
-  const ramp = pal === 'plasma' ? RDPX_PLASMA : RDPX_FIRE, N = ramp.length;
-  return rdpxBake('boom' + pal + D + (ring ? 'r' : ''), D, D, RDPX_BOOM_N, ramp, (u, v, t, px, py) => {
+  const ramp = Array.isArray(pal) ? pal : pal === 'plasma' ? RDPX_PLASMA : RDPX_FIRE, N = ramp.length; // pal 也可以直接给一组颜色（修仙模式用）
+  return rdpxBake('boom' + (Array.isArray(pal) ? pal.join('') : pal) + D + (ring ? 'r' : ''), D, D, RDPX_BOOM_N, ramp, (u, v, t, px, py) => {
     const b = rdpxBayer(px, py), r = Math.hypot(u, v);
     // 冲击波环：前 45% 时间里一圈稀疏的亮点向外扩
     if (ring && t < 0.45) { const rs = 0.28 + t * 1.6; if (Math.abs(r - rs) < 0.03 + 0.03 * (1 - t) && b < 0.85 - t * 1.4) return t < 0.2 ? 0 : 2; }
@@ -236,9 +236,9 @@ function rdpxRift(x, r) {
 
 // ---------- 火焰龙卷风：着火的怪物身上卷起一股旋转的火柱 ----------
 const RDPX_TOR_N = 12;
-function rdpxTornadoSheet(W, H) {
-  const N = 6;
-  return rdpxBake('tor' + W + 'x' + H, W, H, RDPX_TOR_N, RDPX_FIRE, (u, v, t, px, py) => {
+function rdpxTornadoSheet(W, H, gap) { // gap：螺旋缝隙多少（越小缝越少；修仙光环用更实的）
+  const N = 6, gp = gap == null ? -0.3 : gap;
+  return rdpxBake('tor' + W + 'x' + H + 'g' + gp, W, H, RDPX_TOR_N, RDPX_FIRE, (u, v, t, px, py) => {
     const b = rdpxBayer(px, py), y01 = (v + 1) / 2, up = 1 - y01, T = t * 6.2832;
     const w = 0.16 + 0.8 * Math.pow(up, 1.15), cx = Math.sin(y01 * 5.5 - T) * 0.14 * up;
     const dx = (u - cx) / w;
@@ -248,7 +248,7 @@ function rdpxTornadoSheet(W, H) {
     }
     const ang = Math.asin(Math.max(-1, Math.min(1, dx))), s = ang + y01 * 8 - T * 2;
     const band = Math.sin(s * 2 + nz * 3);
-    if (band < -0.3 && y01 < 0.92) return -1; // 螺旋缝隙：看起来是一股一股绞在一起
+    if (band < gp && y01 < 0.92) return -1; // 螺旋缝隙：看起来是一股一股绞在一起
     const depth = Math.cos(ang);
     let heat = depth * 0.45 + (band + 1) * 0.15 + y01 * 0.3 - 0.22;
     let k = rdpxRamp(Math.max(0, Math.min(1, heat)), N, px, py) + 1;
