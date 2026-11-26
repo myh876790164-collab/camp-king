@@ -216,3 +216,105 @@ Object.assign(RDX_THEMES, {
     bonus(D, tier) { if (tier !== 'fail') G.road.me.mood = Math.min(100, G.road.me.mood + 10 + D.lan); },
   },
 });
+
+// ================= 军阀基地 =================
+function rdyFortTiles() {
+  if (RDY_CACHE.fort) return RDY_CACHE.fort;
+  const s = 211, TW = RDS_TW, Rs = RDT_RUST, Cn = rdsR(['#a49a88', '#847a6a', '#665e50', '#4a4438', '#302c24']), Wd = rdsR(['#a88060', '#866042', '#64462c', '#44301c']);
+  // 后面：废铁皮 + 水泥的堡垒高墙，墙头尖刺，瞭望塔，挂着「扳手齿轮」旗，火盆
+  const B = rdsPaper(260);
+  for (let x = 0; x < TW; x++) { const sheet = Math.floor(x / 34), hh = 150 + Math.round(rdcHash(sheet, 0, s) * 16), conc = sheet % 5 === 2; for (let y = -hh; y < 12; y++) { const i = (y + B.base) * TW + x; const R = conc ? Cn : sheet % 3 ? Rs : rdsR(['#7a8088', '#5c6268', '#42484e', '#2c3036']); let v = 1.2 + (conc ? 0 : [-0.4, 0, 0.5, 0.9][(x - sheet * 34) % 4]) + (y < -hh + 3 ? -0.8 : 0) + (rdtN2(x, y, 16, 8, s) > 0.7 ? 0.9 : 0) + (rdcHash(x, y, s) < 0.05 ? 0.6 : 0); B.c[i] = rdsPick(R, v, x, y); B.m[i] = 1; }
+    if (x % 10 === 0) for (let k = 0; k < 12; k++) rdsPx(B, x + (k > 6 ? 1 : 0), -hh - k, 0x8a867c, 1);}
+  for (let k = 0; k < 3; k++) { const tx = k * 512 + 140; for (const d of [-14, 14]) rdsLine(B, tx + d, 0, tx + d * 0.6, -230, Wd[2], 1); for (let y = -40; y > -220; y -= 30) { rdsLine(B, tx - 14, y, tx + 10, y - 30, Wd[3], 1); rdsLine(B, tx + 14, y, tx - 10, y - 30, Wd[3], 1); } rdsRect(B, tx - 22, -238, 44, 6, Wd[1], 1); for (let x = tx - 22; x < tx + 22; x += 6) rdsRect(B, x, -252, 2, 14, Wd[2], 1); rdsPoly(B, [[tx - 26, -252], [tx, -268], [tx + 26, -252]], Rs[1], 1); rdsRect(B, tx + 8, -250, 8, 5, 0x3a3430, 1); rdsLight(B, tx + 14, -248, 'blink', '#fff4c0', 5); }
+  for (let k = 0; k < 4; k++) { const fx2 = k * 384 + 300, fy = -120; rdsLine(B, fx2, fy, fx2, fy + 70, 0x3a3430, 1); for (let x = 0; x < 40; x++) for (let y = 0; y < 26; y++) { const wave = Math.round(Math.sin(x / 6) * 2); rdsPx(B, fx2 + 1 + x, fy + y + wave, y < 2 ? 0x2a1a14 : 0xa83a2a, 1); } const cx = fx2 + 21, cy = fy + 13; for (let a = 0; a < 16; a++) rdsPx(B, cx + Math.round(Math.cos(a / 16 * 6.283) * 6), cy + Math.round(Math.sin(a / 16 * 6.283) * 6), 0xe8d8b0, 1); rdsLine(B, cx - 8, cy - 8, cx + 8, cy + 8, 0xe8d8b0, 1); rdsLine(B, cx + 8, cy - 8, cx - 8, cy + 8, 0xe8d8b0, 1); }
+  for (let k = 0; k < 5; k++) { const bx = rdsRand(s, 30 + k) * TW; rdsCol(B, bx, 0, -20, 14, Rs, s + k, { bands: 6 }); for (let j = 0; j < 6; j++) rdsPx(B, bx - 4 + j * 1.6, -22 - (j % 3) * 2, [0xfff0a0, 0xffb040, 0xe05a20][j % 3], 3); rdsLight(B, bx, -24, 'glow', '#ff9040', 8); }
+  rdsOutline(B, rdsC(RDC_PAL.out), rdsC(RDC_PAL.out2));
+  rdsHaze(B, rdsC('#c0704a'), 0.12, 0.2);
+  const back = rdyLayer(B);
+  // 中景：沙袋墙、带刺铁丝、废车、轮胎堆
+  const M = rdsPaper(150);
+  for (let k = 0; k < 8; k++) { const x = rdsRand(s, 50 + k) * TW, t = k % 4;
+    if (t === 0) { for (let r = 0; r < 3; r++) for (let b = 0; b < 5 - r; b++) rdtEllipse(M, x + b * 12 + r * 6, -5 - r * 8, 7, 4.5, (px, py, d, nx, ny) => rdsPx(M, px, py, rdsPick(rdsR(['#d4c08e', '#b8a070', '#968052', '#6e5c3a']), 1 + nx * 0.6 + ny + (d > 0.8 ? 0.8 : 0), px, py), 1)); }
+    else if (t === 1) { for (let j = 0; j < 90; j++) { const a = j * 0.5; rdsPx(M, x + j, -14 + Math.round(Math.sin(a) * 6), 0x6a665e, 2); rdsPx(M, x + j + Math.round(Math.cos(a) * 2), -14 + Math.round(Math.cos(a) * 6), 0x9a968c, 2); } for (const px of [x, x + 45, x + 90]) rdsRect(M, px, -26, 2, 26, Wd[2], 1); }
+    else if (t === 2) { rdsPoly(M, [[x, -4], [x + 4, -14], [x + 16, -15], [x + 24, -26], [x + 44, -26], [x + 52, -14], [x + 64, -12], [x + 64, -4]], (px, py, tt) => rdsPick(Rs, 0.4 + tt * 2.4 + (rdcHash(px, py, s) < 0.08 ? 0.8 : 0), px, py), 1); for (const wx of [x + 14, x + 52]) rdtEllipse(M, wx, -4, 6, 4, (px, py, d) => rdsPx(M, px, py, d > 0.4 ? 0x2a221c : 0x6e6458, 1)); }
+    else { for (let r = 0; r < 4; r++) rdtEllipse(M, x, -4 - r * 7, 11, 3.6, (px, py, d) => rdsPx(M, px, py, d < 0.3 ? 0x3e3630 : rdsPick(rdsR(['#4a423c', '#36302a', '#26201c']), 1 + d, px, py), 1)); } }
+  rdsOutline(M, rdsC(RDC_PAL.out), rdsC(RDC_PAL.out2));
+  const mid = rdyLayer(M);
+  // 地面：压实的土场，车辙、油渍
+  const F = rdtPaper(TW, 75, 400), Gr = rdtRamp('#9a7854');
+  for (let x = 0; x < TW; x++) for (let y = -42; y < 400; y++) { const i = (y + F.base) * TW + x; let v = 2 + (rdtN2(x, y, 48, 20, s + 6) - 0.5) * 1.5 + ((Math.abs(y + 14) < 3 || Math.abs(y - 12) < 3) && rdcHash(x >> 2, y, s) < 0.6 ? 0.6 : 0); const h = rdcHash(x, y, s + 8); if (h < 0.07) v += 0.8; else if (h > 0.95) v -= 0.8; F.c[i] = rdsPick(Gr, v + (y > 30 ? 0.4 : 0), x, y); F.m[i] = 2; }
+  for (let k = 0; k < 8; k++) rdtEllipse(F, rdsRand(s, 70 + k) * TW, -16 + rdsRand(s, 78 + k) * 30, 10 + rdsRand(s, 86 + k) * 16, 3, (px, py, d) => rdsPx(F, px, py, d < 0.5 ? 0x2a2420 : 0x4a3e34, 2));
+  rdtGroundBits(F, 0, Gr, s);
+  const floor = rdyLayer(F);
+  return (RDY_CACHE.fort = { back, mid, floor });
+}
+Object.assign(RDN_BUILD, {
+  raider(B, fr, atk) { const sw = [-3, 0, 3, 0][fr], L = ['#6a5a48', '#4e4234', '#362e24'], S = ['#c8906a', '#a86e4e', '#7e4e34'];
+    rdnLimb(B, -2, -16, -2 + sw, 0, 4, L); rdnLimb(B, 2, -16, 2 - sw, 0, 4, L);
+    rdcPoly(B, [[-6, -32], [6, -32], [7, -16], [-7, -16]], ['#8a5a3a', '#6a4028', '#4a2c1a'], 1); for (let k = 0; k < 3; k++) rdcPix(B, -5 + k * 5, -33, '#d8d0c0', 1); rdcRect(B, -6, -18, 13, 2, '#2a2018', 1);
+    rdnBlob(B, 1, -38, 5, 5, S); for (let y = -45; y < -40; y++) rdcPix(B, 1, y, '#e04a3a', 1); rdcRect(B, 2, -40, 4, 1, '#1a1410', 1); rdnEye(B, 4, -39, '#ffcd75', 1);
+    const ay = atk ? -46 : -24; rdnLimb(B, 4, -30, 10, ay + 8, 3, S); rdcLine(B, 10, ay + 8, atk ? 14 : 16, ay - (atk ? 8 : -6), '#8a6a4a', 1); rdcLine(B, 11, ay + 8, atk ? 15 : 17, ay - (atk ? 8 : -6), '#6a4a2a', 1); for (let k = 0; k < 3; k++) rdcPix(B, (atk ? 13 : 15) + k % 2, ay - (atk ? 6 : -4) + k * 2, '#c8c4bc', 1); },
+  gunner(B, fr, atk) { const sw = [-3, 0, 3, 0][fr], L = ['#5a6040', '#424830', '#2e3220']; rdnLimb(B, -2, -16, -2 + sw, 0, 4, L); rdnLimb(B, 2, -16, 2 - sw, 0, 4, L);
+    rdcPoly(B, [[-6, -32], [6, -32], [7, -16], [-7, -16]], ['#6a7048', '#50563a', '#3a3e28'], 1); rdcRect(B, -6, -28, 13, 6, '#3a3e28', 1);
+    rdnBlob(B, 1, -38, 5, 5, ['#c8906a', '#a86e4e', '#7e4e34']); rdnBlob(B, 1, -41, 6, 4, ['#6a7048', '#50563a', '#3a3e28']); rdcRect(B, 2, -39, 4, 2, '#1a1410', 1);
+    rdcRect(B, 2, -29, 16, 3, '#3a3632', 1); rdcRect(B, -2, -28, 5, 4, '#6a4a2a', 1); if (atk) rdcRect(B, 18, -29, 3, 3, '#fff0a0', 4); },
+  gate(B) { for (let x = -32; x < 34; x++) { const plank = Math.floor((x + 32) / 8), top = -116 + Math.round(rdcHash(plank, 0, 3) * 10); for (let y = top; y < 0; y++) rdcPix(B, x, y, plank % 3 === 1 ? rdcRampAt(['#8a8478', '#6a645e', '#4a443e'], ((x + 32) % 8) / 8 + y / 400, x, y) : rdcRampAt(['#a8805a', '#866040', '#64462c', '#44301c'], ((x + 32) % 8) / 8 * 0.6 + 0.2 + (rdcHash(x, y, 2) < 0.06 ? 0.3 : 0), x, y), 2); if ((x + 32) % 8 === 3) for (let k = 0; k < 12; k++) rdcPix(B, x, top - k, '#a8a49a', 2); }
+    for (const y of [-90, -40]) { rdcRect(B, -34, y, 68, 6, '#4a443e', 2); for (let x = -30; x < 32; x += 8) rdgRiv(B, x, y + 2); } rdcLine(B, -30, -86, 30, -44, '#4a443e', 2); rdcLine(B, -30, -85, 30, -43, '#6a645e', 2);
+    for (let a = 0; a < 20; a++) rdcPix(B, Math.round(Math.cos(a / 20 * 6.283) * 9), -66 + Math.round(Math.sin(a / 20 * 6.283) * 9), '#e04a3a', 2); rdcLine(B, -10, -76, 10, -56, '#e04a3a', 2); rdcLine(B, 10, -76, -10, -56, '#e04a3a', 2); },
+  warlord(B, fr, atk) { const sw = [-5, 0, 5, 0][fr], Ar = ['#8a8a94', '#6a6a74', '#4c4c56', '#32323a'];
+    rdcPoly(B, [[-22, -80], [-30, -10], [-10, -20]], ['#8a2a20', '#6a1e16', '#4a140e'], 1); // 披风
+    rdnLimb(B, -8, -36, -8 + sw, 0, 9, Ar); rdnLimb(B, 8, -36, 8 - sw, 0, 9, Ar); rdcRect(B, -14 + sw, -4, 14, 4, '#2a2a30', 1); rdcRect(B, 2 - sw, -4, 14, 4, '#2a2a30', 1);
+    rdnBlob(B, 0, -58, 20, 24, Ar); for (let y = -76; y < -40; y += 7) rdcLine(B, -16, y, 16, y, Ar[3], 1); for (const [x, y] of [[-12, -70], [10, -70], [-14, -50], [12, -50]]) rdgRiv(B, x, y);
+    rdnBlob(B, -18, -74, 9, 7, Ar); rdnBlob(B, 18, -74, 9, 7, Ar); for (let k = 0; k < 3; k++) { rdcPoly(B, [[-24 + k * 5, -80], [-22 + k * 5, -90], [-20 + k * 5, -80]], '#c8c4bc', 2); rdcPoly(B, [[14 + k * 5, -80], [16 + k * 5, -90], [18 + k * 5, -80]], '#c8c4bc', 2); }
+    rdnBlob(B, 2, -88, 9, 9, ['#a8a8b0', '#7a7a84', '#54545e']); rdcRect(B, -4, -90, 14, 3, '#1a1a20', 2); rdcRect(B, 0, -89, 3, 1, '#e04a3a', 4); rdcRect(B, 5, -89, 3, 1, '#e04a3a', 4); for (let x = -4; x < 10; x += 2) rdcPix(B, x, -82, '#3a3a42', 2);
+    const ay = atk ? -96 : -60; rdgTube(B, 18, 40, ay + 18, 5, ['#6a6a74', '#4c4c56', '#32323a']); rdcRect(B, 38, ay + 13, 5, 10, '#2a2a30', 2); if (atk) rdcRect(B, 43, ay + 15, 4, 6, '#ffd860', 4);
+    rdnLimb(B, -16, -66, -24, -36, 7, Ar); rdnBlob(B, -24, -34, 6, 6, Ar); },
+});
+Object.assign(RDX_THEMES, {
+  fort: {
+    name: '军阀基地', dur: 240, color: '#ef7d57', hour: 18.4, biomes: [2, 3, 4], npcGoal: 1.1,
+    desc: ['铁颅军阀的废铁堡垒，墙头架着探照灯', '先轰开大门，再顶住打手和枪手', '最后军阀亲自上场：三个阶段，小心火箭弹'],
+    goals: '轰开大门（+120）、打倒军阀（+400）、杀敌、活到最后',
+    pool: ['raider', 'gunner', 'raider', 'dog'], waveGap: [6, 9], hpMul: 0.85, dmgMul: 0.5,
+    slots: ['weapon', 'hand'], res: { gold: { ammo: 80, scrap: 40, med: 4 }, silver: { ammo: 45, scrap: 20 }, bronze: { ammo: 25 }, fail: { ammo: 8 } },
+    enter(D) { const R = G.road; D.gateM = rdxMon('gate', (D.baseKm + 9) * RD_PX_KM); D.bossT = 110; D.marks = []; },
+    tick(D, dt) {
+      const R = G.road, vx = rdVehX(), L = rdVeh().len; D.note = '';
+      if (D.gateM && (D.gateM.dead || D.gateM.hp <= 0)) { D.gateM = null; showBanner('大门被轰开了！', '+120 分，冲进去', 2.5, '#ef7d57'); rcSys('【副本播报】' + rcC().me + ' 轰开了堡垒大门！', 0.3); }
+      // 军阀登场
+      if (!D.boss && !D.bossDone && D.t > D.bossT) { D.boss = rdxMon('warlord', vx + 230); D.boss.ph0 = 1; showBanner('铁颅军阀登场！', '三个阶段：召唤打手 → 火箭弹齐射 → 狂暴', 3.5, '#e04a3a'); rcSys('【副本播报】铁颅军阀亲自出手了！', 0.3); sfx('bad'); }
+      const b = D.boss;
+      if (b) {
+        if (b.dead || b.hp <= 0) { D.boss = null; D.bossDone = true; D.done = true; D.doneT = D.t; showBanner('军阀倒下了！', '+400 分', 3, '#ffcd75'); rcSys('【副本播报】铁颅军阀被打倒了！', 0.3); sfx('win'); }
+        else {
+          const f = b.hp / b.max, ph = f > 0.66 ? 1 : f > 0.33 ? 2 : 3;
+          if (ph !== b.ph0) { b.ph0 = ph; showBanner(ph === 2 ? '军阀架起火箭炮！' : '军阀狂暴了！', ph === 2 ? '地上出现红圈就快躲开（刹车 / 冲刺）' : '速度和伤害都变高了', 2.5, '#e04a3a'); }
+          b.sumT = (b.sumT || 8) - dt; if (ph === 1 && b.sumT <= 0) { b.sumT = 12; for (let k = 0; k < 2; k++) rdxMon('raider', b.x + 20 + k * 12); }
+          if (ph === 2) { b.spd = 0; b.rkT = (b.rkT || 3) - dt; if (b.rkT <= 0) { b.rkT = 6; for (let k = 0; k < 3; k++) D.marks.push({ x: vx - L / 2 + (k - 1) * 46 + (Math.random() - 0.5) * 20, t: 1.7 }); } }
+          if (ph === 3 && !b.rage) { b.rage = true; b.spd = RD_MONSTERS.warlord.spd * 1.7; b.dmg *= 1.4; }
+          D.note = '军阀 ' + Math.ceil(f * 100) + '%';
+        }
+      }
+      for (const mk of D.marks) { mk.t -= dt; if (mk.t <= 0 && !mk.hit) { mk.hit = true; R.fx.push({ kind: 'boom', x: mk.x, y: -6, r: 16, life: 0.4, max: 0.4 }); G.shake = 0.25; if (Math.abs(mk.x - (vx - L / 2)) < L / 2 + 14 && !D.out) rdHurtVehicle(18 * (1 + D.realKm / 2400)); } }
+      D.marks = D.marks.filter((mk) => mk.t > -0.5);
+      if (D.gateM && D.gateM.x - vx < 300) D.note = '轰开大门！（武器会自动打它）';
+    },
+    drawBack(g, D, W, H, gy, day, scroll) {
+      const T = rdyFortTiles(), lit = [];
+      const gr = g.createLinearGradient(0, 0, 0, gy); gr.addColorStop(0, '#3a2a4a'); gr.addColorStop(0.6, '#a85a4a'); gr.addColorStop(1, '#f0a060'); g.fillStyle = gr; g.fillRect(0, 0, W, gy);
+      rdkCircle(g, W * 0.25, gy * 0.7, 10, '#ffb070'); g.globalAlpha = 0.4; g.drawImage(rdsGlow('#ff9050'), W * 0.25 - 40, gy * 0.7 - 40, 80, 80); g.globalAlpha = 1;
+      rdyBlit(g, T.back, scroll * 0.2, gy - 12, W, lit); rdyBlit(g, T.mid, scroll * 0.55, gy - 12, W, lit); rdyBlit(g, T.floor, scroll, gy, W, lit);
+      rdyFillBelow(g, T.floor, gy, W, H, '#5a442e');
+      // 探照灯光柱扫来扫去
+      for (let k = 0; k < 3; k++) { const tw = RDS_TW / RD_Q, x = ((k * 512 + 154) / RD_Q - scroll * 0.2) % tw; for (const xx of [x, x + tw, x - tw]) { if (xx < -60 || xx > W + 60) continue; const a = Math.sin(G.time * 0.6 + k * 2) * 0.7 + 1.9, y0 = gy - 12 - 248 / RD_Q; g.globalAlpha = 0.12; g.fillStyle = '#fff4c8'; g.beginPath(); g.moveTo(xx, y0); g.lineTo(xx + Math.cos(a) * 160 - 10, y0 + Math.sin(a) * 160); g.lineTo(xx + Math.cos(a) * 160 + 10, y0 + Math.sin(a) * 160); g.fill(); g.globalAlpha = 1; } }
+      rdsDrawLights(g, lit, day); RDS_LIT = lit;
+    },
+    ambient(g, D, W, H, gy) { const t = G.time; for (let k = 0; k < 20; k++) { const p = (t * 0.4 + k / 20) % 1; g.globalAlpha = (1 - p) * 0.8; g.fillStyle = k % 3 ? '#ffb040' : '#ff6a30'; g.fillRect((rdHash(k) * W + t * 10) % W, gy - 20 - p * 80, 1 / RD_Q * 2, 1 / RD_Q * 2); } g.globalAlpha = 1; },
+    drawObjs(g, D, gy) { const t = G.time; for (const mk of D.marks || []) { const x = rdSX(mk.x); if (mk.t > 0) { g.globalAlpha = 0.4 + Math.sin(t * 20) * 0.25; g.strokeStyle = '#e04a3a'; g.lineWidth = 1; g.beginPath(); g.ellipse(x, gy + 4, 14, 4, 0, 0, 7); g.stroke(); g.globalAlpha = 1; const fy = gy - 60 + (1.7 - mk.t) / 1.7 * 60; g.fillStyle = '#c8c4bc'; g.fillRect(x - 1, fy - 3, 2, 4); g.fillStyle = '#ff9040'; g.fillRect(x - 0.67, fy - 5, 1.33, 2); } } },
+    hud(ctx, D) {
+      const b = D.boss, sw = G.sw;
+      if (b) { const w = Math.min(320, sw - 40), x = sw / 2 - w / 2, y = G.sw < G.sh ? 186 : 136; rdxPanel(ctx, x, y, w, 24, '#e04a3a'); ctx.fillStyle = '#2a0e0a'; ctx.fillRect(x + 6, y + 13, w - 12, 6); ctx.fillStyle = b.rage ? (Math.floor(G.time * 6) % 2 ? '#ff4a3a' : '#c02a1a') : '#e04a3a'; ctx.fillRect(x + 6, y + 13, (w - 12) * Math.max(0, b.hp / b.max), 6); drawText(ctx, '铁颅军阀' + (b.rage ? '（狂暴）' : ''), sw / 2, y + 7, 11, '#ffcd75', 'center'); }
+      drawText(ctx, (D.gateM ? '大门未破' : '大门已破') + (D.bossDone ? ' · 军阀已倒' : D.boss ? '' : ' · 军阀 ' + Math.max(0, Math.ceil(D.bossT - D.t)) + ' 秒后登场'), 10, G.sw < G.sh ? 160 : 122, 12, '#ef7d57', 'left');
+    },
+  },
+});

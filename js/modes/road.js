@@ -577,6 +577,7 @@ function rdCombat(dt, st) {
     if (m.burn > 0) { m.burn -= dt; m.hp -= m.burnDps * dt; }
     if (m.slow > 0) m.slow -= dt;
     m.cd -= dt; m.ramCd -= dt; m.atkT -= dt;
+    if (M.inert) { m.face = -1; continue; } // 副本里的大门、能量核心：不动也不攻击
     // 目标：车外的主角更近就追主角
     const tx = outside && Math.abs(me.wx - m.x) < Math.abs((vx - L / 2) - m.x) + 30 ? me.wx : vx - L / 2;
     const half = outside && tx === me.wx ? 4 : L / 2 + M.w / 2 - 2;
@@ -619,7 +620,7 @@ function rdCombat(dt, st) {
     if (R.speedNow > 8 && m.x < vx - L - 30) { m.lagT = (m.lagT || 0) + dt; if (m.lagT > 10) m.leave = true; } else m.lagT = 0;
   }
   // 太远的怪物消失（被甩掉了）
-  R.mons = R.mons.filter((m) => m.hp > 0 && m.x > vx - 700 && m.x < vx + 900);
+  R.mons = R.mons.filter((m) => m.hp > 0 && (m.x > vx - 700 && m.x < vx + 900 || RD_MONSTERS[m.type].inert)); // 副本的大门 / 核心离得远也保留
   // ---- 车载武器 ----
   const night = rdIsNight() && !st.light;
   for (const w of rdWeapons()) {

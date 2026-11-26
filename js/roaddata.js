@@ -478,6 +478,10 @@ const RD_MONSTERS = {
   cavebug: { name: '矿洞甲虫', hp: 20, dmg: 1.5, spd: 70, w: 10, h: 6, swarm: [3, 6], color: '#5a4a3a', glow: '#ffd060', drop: { scrap: 0.4 }, dunOnly: true, chase: true },
   ghost: { name: '游荡幽灵', hp: 40, dmg: 3, spd: 60, w: 12, h: 16, swarm: [2, 4], fly: true, color: '#c8d8e0', glow: '#a0ffd0', drop: { power: 0.3 }, dunOnly: true, ghostly: true, chase: true },
   banshee: { name: '哭嚎女妖', hp: 120, dmg: 6, spd: 45, w: 14, h: 22, swarm: [1, 1], fly: true, ranged: 110, color: '#d8c8f0', glow: '#e070ff', drop: { med: 0.5 }, dunOnly: true, ghostly: true },
+  raider: { name: '军阀打手', hp: 50, dmg: 4, spd: 72, w: 9, h: 16, swarm: [2, 4], color: '#8a5a3a', glow: '#ef7d57', drop: { ammo: 0.5, scrap: 0.3 }, dunOnly: true, chase: true },
+  gunner: { name: '军阀枪手', hp: 40, dmg: 3.5, spd: 45, w: 9, h: 16, swarm: [1, 3], ranged: 130, color: '#5a6040', glow: '#ffcd75', drop: { ammo: 0.8 }, dunOnly: true },
+  gate: { name: '堡垒大门', hp: 900, dmg: 0, spd: 0, w: 22, h: 40, swarm: [1, 1], color: '#6a5a48', glow: '#ef7d57', drop: { scrap: 1 }, dunOnly: true, inert: true, block: true, score: 120, big: true },
+  warlord: { name: '铁颅军阀', hp: 2400, dmg: 14, spd: 32, w: 26, h: 40, swarm: [1, 1], color: '#4a4a52', glow: '#e04a3a', drop: { ammo: 1, scrap: 1 }, dunOnly: true, big: true, boss: true, score: 400 },
 };
 
 // ---------- 研究（需要车载电脑 + 外星晶体） ----------
