@@ -431,6 +431,14 @@ function rdhPetBuild(type, st, fr) { // st: 'walk' | 'sit' | 'sleep'
   const B = rdcPaper(60, 40, 30, 32), cat = type === 'cat', C = cat ? ['#f4b070', '#e08a46', '#b0622a', '#7a4018'] : ['#e0c08a', '#c49c64', '#9a7444', '#6a4e2c'];
   const leg = (x, dx) => rdnLimb(B, x, -6, x + dx, 0, 2, C.slice(cat ? 1 : 0));
   if (st === 'sleep') { rdnBlob(B, 0, -4, 10, 4, C); rdnBlob(B, 7, -5, 4, 3, C); rdcLine(B, -9, -2, 4, -1, C[2], 1); if (cat) { rdcPix(B, 8, -9, C[1], 1); rdcPix(B, 10, -9, C[1], 1); } else rdcRect(B, 5, -7, 3, 2, C[3], 1); rdcLine(B, 7, -5, 9, -5, '#2a1a10', 1); rdcOutline(B); return rdcToCanvas(B); }
+  if (st === 'eat') { // 埋头吃饭：站着，头低到碗里，尾巴慢慢摇
+    leg(-6, 0); leg(4, 0); rdnBlob(B, -1, -8, 9, 4, C); leg(-4, 0); leg(6, 0);
+    rdnBlob(B, 9, -4 + (fr % 2), 4, 3, C);
+    if (cat) { rdcPoly(B, [[6, -7], [7, -10], [9, -7]], C, 1); rdcPoly(B, [[10, -7], [12, -10], [13, -7]], C, 1); } else rdcPoly(B, [[6, -6], [8, -9], [10, -6]], [C[2], C[3]], 1);
+    const wag = [-2, 0, 2, 0][fr];
+    if (cat) rdcLine(B, -9, -9, -13, -15 + wag, C[1], 1); else rdcLine(B, -9, -10, -14, -12 + wag, C[1], 1);
+    rdcOutline(B); return rdcToCanvas(B);
+  }
   const sw = st === 'walk' ? [-2, 0, 2, 0][fr] : 0, sit = st === 'sit';
   if (!sit) { leg(-6, -sw); leg(4, sw); }
   rdnBlob(B, -1, sit ? -6 : -8, sit ? 6 : 9, sit ? 5 : 4, C);
@@ -445,7 +453,7 @@ function rdhPetBuild(type, st, fr) { // st: 'walk' | 'sit' | 'sleep'
   rdcOutline(B); return rdcToCanvas(B);
 }
 function rdhPet(g, x, y, type, walking, face, sleep) {
-  const t = G.time, st = sleep ? 'sleep' : walking ? 'walk' : 'sit', fr = walking ? Math.floor(t * 10) % 4 : Math.floor(t * 3) % 4, key = 'pet' + type + st + fr;
+  const t = G.time, st = sleep === 'eat' ? 'eat' : sleep ? 'sleep' : walking ? 'walk' : 'sit', fr = walking ? Math.floor(t * 10) % 4 : Math.floor(t * 3) % 4, key = 'pet' + type + st + fr; // sleep 传 'eat' = 埋头吃饭
   const S = RDH_CACHE[key] || (RDH_CACHE[key] = rdhPetBuild(type, st, fr)), Q = RD_Q;
   g.save(); g.translate(Math.round(x * Q) / Q, Math.round(y * Q) / Q); if (face < 0) g.scale(-1, 1);
   g.fillStyle = 'rgba(20,12,8,0.3)'; g.fillRect(-4, 0, 8, 1 / Q * 2);

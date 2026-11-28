@@ -277,7 +277,7 @@ Object.assign(RDX_THEMES, {
     goals: '轰开大门（+120）、打倒军阀（+400）、杀敌、活到最后',
     pool: ['raider', 'gunner', 'raider', 'dog'], waveGap: [7, 10], hpMul: 0.65, dmgMul: 0.26,
     slots: ['weapon', 'hand'], res: { gold: { ammo: 80, scrap: 40, med: 4 }, silver: { ammo: 45, scrap: 20 }, bronze: { ammo: 25 }, fail: {} },
-    // 战败惩罚：被铁颅帮洗劫（废料 35%、弹药 30%、食物和水 20%），车只剩 20% 耐久（rdxExit 里处理）
+    // 战败惩罚：被铁颅帮洗劫（零件 35%、弹药 30%、食物和水 20%），车只剩 20% 耐久（rdxExit 里处理）
     lose(D, rewards) {
       const cut = { scrap: 0.35, ammo: 0.3, food: 0.2, water: 0.2 }, txt = [];
       for (const k in cut) { const n = Math.floor((G.res[k] || 0) * cut[k]); if (n > 0) { G.res[k] -= n; rewards.push({ res: k, n: -n }); txt.push(RD_RES[k].name + ' -' + n); } }

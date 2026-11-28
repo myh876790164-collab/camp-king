@@ -73,6 +73,31 @@ const RDF_B = {
   generator: (B, W) => { rdfBx(B, 4, -44, W - 8, 4, RDF.dark, 2); rdfBx(B, 4, -4, W - 8, 4, RDF.dark, 2); for (const x of [4, W - 8]) rdfRc(B, x, -44, 4, 44, RDF.dark[1], 2); rdfBx(B, 14, -38, W - 28, 30, RDF.yellow, 1); rdfBx(B, 22, -32, 24, 18, RDF.dark, 2); for (let y = -30; y < -16; y += 3) rdfRc(B, 24, y, 20, 1, RDF.dark[0], 2); rdfRc(B, W - 24, -32, 8, 6, RDF.steel[3], 2); rdfLn(B, W - 12, -44, W - 12, -58, RDF.steel[2], 2); rdfRc(B, W - 14, -60, 5, 3, RDF.steel[3], 2); rdfKnob(B, 54, -24); },
   fusion: (B, W) => { const c = W / 2; rdfBx(B, c - 22, -10, 44, 10, RDF.steel, 2); rdfBx(B, c - 22, -62, 44, 8, RDF.steel, 2); for (const d of [-20, 16]) rdfRc(B, c + d, -54, 4, 44, RDF.steel[2], 2); rdfRound(B, c - 16, -54, 32, 44, 10, ['#3a2a60', '#2a1c48'], 3); },
   capwall: (B, W) => { rdfBx(B, 4, 2, W - 8, 56, ['#3a4a7a', '#2a3864', '#1e284a'], 2); for (let k = 0; k < 5; k++) rdfRound(B, 10 + k * 13, 8, 10, 40, 4, RDF.blue, 2); },
+  // 空间折叠货舱模块（只用来当图标，用掉了不会摆在车里）：银白立方体 + 发光的折叠网格
+  foldmod: (B, W) => { const c = W / 2; rdfBx(B, c - 22, -46, 44, 44, ['#f6f8fa', '#dfe6ec', '#c2ccd6', '#9aa8b6'], 2); for (let k = 1; k < 4; k++) { rdfRc(B, c - 22 + k * 11, -46, 1, 44, '#41a6f6', 4); rdfRc(B, c - 22, -46 + k * 11, 44, 1, '#41a6f6', 4); } rdgBall(B, c, -24, 6, ['#f0fcff', '#9ce8ff', '#41a6f6'], 4); rdfBx(B, c - 26, -4, 52, 4, RDF.steel, 2); },
+  // 宠物食盆：两只小碗（一碗粮一碗水），垫在小垫子上
+  petbowl: (B, W) => { const c = W / 2; rdfRound(B, c - 26, -4, 52, 4, 2, ['#c86a7a', '#a04a5a'], 1); for (const [x, R] of [[c - 18, RDF.red], [c + 4, RDF.blue]]) { rdfRound(B, x, -12, 16, 9, 3, R, 1); rdfRc(B, x + 2, -12, 12, 2, R[3]); } rdfRc(B, c + 6, -12, 12, 2, '#9ad8f4', 3); rdfRc(B, c - 6, -8, 4, 1, '#f4ecd8'); },
+  // 宠物玩具篮：编织篮 + 露出来的球、骨头、逗猫棒
+  pettoy: (B, W) => { const c = W / 2; rdgBall(B, c - 12, -22, 6, ['#f08a60', '#e04a3a', '#a8301e'], 1); rdfRc(B, c - 14, -24, 5, 1, '#f4f4f4'); rdfRound(B, c - 2, -26, 14, 5, 2, ['#f4ecd8', '#d8ccb0'], 1); rdfLn(B, c + 10, -16, c + 18, -44, '#a87850'); rdfRc(B, c + 16, -48, 5, 4, '#c27bd6'); rdfRc(B, c + 17, -44, 2, 5, '#ffcd75'); rdfBx(B, c - 22, -18, 44, 18, RDF.wood); for (let x = c - 20; x < c + 20; x += 4) rdfRc(B, x, -16, 2, 14, RDF.wood[3]); rdfRc(B, c - 22, -18, 44, 2, RDF.wood[0]); },
+  // 窗边软垫：矮木台 + 厚坐垫 + 两个抱枕
+  windowseat: (B, W) => { rdfBx(B, 4, -18, W - 8, 18, RDF.wood); for (let x = 10; x < W - 8; x += 22) rdfKnob(B, x + 8, -10); rdfRound(B, 4, -26, W - 8, 9, 4, ['#a8c8e8', '#7aa0c8', '#5078a0'], 1, 0.1); rdfRound(B, 8, -38, 16, 13, 4, RDF.orange, 1, 0); rdfRound(B, W - 26, -36, 18, 11, 4, ['#f4ecd8', '#ddd0b4', '#b4a68a'], 1, 0); },
+  // 蔬菜种植箱：木箱 + 一排绿叶 + 上面一根补光灯架
+  planter: (B, W) => { rdfBx(B, 6, -26, W - 12, 26, RDF.wood); for (let x = 8; x < W - 8; x += 12) rdfRc(B, x, -24, 1, 22, RDF.wood[3]); rdfRc(B, 8, -28, W - 16, 3, '#5a3a24'); for (let k = 0; k < 5; k++) { const x = 12 + k * (W - 24) / 5; rdfLn(B, x + 4, -28, x + 4, -38 - (k % 2) * 6, RDF.green[3]); rdfRound(B, x - 1, -44 - (k % 2) * 6, 10, 8, 3, RDF.green, 1, 0); rdfRound(B, x + 4, -38 - (k % 2) * 4, 8, 6, 2, RDF.green, 1, 0); if (k % 2) rdgBall(B, x + 2, -36, 2, ['#f08a60', '#c04a30'], 1); } for (const x of [8, W - 12]) rdfBx(B, x, -72, 4, 46, RDF.steel, 2); rdfBx(B, 8, -76, W - 16, 5, RDF.steel, 2); },
+  // 蛋白质合成设备：白色机柜，中间一个绿色培养罐，下面出料口放着蛋白块
+  protein: (B, W) => { const c = W / 2; rdfBx(B, 6, -84, W - 12, 84, RDF.white); rdfRound(B, c - 16, -76, 32, 40, 8, ['#c8f0d8', '#8ad0a8', '#5aa880'], 3); rdfRc(B, c - 12, -70, 24, 30, '#3a8a5a', 3); rdfBx(B, 10, -30, W - 20, 6, RDF.steel, 2); rdfBx(B, c - 14, -22, 28, 14, RDF.dark, 2); for (let k = 0; k < 3; k++) rdfBx(B, c - 11 + k * 8, -16, 6, 6, ['#e8d8a8', '#c8b080', '#a08858'], 1); for (let k = 0; k < 3; k++) rdfKnob(B, W - 18, -80 + k * 6); rdfBx(B, 10, -90, W - 20, 6, RDF.steel, 2); },
+  // 冷凝净水器：机身 + 顶上散热风扇格栅 + 侧面透明储水罐
+  condenser: (B, W) => { rdfBx(B, 6, -66, W - 30, 66, ['#d8e4ec', '#a8bccb', '#7890a4', '#506478'], 2); rdfBx(B, 10, -62, W - 38, 22, RDF.dark, 2); for (let x = 12; x < W - 30; x += 4) rdfRc(B, x, -60, 2, 18, '#5a6670', 2); rdgBall(B, (W - 24) / 2 + 3, -51, 7, RDF.steel, 2); rdfBx(B, W - 24, -54, 18, 54, ['#e0f4ff', '#a8d8f0', '#78b0d0'], 3); rdfRc(B, W - 22, -50, 14, 46, '#2a5a80', 3); rdfLn(B, W - 30, -30, W - 24, -30, RDF.steel[2], 2); rdfRc(B, 14, -30, 20, 10, '#2a3a44', 2); },
+  // 高能电池组：钢架里叠三块蓝色电芯模块，顶上一块电量屏
+  hibattery: (B, W) => { rdfBx(B, 10, -66, W - 20, 66, RDF.steel, 2); for (let k = 0; k < 3; k++) { const y = -58 + k * 18; rdfBx(B, 14, y, W - 28, 15, ['#5a9ad8', '#3a72b0', '#24508a', '#163660'], 2); rdfRc(B, 18, y + 3, 4, 3, '#d84a3a', 2); rdfRc(B, W - 22, y + 3, 4, 3, RDF.dark[1], 2); for (let x = 26; x < W - 26; x += 5) rdfRc(B, x, y + 10, 3, 2, '#1a2a44', 2); } rdfBx(B, 18, -74, W - 36, 9, RDF.dark, 2); rdfLn(B, 20, -66, 20, -58, '#d84a3a', 2); },
+  // 智能充电控制器（墙上）：控制箱 + 小屏 + 几根粗电缆往下走
+  chargectl: (B, W) => { const c = W / 2; rdfBx(B, c - 22, 6, 44, 34, RDF.dark, 2); rdfScreen(B, c - 18, 10, 24, 14); for (let k = 0; k < 3; k++) rdfKnob(B, c + 12, 12 + k * 6); for (const [x, col] of [[c - 14, '#d84a3a'], [c - 4, '#2a2622'], [c + 8, '#e8c040']]) { rdfRc(B, x, 40, 3, 18, col, 2); } rdfRc(B, c - 20, 28, 36, 2, RDF.steel[2], 2); },
+  // 大功率柴油发电机（2 格）：底座 + 黄色机壳 + 散热格栅 + 控制面板 + 竖排气管
+  diesel: (B, W) => { rdfBx(B, 4, -8, W - 8, 8, RDF.dark, 2); rdfBx(B, 10, -62, W - 44, 54, RDF.yellow); for (let x = 16; x < 56; x += 4) rdfRc(B, x, -54, 2, 38, RDF.yellow[3]); rdfBx(B, 62, -54, 40, 26, RDF.dark, 2); for (let k = 0; k < 3; k++) rdfKnob(B, 68 + k * 10, -48); rdfRc(B, 68, -38, 28, 6, '#1a2a20', 2); rdfBx(B, W - 34, -50, 26, 42, RDF.steel, 2); for (let y = -46; y < -12; y += 4) rdfRc(B, W - 30, y, 18, 2, RDF.steel[3], 2); rdfBx(B, W - 30, -96, 6, 46, RDF.steel, 2); rdfBx(B, W - 32, -100, 10, 5, RDF.dark, 2); rdfRc(B, 12, -66, W - 48, 4, RDF.yellow[0]); },
+  // 军用固态电池阵列（2 格）：橄榄绿储能柜，四扇门，每扇一排电量灯
+  ssbattery: (B, W) => { rdfBx(B, 4, -86, W - 8, 86, RDF.olive, 2); for (let k = 0; k < 4; k++) { const x = 8 + k * (W - 16) / 4; rdfBx(B, x + 2, -80, (W - 16) / 4 - 4, 72, ['#7a7c50', '#5c5e38', '#424428'], 2); rdfRc(B, x + 6, -74, (W - 16) / 4 - 12, 3, '#2a2c1c', 2); rdfRc(B, x + (W - 16) / 4 - 10, -44, 3, 8, RDF.steel[1], 2); } rdfBx(B, 4, -92, W - 8, 6, RDF.dark, 2); for (let x = 14; x < W - 14; x += 10) rdcPix(B, x, -89, '#e8d870', 2); },
+  // 外星质能方程反应堆（2 格）：紫色底座 + 两根导能柱 + 中间悬着的能量核心
+  // 外星质能方程反应堆（2 格）：圆形发射台 + 上面悬浮的蓝色光球（光球本体在静态图里也画一份，图标里能看到）
+  emcreactor: (B, W) => { const c = W / 2; rdfBx(B, 10, -10, W - 20, 10, ['#c8d8e8', '#8aa4c0', '#5a7494', '#3a4e68'], 2); rdfRound(B, c - 34, -18, 68, 9, 4, ['#a8c8e8', '#6a94c4', '#3a6494'], 2); rdfRound(B, c - 22, -24, 44, 7, 3, ['#2a4a78', '#1a3058'], 3); for (let x = 16; x < W - 16; x += 7) rdcPix(B, x, -5, '#73eff7', 4); for (let a = 0; a < 40; a++) { const an = a / 40 * 6.283; rdcPix(B, Math.round(c + Math.cos(an) * 18), Math.round(-21 + Math.sin(an) * 2), '#9ce8ff', 4); } rdgBall(B, c, -66, 14, ['#f0fcff', '#9ce8ff', '#41a6f6', '#2a5ab0'], 4); },
 };
 // 有的家具在地上 / 墙上高度不同；返回 [上方空间, 下方空间]（精细像素）
 function rdfSize(v, wall) { return wall ? [10, 150] : [150, 10]; }
@@ -97,7 +122,8 @@ function rdfDraw(g, o, xr, base, wall) {
   const p = o.p, v = p.v, w = p.w || 1, Q = RD_Q, R = G.road, t = G.time;
   const S = rdfSprite(v, w, wall, p.tier), X = Math.round((xr - w * RD_CELL) * Q) / Q, W = w * RD_CELL * Q;
   const off = p.pw > 0 && R.powered === false, using = !!(R.me.act && R.me.act.it === o.it && !R.me.walking);
-  const vib = v === 'generator' && R.genOn ? (Math.floor(t * 30) % 2) / Q : 0;
+  const usingNow = !!(R.me.act && R.me.act.it === o.it && !R.me.walking);
+  const vib = (v === 'generator' || v === 'diesel') && R.genOn ? (Math.floor(t * 30) % 2) / Q : usingNow && R.me.act.mode === 'rummage' ? Math.round(Math.sin(t * 25)) / Q : 0; // 翻储物箱时箱子跟着晃
   if (using && (v === 'guitar' || v === 'harmonica')) return; // 拿在主角手里了
   // 阴影 + 本体
   g.globalAlpha = wall ? 0.4 : 0.22; g.drawImage(S.shadow, X - S.ox / Q + (wall ? 1 : 1.6), base - S.oy / Q + (wall ? 1.3 : -0.6), S.cv.width / Q, S.cv.height / Q);
@@ -133,6 +159,22 @@ function rdfDraw(g, o, xr, base, wall) {
     case 'battery': { const lv = Math.min(1, G.res.power / Math.max(1, rdStats().battery)), n = Math.round(lv * 8); for (let k = 0; k < 8; k++) F(c - 16 + k * 4, -6, 3, 2, k < n ? (lv < 0.25 ? '#e04a3a' : '#a7f070') : '#2a2622'); break; }
     case 'generator': if (R.genOn) { F(W - 14, -64, 2, 2, '#ffd060'); for (let k = 0; k < 4; k++) { const pp = (t * 1.2 + k / 4) % 1; F(W - 14 + Math.sin(pp * 5) * 3 - pp * 4, -62 - pp * 30, 4 + pp * 6, 4 + pp * 6, '#8a847c', (1 - pp) * 0.5); } F(56, -26, 3, 3, Math.sin(t * 8) > 0 ? '#a7f070' : '#3a5a2a'); } break;
     case 'fusion': if (!off) { g.globalAlpha = 0.6 + Math.sin(t * 4) * 0.25; g.drawImage(rdsGlow('#73eff7'), c - 18, -50, 36, 36); g.globalAlpha = 1; for (let k = 0; k < 2; k++) { g.strokeStyle = k ? '#c27bd6' : '#73eff7'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(c, -32, 12, 4, t * (k ? -2 : 2), 0, 7); g.stroke(); } F(c - 2, -34, 4, 4, '#ffffff'); } break;
+    case 'petbowl': { const lv = Math.max(0, Math.min(1, G.road.petBowl || 0)); if (lv > 0) { F(c - 16, -12 - Math.round(lv * 2), 12, 2 + Math.round(lv * 2), '#b87a44'); for (let k = 0; k < 4; k++) F(c - 15 + k * 3, -13 - Math.round(lv * 2), 2, 1, '#d89a5c'); } break; } // 碗里的粮：吃一次少一截
+    case 'planter': if (!off) { F(10, -71, W - 20, 2, '#f8e0ff', 0.9); g.globalAlpha = 0.18; F(10, -69, W - 20, 40, '#f0b0e0'); g.globalAlpha = 1; } break;
+    case 'protein': if (!off) { for (let k = 0; k < 4; k++) { const pp = (t * 0.5 + k / 4) % 1; F(c - 9 + k * 5, -42 - pp * 28, 2, 2, '#c8ffd8', 1 - pp); } F(W - 16, -26, 3, 3, Math.sin(t * 2) > 0 ? '#a7f070' : '#3a5a2a'); } break;
+    case 'condenser': if (!off) { const a = t * 12; g.fillStyle = '#c8d4dc'; for (let k = 0; k < 3; k++) { const an = a + k * 2.09; g.fillRect((W - 24) / 2 + 3 + Math.cos(an) * 5 - 1, -51 + Math.sin(an) * 5 - 1, 2, 2); } const lv = 0.35 + ((t * 0.05) % 0.6); F(W - 22, -4 - 46 * lv, 14, 46 * lv, '#41a6f6', 0.55); if ((t * 1.5) % 1 < 0.4) F(W - 16, -50 + ((t * 1.5) % 1) * 30, 2, 3, '#c8f0ff'); } break;
+    case 'hibattery': { const lv = Math.min(1, G.res.power / Math.max(1, rdStats().battery)), n = Math.round(lv * 10); for (let k = 0; k < 10; k++) F(22 + k * (W - 44) / 10, -71, (W - 44) / 10 - 1, 3, k < n ? (lv < 0.25 ? '#e04a3a' : '#73eff7') : '#2a2622'); break; }
+    case 'chargectl': if (!off) { const net = R.powNet || 0; F(c - 16, 12, 20, 10, net >= 0 ? '#1a3a2a' : '#3a1a1a'); for (let k = 0; k < 4; k++) F(c - 14 + k * 5, 20 - (2 + ((t * 6 + k * 3) % 6)), 3, 2 + ((t * 6 + k * 3) % 6), net >= 0 ? '#a7f070' : '#e04a3a'); F(c + 16, 34, 3, 3, Math.sin(t * 5) > 0 ? '#a7f070' : '#3a5a2a'); } break;
+    case 'diesel': if (R.genOn) { F(70, -36, 20, 2, '#a7f070'); for (let k = 0; k < 5; k++) { const pp = (t * 1.4 + k / 5) % 1; F(W - 30 + Math.sin(pp * 5) * 3 - pp * 6, -104 - pp * 36, 5 + pp * 8, 5 + pp * 8, '#6a665e', (1 - pp) * 0.55); } F(W - 30, -101, 4, 3, '#ffd060', 0.6 + Math.sin(t * 20) * 0.3); } else F(70, -36, 6, 2, '#5a3a2a'); break;
+    case 'ssbattery': { const lv = Math.min(1, G.res.power / Math.max(1, rdStats().battery)); for (let k = 0; k < 4; k++) { const x = 8 + k * (W - 16) / 4 + 6; for (let j = 0; j < 6; j++) F(x + 4, -20 - j * 7, 6, 4, (j + 0.5) / 6 < lv ? (lv < 0.25 ? '#e04a3a' : '#a7f070') : '#2a2c1c'); } break; }
+    case 'emcreactor': if (!off) { // 蓝色光球：上下浮动、呼吸发光、两圈光环、往上飘的光点、底座射上去的光柱
+      const cy = -66 + Math.sin(t * 1.4) * 5, pulse = 0.55 + Math.sin(t * 3) * 0.2;
+      F(c - 6, cy, 12, -20 - cy, '#73eff7', 0.12 + Math.sin(t * 5) * 0.05);
+      g.globalAlpha = pulse; g.drawImage(rdsGlow('#41a6f6'), c - 46, cy - 46, 92, 92); g.globalAlpha = 0.9; g.drawImage(rdsGlow('#9ce8ff'), c - 24, cy - 24, 48, 48); g.globalAlpha = 1;
+      rdkCircle(g, c, cy, 13, '#41a6f6'); rdkCircle(g, c, cy, 10, '#9ce8ff'); rdkCircle(g, c - 3, cy - 3, 5, '#f0fcff');
+      for (let k = 0; k < 2; k++) { g.strokeStyle = k ? '#9ce8ff' : '#41a6f6'; g.lineWidth = 1.5; g.globalAlpha = 0.8; g.beginPath(); g.ellipse(c, cy, 22 + k * 7, 5 + k * 2, t * (k ? -1.2 : 1.6), 0, 7); g.stroke(); } g.globalAlpha = 1;
+      for (let k = 0; k < 6; k++) { const pp = (t * 0.6 + k / 6) % 1, ang = k * 1.05 + t * 0.5; F(c + Math.cos(ang) * (16 + pp * 10), cy + 14 - pp * 50, 2, 2, '#c8f4ff', 1 - pp); }
+    } break;
     case 'capwall': { const lv = Math.min(1, G.res.power / Math.max(1, rdStats().battery)); for (let k = 0; k < 5; k++) { const hh = Math.round(36 * lv); F(12 + k * 13, 46 - hh, 6, hh, '#73eff7', 0.5 + Math.sin(t * 3 + k) * 0.2); } break; }
   }
   rdfAnim2(g, v, W, c, using, off, wall, t, F, steam);
@@ -232,9 +274,9 @@ Object.assign(RDF_B, {
 function rdfAnim2(g, v, W, c, using, off, wall, t, F, steam) {
   const on = using && !off, scr = (x, y, w, h, kind) => { const fr = Math.floor(t * 4); if (kind === 'code') { for (let k = 0; k < Math.floor(h / 3); k++) F(x, y + k * 3, 3 + ((k * 7 + fr) % (w - 4)), 1, '#a7f070'); } else if (kind === 'game') { F(x, y + h - 4, w, 4, '#3a7a3a'); F(x + ((t * 20) % (w - 4)), y + h - 8 - Math.abs(Math.sin(t * 6)) * 6, 4, 4, '#ffcd75'); F(x + w - 10, y + h - 10, 4, 6, '#d84a3a'); } else { for (let k = 0; k < 3; k++) F(x, y + k * h / 3, w, Math.ceil(h / 3), ['#5a88b4', '#8ab45e', '#e8a040', '#c86a54', '#a07cc8'][(k + fr) % 5]); F(x + ((t * 15) % (w - 6)), y + h / 2 - 2, 6, 4, '#f4f0e4'); } g.globalAlpha = 0.25; g.drawImage(rdsGlow('#a0d0ff'), x - 6, y - 6, w + 12, h + 12); g.globalAlpha = 1; };
   switch (v) {
-    case 'laptop': if (on) scr(58, -58, 15, 13, 'code'); break;
-    case 'carpc': if (!off) scr(54, -70, 22, 22, using ? 'code' : 'tv'); break;
-    case 'terminal': if (!off) scr(c - 16, -66, 32, 22, 'code'); break;
+    case 'laptop': if (on) scr(58, -58, 15, 13, rdPcScr()); break;                       // 研究时写代码，娱乐时打游戏
+    case 'carpc': if (!off) scr(54, -70, 22, 22, using ? rdPcScr() : 'tv'); break;
+    case 'terminal': if (!off) scr(c - 16, -66, 32, 22, using ? rdPcScr() : 'code'); break;
     case 'quantum': if (!off) for (let k = 0; k < 5; k++) for (let y = -84; y < -10; y += 6) if (Math.sin(t * 5 + k * 3 + y) > 0.3) F(12 + k * (W - 20) / 5, y, 3, 1, (y + k) % 4 ? '#73eff7' : '#a7f070'); break;
     case 'aicore': if (!off) { const fy = -46 + Math.sin(t * 1.5) * 4; g.globalAlpha = 0.6; g.drawImage(rdsGlow('#c27bd6'), c - 20, fy - 20, 40, 40); g.globalAlpha = 1; rdkCircle(g, c, fy, 9, '#9e74d4'); rdkCircle(g, c - 2, fy - 2, 5, '#e0c8ff'); g.strokeStyle = '#73eff7'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(c, fy, 16, 5, t, 0, 7); g.stroke(); } break;
     case 'bench': case 'workshop': if (using) for (let k = 0; k < 6; k++) { const pp = (t * 3 + k / 6) % 1; F(36 + Math.cos(k * 2) * pp * 18, -46 - pp * 14 + pp * pp * 20, 2, 2, pp < 0.5 ? '#fff0a0' : '#f08a30', 1 - pp); } if (v === 'workshop' && !off) F(104, -44 - ((t * 10) % 4), 26, 1, '#e04a3a', 0.5); break;
@@ -262,4 +304,5 @@ function rdfAnim2(g, v, W, c, using, off, wall, t, F, steam) {
     case 'hydro': if (!off) { g.globalAlpha = 0.25 + Math.sin(t * 1.5) * 0.08; F(10, -90, W - 20, 84, '#c27bd6'); g.globalAlpha = 1; } break;
   }
 }
+function rdPcScr() { const a = G.road.me.act; return a && a.type === 'fun' ? 'game' : 'code'; } // 电脑屏幕：打游戏还是写代码
 function rdfNotes(g, x, y, t) { for (let k = 0; k < 3; k++) { const pp = (t * 0.5 + k / 3) % 1; g.globalAlpha = 1 - pp; g.fillStyle = ['#ffcd75', '#c27bd6', '#73eff7'][k]; const nx = x + pp * 10 + Math.sin(pp * 6) * 3, ny = y - pp * 24; g.fillRect(nx, ny, 3, 3); g.fillRect(nx + 2, ny - 8, 1, 8); g.fillRect(nx + 2, ny - 8, 3, 1); } g.globalAlpha = 1; }

@@ -16,10 +16,10 @@ function rdFxText(p) {
   const L = {
     hp: (v) => '耐久+' + v, armor: (v) => '护甲' + pct(v), shield: (v) => '护盾' + v, regen: (v) => '自修' + v + '/时', speed: (v) => '速度' + (v >= 0 ? '+' : '') + v, speedPct: (v) => '速度+' + pct(v),
     fuelPct: (v) => v <= -1 ? '不耗油' : '油耗' + (v >= 0 ? '+' : '') + pct(v), torque: (v) => '载重' + (v >= 0 ? '+' : '') + v, alt: (v) => '行驶发电' + v + '/时', electric: () => '改为耗电',
-    ram: (v) => '撞击+' + v, obs: (v) => '路障伤害-' + pct(Math.min(1, v)), thorns: (v) => '反伤' + v, tank: (v) => '油箱+' + v, battery: (v) => '电池+' + v, cargo: (v) => '货舱+' + v,
+    ram: (v) => '撞击+' + v, obs: (v) => '路障伤害-' + pct(Math.min(1, v)), thorns: (v) => '反伤' + v, tank: (v) => '油箱+' + v, battery: (v) => '电池+' + v, chargeMul: (v) => '发电+' + pct(v), genEff: (v) => '发电机省油' + pct(v), cargo: (v) => '货舱+' + v,
     cells: (v) => '地面+' + v + '格', wcells: (v) => '墙面+' + v + '格', mounts: (v) => '武器挂点+' + v, solar: (v) => '太阳能' + v + '/时', wind: (v) => '风力' + v + '/时', light: () => '夜视',
     rangePct: (v) => '射程+' + pct(v), lookout: () => '看到前方建筑', radar: () => '雷达', searchSpd: (v) => '搜索加快' + pct(v), lootBonus: (v) => '找到更多' + pct(v), rain: (v) => '雨水' + v + '/天',
-    alienSense: () => '感应外星遗迹', nightSolar: () => '夜间发电', stealth: (v) => '遇怪-' + pct(v), trade: () => '商人更爱来', scrapBonus: (v) => '废料+' + pct(v), hover: () => '反重力漂浮',
+    alienSense: () => '感应外星遗迹', nightSolar: () => '夜间发电', stealth: (v) => '遇怪-' + pct(v), trade: () => '商人更爱来', scrapBonus: (v) => '零件+' + pct(v), armSearch: () => '机械臂自动搜索', cargoFold: () => '使用后货舱凭空变大（最多 3 级）', hover: () => '反重力漂浮',
     spaceMul: (v) => '车内空间×' + v, snow: () => '雪地不减速', comfort: (v) => '舒适+' + v,
     armorP: (v) => '人物护甲' + pct(v), hpP: (v) => '生命+' + v, radRes: (v) => '防辐射' + pct(Math.min(1, v)), walk: (v) => '走路+' + pct(v), regenP: (v) => '回血' + v + '/时',
     sleep: (v) => '睡眠×' + v, sleepHeal: (v) => '睡觉回血' + v, slowNeeds: () => '睡时少饿', cook: (v) => '食物顶饱×' + v, foodGen: (v) => '食物+' + v + '/天', fridge: (v) => v >= 1 ? '食物不变质' : '减缓变质', waterGen: (v) => '水+' + v + '/天',
@@ -29,7 +29,7 @@ function rdFxText(p) {
   };
   for (const k in f) if (L[k]) out.push(L[k](f[k]));
   if (p.slot === 'in') out.push((p.layer === 'wall' ? '墙面' : '地面') + (p.w || 1) + '格');
-  if (p.pw > 0) out.push('耗电' + p.pw + '/时' + (p.slot === 'in' && RD_PW_ONDEMAND[p.kind] && p.act !== 'plant' ? '（用时，平时待机1成）' : ''));
+  if (p.pw > 0) out.push('耗电' + p.pw + '/时' + (p.slot === 'in' && RD_PW_ONDEMAND[p.kind] && p.act !== 'plant' && !p.fx.foodGen && !p.fx.waterGen && !p.fx.medGen ? '（用时，平时待机1成）' : ''));
   if (p.wt && RD_SLOTS[p.slot].ext) out.push('重' + p.wt);
   return out.join(' · ');
 }
@@ -55,6 +55,10 @@ function rdDrawUI(ctx) {
   let info = '第' + rdDay() + '天 ' + String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0') + (rdIsNight() ? ' ☾' : ' ☀') + ' · ' + rdBiomeAt(R.km).name;
   if (R.weather) info += ' · ' + R.weather.name;
   drawText(ctx, info, 8, topH + 12, 12, '#ffcd75', 'left');
+  if (!RD_DASH_SCRAP) { // 窄屏：零件（货币）接在信息行后面
+    ctx.font = 'bold 12px ' + FONT; const ix = 8 + ctx.measureText(info).width + 10;
+    rdIcon(ctx, 'scrap', ix, topH + 4, 15); drawText(ctx, String(Math.floor(G.res.scrap || 0)), ix + 18, topH + 12, 12, '#ffcd75', 'left');
+  }
   // 前方建筑（瞭望台 / 雷达 / 车载电脑）
   let iy = topH + 30;
   const nx = rdNextSite();
@@ -107,7 +111,7 @@ function rdDrawUI(ctx) {
   const outside = me.loc === 'out' || me.loc === 'site';
   rdDrawPedal(ctx, ped, R.driving, outside);
   const btns = [
-    { l: R.view === 'in' ? (rdVeh().tent ? '公路' : '车外') : (rdVeh().tent ? '营地' : '车内'), f: () => { R.view = R.view === 'in' ? 'out' : 'in'; } },
+    { l: R.view === 'in' ? (rdVeh().tent && !rdVeh().pod ? '公路' : '车外') : (rdVeh().tent && !rdVeh().pod ? '营地' : '车内'), f: () => { R.view = R.view === 'in' ? 'out' : 'in'; } },
     { l: '改装', f: () => rdOpenPanel('garage') },
     { l: '仓库', f: () => rdOpenPanel('inv'), badge: R.inv.length },
     { l: '制作', f: () => rdOpenPanel('craft'), badge: R.craftQ.length },
@@ -133,7 +137,7 @@ function rdDrawUI(ctx) {
   // ---- 搜索按钮（建筑旁边） ----
   if (playing && R.view === 'out') {
     const s = rdNearSite();
-    if (s && !outside) {
+    if (s && !outside && !R.search) { // 机械臂正在搜的时候不显示（免得点了让主角也下车）
       const S = RD_SITES[s.type], p = rdToScreen(rdSX(s.km * RD_PX_KM), RDV.gy - S.h - 20);
       const label = S.trade ? '拜访 ' + S.name : '搜索 ' + S.name + '（约' + rdSearchDur(s).toFixed(1) + '小时）';
       ctx.font = 'bold 13px ' + FONT;
@@ -149,14 +153,14 @@ function rdDrawUI(ctx) {
       const lw = ctx.measureText(label).width + 24;
       drawButton(ctx, 8, yb - 50, lw, 34, label, R.reverse === bs ? () => { R.reverse = null; } : () => rdStartReverse(bs), { color: '#566c86', size: 13, active: R.reverse === bs });
     }
-    if (outside && R.search) {
-      const t = R.search.phase === 'in' ? '正在搜索……' : R.search.phase === 'back' ? '回车上……' : '走向建筑……';
+    if (outside && R.search || R.search && R.search.phase === 'arm') {
+      const t = R.search.phase === 'arm' ? '机械臂搜索中……' + Math.floor(R.search.t / R.search.dur * 100) + '%' : R.search.phase === 'in' ? '正在搜索……' : R.search.phase === 'back' ? '回车上……' : '走向建筑……';
       drawText(ctx, t, sw / 2, yb - 22, 14, '#ffcd75', 'center');
     }
   }
   // 车内：提示可以拖动
   if (R.view === 'in' && playing) {
-    drawText(ctx, (rdVeh().tent ? '营地' : '车内') + ' · 左右拖动查看 · 舒适度 ' + st.comfort.toFixed(1) + (R.powered === false ? ' · 停电中！' : ''), sw / 2, yb - 22, 12, R.powered === false ? '#ef7d57' : '#c8d6e5', 'center', false);
+    drawText(ctx, (rdVeh().tent && !rdVeh().pod ? '营地' : '车内') + ' · 左右拖动查看 · 舒适度 ' + st.comfort.toFixed(1) + (R.powered === false ? ' · 停电中！' : ''), sw / 2, yb - 22, 12, R.powered === false ? '#ef7d57' : '#c8d6e5', 'center', false);
     if (me.loc === 'out' || me.loc === 'site') drawText(ctx, '（你下车搜索去了，车里没人）', sw / 2, yb - 40, 12, '#94b0c2', 'center', false);
   }
   // 车外飘字
@@ -211,24 +215,28 @@ function rdDrawPedal(ctx, b, driving, dim) {
 }
 function rdDoingText() {
   const R = G.road, me = R.me, a = me.act;
-  if (me.loc === 'drive') return R.driving ? '正在开车' + (me.energy < 25 ? '（很困了）' : '') : '';
+  if (me.loc === 'drive') return R.driving ? '正在开车' + (me.energy < 25 ? '（很困了）' : '') + (R.afk ? ' · 挂机中' : '') : (R.search && R.search.phase === 'arm' ? '机械臂在搜索……' : '');
   if (me.loc === 'out' || me.loc === 'site') return '在车外';
-  if (!a) return '';
+  if (!a) return R.search && R.search.phase === 'arm' ? '机械臂在搜索……' : R.afk && R.driving ? '挂机中' : '';
   const p = a.it ? RD_PARTS[a.it.id] : null;
   const m = { sleep: p ? '在' + p.name + '上睡觉' : '蜷在地上睡觉', cook: '在做饭', eat: '在吃东西', drink: '在喝水', coffee: '在喝咖啡', heal: '在治疗', shower: '在洗澡', research: '在研究', craft: '在工作台干活', plant: '在照料植物', pet: '在撸' + (R.pet ? R.pet.name : '宠物'), mope: '抱着膝盖发呆……', window: '望着窗外', wander: '在车里走来走去', fun: p ? '在用' + p.name : '在休息' };
-  return (m[a.type] || '') + (R.driving ? '（自动驾驶中）' : '');
+  const pn = R.pet ? R.pet.name : '宠物';
+  Object.assign(m, { feed: '在给' + pn + '添粮', playpet: R.pet && R.pet.type === 'cat' ? '在用逗猫棒逗' + pn : '在扔球给' + pn, sip: p ? '坐着慢慢喝咖啡' : '端着咖啡看窗外', pet: '在摸' + pn });
+  if (a.type === 'window' && a.seatH) m.window = '坐在窗边软垫上看风景';
+  if (a.type === 'use' && p) m.use = ({ fix: '在检修' + p.name, refuel: '在给' + p.name + '加油', look: '在看' + p.name, rummage: '在翻' + p.name, warm: '凑在' + p.name + '旁边烤手', press: '在摆弄' + p.name, laundry: '在洗衣服', collect: '在取蛋白块', rest: '坐着歇会', tidy: '在收拾' + p.name })[a.mode] || '在摆弄' + p.name;
+  return (m[a.type] || '') + (R.driving ? '（自动驾驶中' + (R.afk ? ' · 挂机' : '') + '）' : R.search && R.search.phase === 'arm' ? '（机械臂在搜索）' : '');
 }
 function rdToggleDrive() {
   const R = G.road, me = R.me;
   if (me.loc === 'out' || me.loc === 'site') return;
-  if (R.driving) { R.driving = false; return; }
-  if (R.broken) { showBanner('车辆瘫痪', '先修车：耐久修到 30% 以上（改装 → 修车，需要废料）', 3, '#ef7d57'); return; }
+  if (R.driving) { R.driving = false; if (R.afk) { R.afk = false; showBanner('挂机已关闭', '你接管了驾驶', 2, '#ffcd75'); } return; }
+  if (R.broken) { showBanner('车辆瘫痪', '先修车：耐久修到 30% 以上（改装 → 修车，需要零件）', 3, '#ef7d57'); return; }
   if (me.energy < 8 && !rdStats().autopilot) { showBanner('太困了', '先睡一觉再开车', 2, '#ef7d57'); return; }
   const st = rdStats();
   if (st.fuelKm > 0 && G.res.fuel <= 0) { showBanner('没有油', '去搜索加油站，或者等商人', 2, '#ef7d57'); return; }
   if (st.powKm > 0 && G.res.power <= 0) { showBanner('没有电', '等太阳能充电或装发电机', 2, '#ef7d57'); return; }
   R.driving = true;
-  R.reverse = null;
+  R.reverse = null; R.park = null;
   if (me.act && me.act.type === 'sleep' && !st.autopilot) me.act = null;
 }
 function rdOpenPanel(p) { const R = G.road; R.panel = p; R.pick = null; G.state = 'rpanel'; if (G.scroll) G.scroll.rpanel = 0; }
@@ -258,7 +266,7 @@ function rdDrawPanel(ctx) {
 }
 function rdLine(c, t, size, color, bold) { wrapText(c.ctx, t, c.w, size || 13).forEach((ln) => { drawText(c.ctx, ln, c.x, c.y + (size || 13) / 2 + 2, size || 13, color || '#c8d6e5', 'left', !!bold); c.y += (size || 13) + 5; }); }
 function rdHead(c, t) { c.y += 4; c.ctx.fillStyle = '#333c57'; c.ctx.fillRect(c.x, c.y, c.w, 24); drawText(c.ctx, t, c.x + 8, c.y + 12, 13, '#ffcd75'); c.y += 30; }
-// 一行改装件：label 槽位名 · p 零件 · btns 按钮
+// 一行改装件：label 槽位名 · p 改装件 · btns 按钮
 function rdPartRow(c, label, p, btns, note) {
   const ctx = c.ctx, h = 46;
   ctx.fillStyle = 'rgba(38,43,68,0.9)'; ctx.fillRect(c.x, c.y, c.w, h);
@@ -268,7 +276,7 @@ function rdPartRow(c, label, p, btns, note) {
   const lx0 = label ? tx + Math.max(64, ctx.measureText(label).width + 10) : tx;
   const lx = p ? lx0 + 42 : lx0;
   if (p) {
-    rdoIcon(ctx, p, lx0, c.y + 5, 36); // 零件像素图标（js/roadicons.js）
+    rdoIcon(ctx, p, lx0, c.y + 5, 36); // 改装件像素图标（js/roadicons.js）
     drawText(ctx, rdPartLabel(p), lx, c.y + 13, 13, RD_TIER_COLOR[p.tier]);
     const t = note || rdFxText(p);
     const lines = wrapText(ctx, t, c.w - (lx - c.x) - bw - 8, 10);
@@ -306,8 +314,8 @@ function rdPanelGarage(c) {
   c.y += Math.max(img.lh * sc + 8, stats.length * 16 + 8) + 6;
   if (sx + 60 >= c.x + c.w) stats.forEach((t) => rdLine(c, t, 11));
   rdLine(c, '特性：' + v.perk, 11, '#a7f070');
-  if (R.broken && R.speedNow < 1) { drawButton(ctx, c.x, c.y, 260, 32, '应急抢修（8 小时，不花废料，修到 30%）', () => rdEmergencyRepair(), { color: '#b13e53', size: 12 }); c.y += 38; }
-  if (R.hpV < st.hp) { const cost = Math.ceil((st.hp - R.hpV) / 5); drawButton(ctx, c.x, c.y, 200, 32, '修车（' + Math.min(cost, Math.floor(G.res.scrap)) + ' 废料）', R.speedNow < 1 ? () => rdRepair() : null, { color: '#1f5e3a', size: 12, dim: R.speedNow >= 1 }); c.y += 38; }
+  if (R.broken && R.speedNow < 1) { drawButton(ctx, c.x, c.y, 260, 32, '应急抢修（8 小时，不花零件，修到 30%）', () => rdEmergencyRepair(), { color: '#b13e53', size: 12 }); c.y += 38; }
+  if (R.hpV < st.hp) { const cost = Math.ceil((st.hp - R.hpV) / 5); drawButton(ctx, c.x, c.y, 200, 32, '修车（' + Math.min(cost, Math.floor(G.res.scrap)) + ' 零件）', R.speedNow < 1 ? () => rdRepair() : null, { color: '#1f5e3a', size: 12, dim: R.speedNow >= 1 }); c.y += 38; }
   if (R.speedNow < 1 && (R.broken || G.res.fuel < 3 && st.fuelKm > 0)) { drawButton(ctx, c.x + 208, c.y - (R.hpV < st.hp ? 38 : 0), 220, 32, '徒步去附近搜寻（6 小时）', () => rdHike(), { color: '#a8794f', size: 12 }); if (R.hpV >= st.hp) c.y += 38; }
   const can = rdCanModExt();
   if (!can) rdLine(c, '车子在开，停车后才能改装车外的部件（车内家具随时可以摆）', 12, '#ef7d57');
@@ -343,7 +351,7 @@ function rdPanelGarage(c) {
   const fl = rdCellCount('floor'), wl = rdCellCount('wall');
   const usedF = R.inner.filter((it) => (RD_PARTS[it.id].layer || 'floor') === 'floor').reduce((s, it) => s + (RD_PARTS[it.id].w || 1), 0);
   const usedW = R.inner.filter((it) => RD_PARTS[it.id].layer === 'wall').reduce((s, it) => s + (RD_PARTS[it.id].w || 1), 0);
-  rdHead(c, (v.tent ? '营地' : '车内') + '布置 · 地面 ' + usedF + '/' + fl + ' 格 · 墙面 ' + usedW + '/' + wl + ' 格');
+  rdHead(c, (v.tent && !v.pod ? '营地' : '车内') + '布置 · 地面 ' + usedF + '/' + fl + ' 格 · 墙面 ' + usedW + '/' + wl + ' 格');
   const haveIn = R.inv.some((x) => RD_PARTS[x].slot === 'in');
   drawButton(ctx, c.x, c.y, 160, 32, '+ 添加家具/设施', haveIn ? () => { R.pick = { slot: 'in' }; R.panel = 'pick'; if (G.scroll) G.scroll.rpanel = 0; } : null, { color: '#1f5e3a', size: 12, dim: !haveIn });
   drawButton(ctx, c.x + 168, c.y, 120, 32, '去车内看看', () => { G.state = 'play'; R.view = 'in'; }, { size: 12 });
@@ -353,6 +361,14 @@ function rdPanelGarage(c) {
   rdHead(c, '驾驶设置');
   drawButton(ctx, c.x, c.y, 240, 32, '路过建筑自动停车搜索：' + (R.autoSearch ? '开' : '关'), () => { R.autoSearch = !R.autoSearch; }, { color: R.autoSearch ? '#1f5e3a' : '#333c57', size: 12 });
   c.y += 40;
+  // 机械臂自动搜索（装了机械臂回收器才有）
+  const arm = rdSum('armSearch') > 0;
+  if (arm) { drawButton(ctx, c.x, c.y, 240, 32, '机械臂自动搜索（不用下车）：' + (R.armOff ? '关' : '开'), () => { R.armOff = !R.armOff; if (R.armOff) R.afk = false; }, { color: R.armOff ? '#333c57' : '#1f5e3a', size: 12 }); c.y += 40; }
+  // 挂机模式：自动驾驶 + 机械臂
+  const canAfk = arm && st.autopilot;
+  drawButton(ctx, c.x, c.y, 240, 32, '挂机模式：' + (R.afk ? '开' : '关'), canAfk ? () => rdSetAfk(!R.afk) : null, { color: R.afk ? '#b13e53' : '#333c57', size: 12, dim: !canAfk });
+  c.y += 38;
+  rdLine(c, canAfk ? '挂机：自动开车、机械臂搜建筑、事件自动选、车坏了自动修、弹药少了自动做、副本自动打。按「停车」退出挂机。' : '挂机模式需要：自动驾驶（军用战术终端 / 自动驾驶模块等）+ 机械臂回收器。', 11, canAfk ? '#94b0c2' : '#566c86');
 }
 function rdPanelPick(c) {
   const R = G.road, pk = R.pick, ctx = c.ctx;
@@ -376,23 +392,23 @@ function rdPanelPick(c) {
     } }]);
     if (p.d) { c.y -= 2; rdLine(c, '　' + p.d, 10, '#94b0c2'); }
   });
-  if (!Object.keys(seen).length) rdLine(c, '仓库里没有这类零件。去搜索建筑、找商人，或者在工作台制作。', 12, '#94b0c2');
+  if (!Object.keys(seen).length) rdLine(c, '仓库里没有这类改装件。去搜索建筑、找商人，或者在工作台制作。', 12, '#94b0c2');
 }
 // ---------- 仓库：小方格（只有图标 + 数量），下面的信息栏显示选中格子的名字和说明（可以滑动看完） ----------
-let RD_INV_SEL = null; // 选中的格子：'res:燃油键名' 或零件 id（不存档）
+let RD_INV_SEL = null; // 选中的格子：'res:燃油键名' 或改装件 id（不存档）
 const RD_RES_DESC = {
   fuel: '汽油车、柴油车开车要烧。放在油箱里，不占货舱。加油站、汽修厂、军事检查站容易找到。',
   power: '用电设备（冰箱、电脑、空调……）和电动车要用。放在电池里，不占货舱。太阳能板、风力发电机、发电机能发电。',
-  scrap: '制作零件、做弹药、修车都要用。拆解零件、卖东西也能换到。占货舱。',
+  scrap: '废土上通用的货币：跟商人买卖、制作改装件、做弹药、修车、研究都要用。搜索建筑、打怪、拆解改装件、卖东西都能得到。不占货舱，攒多少都行。',
   food: '主角饿了要吃。没有冰箱的话放久了会坏。占货舱。',
   water: '主角渴了要喝。净水机、雨水收集棚能自己产水。占货舱。',
   med: '受伤、辐射高时用来治疗。药店、医院类建筑里多。占货舱。',
-  ammo: '车载武器和随身枪械开火要用。可以在工作台用废料做。占货舱。',
+  ammo: '车载武器和随身枪械开火要用。可以在工作台用零件做。占货舱。',
   alien: '研究外星科技、制作外星部件要用。外星坠落舱和外星怪物身上能找到。占货舱。',
 };
 function rdPanelInv(ctx, x, y, w, h) {
   const R = G.road, st = rdStats();
-  const keys = ['fuel', 'power', 'scrap', 'food', 'water', 'med', 'ammo', 'alien'];
+  const keys = ['fuel', 'power', 'food', 'water', 'med', 'ammo', 'alien'];
   const order = ['weapon', ...RD_EXT_ORDER, 'hand', 'suit', 'in'];
   const ids = [...new Set(R.inv)].filter((id) => RD_PARTS[id]).sort((a, b) => order.indexOf(RD_PARTS[a].slot) - order.indexOf(RD_PARTS[b].slot) || RD_PARTS[b].tier - RD_PARTS[a].tier);
   // 选中的东西不在了（装上 / 拆掉）就清掉
@@ -414,6 +430,11 @@ function rdPanelInv(ctx, x, y, w, h) {
     if (badge) { ctx.font = 'bold 11px ' + FONT; const bw = ctx.measureText(badge).width + 6; ctx.fillStyle = 'rgba(10,10,30,0.85)'; ctx.fillRect(cx + cs - bw - 2, yy + cs - 15, bw, 13); drawText(ctx, badge, cx + cs - 5, yy + cs - 8, 11, low ? '#ef7d57' : '#f4f4f4', 'right'); }
     addButton(cx, yy, cs, cs, () => { RD_INV_SEL = key; if (G.scroll) G.scroll.rinvi = 0; });
   };
+  // 货币：零件（不占货舱），单独一栏
+  head('货币');
+  cell(0, 'res:scrap', (ix, iy, s) => rdIcon(ctx, 'scrap', ix, iy, s), String(Math.floor(G.res.scrap || 0)), '#ffcd75');
+  drawText(ctx, '零件 ' + Math.floor(G.res.scrap || 0) + '　废土通用货币，不占货舱', gx + cs + 10, cy + cs / 2, 12, '#ffcd75', 'left', false);
+  cy += cs + gap + 4;
   head('物资　货舱 ' + rdCargoUsed() + '/' + st.cargo);
   keys.forEach((k, i) => {
     const cap = k === 'fuel' ? st.tank : k === 'power' ? st.battery : 0;
@@ -421,7 +442,7 @@ function rdPanelInv(ctx, x, y, w, h) {
     cell(i, 'res:' + k, (ix, iy, s) => rdIcon(ctx, k, ix, iy, s), String(Math.floor(G.res[k] || 0)), null, low);
   });
   cy += Math.ceil(keys.length / cols) * (cs + gap) + 4;
-  head('零件　' + R.inv.length + ' 件');
+  head('改装件　' + R.inv.length + ' 件');
   if (!ids.length) { drawText(ctx, '仓库是空的。', x, cy + 8, 13, '#566c86', 'left', false); cy += 24; }
   ids.forEach((id, i) => { const p = RD_PARTS[id], n = R.inv.filter((q) => q === id).length; cell(i, id, (ix, iy, s) => rdoIcon(ctx, p, ix, iy, s), n > 1 ? '×' + n : '', RD_TIER_COLOR[p.tier]); });
   cy += Math.ceil(ids.length / cols) * (cs + gap);
@@ -437,7 +458,7 @@ function rdPanelInv(ctx, x, y, w, h) {
     color = RD_RES[k].color;
     text.push(RD_RES_DESC[k]);
     if (k === 'power') text.push('现在每小时 ' + (R.powNet >= 0 ? '+' : '') + (R.powNet || 0).toFixed(1) + '（发电 ' + (R.powProd || 0).toFixed(1) + '，用电 ' + (R.powCons || 0).toFixed(1) + '）');
-    if (!cap) text.push('货舱：' + rdCargoUsed() + ' / ' + st.cargo);
+    if (!cap && RD_CARGO_RES.includes(k)) text.push('货舱：' + rdCargoUsed() + ' / ' + st.cargo);
   } else {
     const id = RD_INV_SEL, p = RD_PARTS[id], n = R.inv.filter((q) => q === id).length;
     const learn = !R.bps[id] && st.craft >= p.tier, scrap = Math.round(rdScrapValue(p) * (1 + st.scrapBonus));
@@ -445,10 +466,10 @@ function rdPanelInv(ctx, x, y, w, h) {
     text.push('种类：' + RD_SLOTS[p.slot].name);
     text.push('效果：' + (rdFxText(p) || '无'));
     if (p.d) text.push(p.d);
-    text.push('拆解得到 ' + scrap + ' 废料' + (learn ? '，并学会它的图纸' : R.bps[id] ? '（已经会做了）' : '（工作台 Lv' + p.tier + ' 拆解才能学会图纸，现在：' + (st.craft || '没有工作台') + '）'));
+    text.push('拆解得到 ' + scrap + ' 零件' + (learn ? '，并学会它的图纸' : R.bps[id] ? '（已经会做了）' : '（工作台 Lv' + p.tier + ' 拆解才能学会图纸，现在：' + (st.craft || '没有工作台') + '）'));
     btns = [
-      { l: '装上', c: '#1f5e3a', w: 54, f: () => rdQuickInstall(id) },
-      { l: learn ? '拆解+图纸' : '拆解', c: '#5d275d', w: learn ? 80 : 54, f: () => askConfirm('拆解 ' + p.name + '？会得到 ' + scrap + ' 废料' + (learn ? '，并学会它的图纸' : '') + '。', () => rdDismantle(R.inv.indexOf(id))) },
+      { l: p.fx.cargoFold ? '使用' : '装上', c: '#1f5e3a', w: 54, f: () => rdQuickInstall(id) },
+      { l: learn ? '拆解+图纸' : '拆解', c: '#5d275d', w: learn ? 80 : 54, f: () => askConfirm('拆解 ' + p.name + '？会得到 ' + scrap + ' 零件' + (learn ? '，并学会它的图纸' : '') + '。', () => rdDismantle(R.inv.indexOf(id))) },
     ];
   }
   // 标题行 + 按钮（固定不动）
@@ -465,6 +486,7 @@ function rdPanelInv(ctx, x, y, w, h) {
 }
 function rdQuickInstall(id) {
   const R = G.road, p = RD_PARTS[id], i = R.inv.indexOf(id), st = rdStats();
+  if (p.fx.cargoFold) { rdUseFold(id); return; }
   if (p.slot === 'weapon') {
     let m = -1;
     for (let k = 0; k < st.mounts; k++) if (!R.wpn[k]) { m = k; break; }
@@ -476,17 +498,17 @@ function rdQuickInstall(id) {
 function rdPanelCraft(c) {
   const R = G.road, ctx = c.ctx, st = rdStats();
   if (!st.craft) { rdLine(c, '车上没有工作台。先把「简易工具箱」或「工作台」装进车里（改装 → 车内布置）。', 13, '#ef7d57'); }
-  else rdLine(c, '工作台等级 ' + st.craft + '：可以制作品阶 ≤ ' + st.craft + ' 的零件。制作需要主角在工作台前干活（停车或开着自动驾驶时）。', 12, '#c8d6e5');
+  else rdLine(c, '工作台等级 ' + st.craft + '：可以制作品阶 ≤ ' + st.craft + ' 的改装件。制作需要主角在工作台前干活（停车或开着自动驾驶时）。', 12, '#c8d6e5');
   if (st.craft) {
     rdHead(c, '快速制作');
-    drawButton(ctx, c.x, c.y, 220, 32, '复装弹药：4 废料 → 10 发', G.res.scrap >= 4 ? () => rdMakeAmmo() : null, { color: '#1f5e3a', size: 12, dim: G.res.scrap < 4 });
+    drawButton(ctx, c.x, c.y, 220, 32, '复装弹药：4 零件 → 10 发', G.res.scrap >= 4 ? () => rdMakeAmmo() : null, { color: '#1f5e3a', size: 12, dim: G.res.scrap < 4 });
     c.y += 40;
   }
   if (R.craftQ.length) {
     rdHead(c, '制作队列');
     R.craftQ.forEach((q, i) => rdPartRow(c, i === 0 ? '进行中' : '排队', RD_PARTS[q.id], i === 0 ? [] : [{ l: '取消', c: '#5d275d', w: 50, f: () => { R.craftQ.splice(i, 1); const cost = rdCraftCost(RD_PARTS[q.id]); for (const k in cost) G.res[k] += cost[k]; } }], '还要 ' + q.left.toFixed(1) + ' 小时'));
   }
-  rdHead(c, '已学会的图纸（拆解零件、搜索、研究都能学到新图纸）');
+  rdHead(c, '已学会的图纸（拆解改装件、搜索、研究都能学到新图纸）');
   const ids = Object.keys(R.bps).filter((id) => RD_PARTS[id]).sort((a, b) => RD_PARTS[a].tier - RD_PARTS[b].tier || (RD_PARTS[a].slot > RD_PARTS[b].slot ? 1 : -1));
   for (const id of ids) {
     const p = RD_PARTS[id], cost = rdCraftCost(p), ok = st.craft >= p.tier && rdHas(cost);
@@ -525,29 +547,29 @@ function rdPanelLog(c) {
 function rdPanelTrade(c) {
   const R = G.road, T = R.trade, ctx = c.ctx;
   if (!T) { G.state = 'play'; return; }
-  rdLine(c, '这里只收废料。你有 ' + Math.floor(G.res.scrap) + ' 废料。', 13, '#ffcd75');
-  rdHead(c, '出售的零件');
+  rdLine(c, '这里只收零件。你有 ' + Math.floor(G.res.scrap) + ' 零件。', 13, '#ffcd75');
+  rdHead(c, '出售的改装件');
   T.items.forEach((it, i) => {
     const p = RD_PARTS[it.id];
     if (it.sold) return;
     rdPartRow(c, '', p, [{ l: '买 ' + it.price, c: '#1f5e3a', w: 64, dim: G.res.scrap < it.price, f: () => { G.res.scrap -= it.price; R.inv.push(it.id); it.sold = true; rdLog('买下了 ' + p.name, '#a7f070'); sfx('coin'); } }]);
   });
-  rdHead(c, '买物资（废料换）');
+  rdHead(c, '买物资（零件换）');
   for (const k of ['fuel', 'food', 'water', 'med', 'ammo']) {
     const n = k === 'ammo' ? 10 : 5, price = Math.ceil(RD_PRICES[k] * n * (1 - Math.min(0.3, rdStats().trade)));
-    rdPartRow(c, '', null, [{ l: '买 ' + n, c: '#1f5e3a', w: 56, dim: G.res.scrap < price, f: () => { const got = rdGain(k, n); if (got > 0) { G.res.scrap -= Math.ceil(price * got / n); sfx('coin'); } else showBanner('装不下了', '', 2, '#ef7d57'); } }], RD_RES[k].name + ' ×' + n + '：' + price + ' 废料');
+    rdPartRow(c, '', null, [{ l: '买 ' + n, c: '#1f5e3a', w: 56, dim: G.res.scrap < price, f: () => { const got = rdGain(k, n); if (got > 0) { G.res.scrap -= Math.ceil(price * got / n); sfx('coin'); } else showBanner('装不下了', '', 2, '#ef7d57'); } }], RD_RES[k].name + ' ×' + n + '：' + price + ' 零件');
   }
-  rdHead(c, '卖物资（换废料）');
+  rdHead(c, '卖物资（换零件）');
   for (const k of ['food', 'water', 'med', 'ammo', 'fuel']) {
     const n = k === 'ammo' ? 10 : 5, price = Math.floor(RD_PRICES[k] * n * 0.5 * T.sell);
-    rdPartRow(c, '', null, [{ l: '卖 ' + n, c: '#5d275d', w: 56, dim: G.res[k] < n, f: () => { G.res[k] -= n; rdGain('scrap', price, true); rdLog('卖出 ' + RD_RES[k].name + ' ×' + n + '：废料 +' + price, '#a7f070'); sfx('coin'); } }], RD_RES[k].name + ' ×' + n + '：+' + price + ' 废料（你有 ' + Math.floor(G.res[k]) + '）');
+    rdPartRow(c, '', null, [{ l: '卖 ' + n, c: '#5d275d', w: 56, dim: G.res[k] < n, f: () => { G.res[k] -= n; rdGain('scrap', price, true); rdLog('卖出 ' + RD_RES[k].name + ' ×' + n + '：零件 +' + price, '#a7f070'); sfx('coin'); } }], RD_RES[k].name + ' ×' + n + '：+' + price + ' 零件（你有 ' + Math.floor(G.res[k]) + '）');
   }
-  rdHead(c, '卖零件');
+  rdHead(c, '卖改装件');
   const seen = {};
   R.inv.forEach((id) => {
     if (seen[id]) return; seen[id] = true;
     const p = RD_PARTS[id], price = Math.round(rdScrapValue(p) * 1.5 * T.sell);
-    rdPartRow(c, '', p, [{ l: '卖 ' + price, c: '#5d275d', w: 60, f: () => { const i = R.inv.indexOf(id); if (i >= 0) { R.inv.splice(i, 1); rdGain('scrap', price, true); rdLog('卖出 ' + p.name + '：废料 +' + price, '#a7f070'); showBanner('卖出 ' + p.name, '废料 +' + price, 2, '#a7f070'); sfx('coin'); } } }]);
+    rdPartRow(c, '', p, [{ l: '卖 ' + price, c: '#5d275d', w: 60, f: () => { const i = R.inv.indexOf(id); if (i >= 0) { R.inv.splice(i, 1); rdGain('scrap', price, true); rdLog('卖出 ' + p.name + '：零件 +' + price, '#a7f070'); showBanner('卖出 ' + p.name, '零件 +' + price, 2, '#a7f070'); sfx('coin'); } } }]);
   });
 }
 

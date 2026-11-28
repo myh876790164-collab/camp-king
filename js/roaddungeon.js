@@ -135,6 +135,10 @@ function rdxObjs(g, gy) { const D = G.road && G.road.dun, T = D && RDX_THEMES[D.
 function rdxUpdate(dt) {
   const R = G.road, D = R.dun, T = RDX_THEMES[D.id];
   D.pt += dt;
+  if (R.afk) { // 挂机：矿点前刹车、塌方 / 红圈 / 挡路时冲刺；结算 4 秒后自动回公路
+    if (D.phase === 'run') { const n = D.note || ''; D.drive = /矿点|跟前/.test(n) ? 'stop' : /塌方|红圈|躲开|猛撞/.test(n) || D.blockM ? 'boost' : 'go'; }
+    if (D.phase === 'result' && D.pt > 4) { D.phase = 'warpOut'; D.pt = 0; }
+  }
   if (D.phase === 'warpIn') { if (D.pt > 2.2) { D.phase = 'intro'; D.pt = 0; } return; }
   if (D.phase === 'intro') { if (D.pt > 3.6) { D.phase = 'run'; D.pt = 0; showBanner('开始！', T.goals, 2, T.color); } return; }
   if (D.phase === 'warpOut') { if (D.pt > 2) rdxExit(); return; }

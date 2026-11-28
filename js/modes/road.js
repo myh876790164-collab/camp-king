@@ -28,6 +28,7 @@ function rdNewGame(vehId) {
   Object.assign(G.res, { fuel: Math.round(v.tank * 0.7), scrap: 30, food: 10, water: 10, med: 3, ammo: 35, power: Math.round(v.battery * 0.6), alien: 0 });
   // 起步装备
   for (const id of ['armor1', 'ram1', 'wpn1', 'bed1', 'bed2', 'stove1', 'water1', 'store1', 'hand1', 'tank1', 'decor1']) R.bps[id] = true;
+  for (const id of RD_START_BPS2) R.bps[id] = true;
   R.hand = vehId === 'ebike' ? 'hand4' : 'hand1';
   R.suit = 'suit1';
   if (vehId === 'courier' || vehId === 'pickup') R.wpn = ['wpn3'];
@@ -76,7 +77,28 @@ function rdFxAll() {
 }
 function rdSum(k) { return rdFxAll().sum[k] || 0; }
 function rdMax(k) { return rdFxAll().max[k] || 0; }
-function rdVeh() { return RD_VEHICLES[rdR().veh]; }
+// 当前车型；电单车用了货舱折叠模块后进化成「电动三轮车」：后面多一个银白货舱（车内 2+1 格，不再睡帐篷）
+let RD_TRIKE = null;
+function rdVeh() {
+  const R = rdR(), v = RD_VEHICLES[R.veh];
+  if (R.veh === 'ebike' && (R.cargoFold || 0) > 0) return RD_TRIKE || (RD_TRIKE = Object.assign({}, v, { name: '电动三轮车', len: 36, cells: 2, wcells: 1, pod: true, carKey: 'trike' }));
+  return v;
+}
+// 货舱折叠模块：每用一个，货舱凭空变大（最多 3 级）
+const RD_FOLD_CARGO = [0, 150, 350, 700];
+function rdUseFold(id) {
+  const R = rdR(), i = R.inv.indexOf(id), lv = R.cargoFold || 0;
+  if (i < 0) return false;
+  if (lv >= 3) { showBanner('已经满级了', '货舱折叠已经 3 级，再折就要塌缩了', 3, '#ffcd75'); return false; }
+  R.inv.splice(i, 1);
+  R.cargoFold = lv + 1;
+  rdFxDirty(); rdRefit();
+  const msg = '货舱凭空变大：+' + (RD_FOLD_CARGO[lv + 1] - RD_FOLD_CARGO[lv]) + '（折叠 Lv' + (lv + 1) + '）';
+  rdLog('空间折叠启动！' + msg + (lv === 0 ? '，车内换成了银白科技舱' : '') + (lv === 0 && R.veh === 'ebike' ? '；电单车进化成了电动三轮车' : ''), '#73eff7');
+  showBanner('空间折叠货舱 Lv' + (lv + 1), lv === 0 && R.veh === 'ebike' ? '电单车进化成了电动三轮车！' : msg, 4, '#73eff7');
+  sfx('win');
+  return true;
+}
 
 function rdWeight() {
   const R = rdR(), v = rdVeh();
@@ -99,10 +121,10 @@ function rdStats() {
     hp: v.hp + rdSum('hp'), armor: Math.min(0.75, (v.armor || 0) + rdSum('armor')), shieldMax: rdSum('shield'),
     speed: Math.max(15, Math.round(speed)), weight, torque, over,
     fuelKm: electric ? 0 : v.fuel * fuelMul * loadF, powKm: electric ? electric * Math.max(0.2, fuelMul) * loadF : 0,
-    tank: v.tank + rdSum('tank'), battery: v.battery + rdSum('battery'), cargo: v.cargo + rdSum('cargo'),
+    tank: v.tank + rdSum('tank'), battery: v.battery + rdSum('battery'), cargo: v.cargo + rdSum('cargo') + RD_FOLD_CARGO[Math.min(3, R.cargoFold || 0)],
     mounts: v.mounts + rdSum('mounts'), ram: 8 + rdSum('ram'), obs: Math.min(1, rdSum('obs')), thorns: rdSum('thorns'),
     regen: rdSum('regen'), stealth: Math.min(0.8, rdSum('stealth')), hover,
-    autopilot: rdSum('autopilot') > 0 && R.veh !== 'ebike', research: rdMax('research'), craft: rdMax('craft'),
+    autopilot: rdSum('autopilot') > 0 && (R.veh !== 'ebike' || (R.cargoFold || 0) > 0), // 电单车不能自动驾驶，进化成三轮车后可以 research: rdMax('research'), craft: rdMax('craft'),
     cook: Math.max(1, rdMax('cook')), fridge: Math.max(v.fridge || 0, rdMax('fridge')), comfort: (v.comfort || 0) + rdSum('comfort'),
     light: rdSum('light') > 0, radar: rdMax('radar'), lookout: rdSum('lookout') > 0, rangePct: rdSum('rangePct'), aim: rdSum('aim'),
     searchSpd: (v.searchSpd || 0) + rdSum('searchSpd'), lootBonus: rdSum('lootBonus'), scrapBonus: (v.scrapBonus || 0) + rdSum('scrapBonus'),
@@ -112,7 +134,7 @@ function rdStats() {
 // 车内空间：车厢 + 挂车，空间核心会把格子数放大
 function rdRooms() {
   const R = rdR(), v = rdVeh(), mul = Math.max(1, rdMax('spaceMul'));
-  const rooms = [{ name: v.tent ? '露营地' : '车厢', cells: Math.floor(v.cells * mul), wcells: Math.floor(v.wcells * mul), camp: !!v.tent }];
+  const rooms = [{ name: v.pod ? '货舱' : v.tent ? '露营地' : '车厢', cells: Math.floor(v.cells * mul), wcells: Math.floor(v.wcells * mul), camp: !!v.tent && !v.pod }];
   const tr = R.ext.trailer && RD_PARTS[R.ext.trailer];
   if (tr && tr.fx.cells) rooms.push({ name: '挂车', cells: Math.floor(tr.fx.cells * mul), wcells: Math.floor(tr.fx.wcells * mul), trailer: true });
   let at = 0;
@@ -172,7 +194,7 @@ function rdRefit() {
 // ---------- 资源 ----------
 function rdCargoUsed() { return RD_CARGO_RES.reduce((s, k) => s + Math.max(0, Math.floor(G.res[k] || 0)), 0); }
 // 获得资源（货舱 / 油箱 / 电池装不下的会丢掉），返回实际得到多少
-// over = true：卖东西、拆解换来的废料一定到手（货舱可以暂时超载，满了就捡不了新东西）
+// over = true：卖东西、拆解换来的零件一定到手（货舱可以暂时超载，满了就捡不了新东西）
 function rdGain(k, n, over) {
   if (n <= 0) return 0;
   if (over && RD_CARGO_RES.includes(k)) { G.res[k] = (G.res[k] || 0) + n; return n; }
@@ -276,6 +298,15 @@ function rdUpdate(dt) {
       }
     }
   } else R.reversing = false;
+  // 靠边停车：要搜的建筑在前面，按刹车距离提前减速，车身正好停在建筑门口（高速时不再冲过头）
+  if (R.park) {
+    const P = R.park, s = P.s, d = rdParkDist(s);
+    if (s.searched || me.loc === 'out' || me.loc === 'site' || R.broken || R.dun) R.park = null;
+    else if (d <= 2 || (d < 10 && R.speedNow < 4) || d < -25) {
+      R.speedNow = 0; R.km = s.km + rdVeh().len / 2 / RD_PX_KM; R.park = null; // 最后几像素直接对齐
+      if (P.arm) rdStartArmSearch(s); else rdStartSearch(s);
+    } else target = Math.min(st.speed, Math.sqrt(160 * d / (RD_KM_RATE * RD_PX_KM)) + 3);
+  }
   const acc = target > R.speedNow ? 28 : 80;
   R.speedNow += Math.sign(target - R.speedNow) * Math.min(Math.abs(target - R.speedNow), acc * dt);
   const dkm = R.speedNow * RD_KM_RATE * dt;
@@ -289,10 +320,15 @@ function rdUpdate(dt) {
     const ms = Math.floor(R.km / 250);
     if (ms > R.milestone) { R.milestone = ms; showBanner('已行驶 ' + ms * 250 + ' 公里', '进入「' + rdBiomeAt(R.km).name + '」', 4, '#ffcd75'); rdLog('进入了「' + rdBiomeAt(R.km).name + '」', '#ffcd75'); sfx('dawn'); }
   }
+  // 机械臂自动搜索：前面有建筑就提前减速停到门口，机械臂伸过去搜（主角不下车，搜完接着开）
+  if (R.driving && !R.armOff && rdSum('armSearch') > 0 && !R.search && !R.park) {
+    const s = rdParkAhead();
+    if (s) R.park = { s, arm: true };
+  }
   // 自动停车搜索
-  if (R.autoSearch && R.driving && me.loc === 'drive' || R.autoSearch && R.driving && st.autopilot) {
-    const s = rdNearSite();
-    if (s && Math.abs(s.km - R.km) * RD_PX_KM < 30 && RD_SITES[s.type].trade !== true) rdStartSearch(s);
+  if ((R.autoSearch && R.driving && me.loc === 'drive' || R.autoSearch && R.driving && st.autopilot) && !R.search && !R.park) {
+    const s = rdParkAhead();
+    if (s) R.park = { s, arm: false };
   }
   // ---- 电力 ----
   rdPowerTick(dh, st);
@@ -319,8 +355,43 @@ function rdUpdate(dt) {
   // ---- 失败 ----
   if (me.hp <= 0) rdLose('你倒下了', me.lastHurt || '伤势过重');
   // 车辆瘫痪：不能开，修好才行（怪物会冲进车里）
-  if (R.hpV <= 0 && !R.broken) { R.broken = true; R.driving = false; rdLog('车辆瘫痪了！用废料修好才能继续开（改装 → 修车）', '#ef7d57'); showBanner('车辆瘫痪！', '怪物会冲进车里——打退它们，然后用废料修车', 4, '#ef7d57'); sfx('bad'); }
+  if (R.hpV <= 0 && !R.broken) { R.broken = true; R.driving = false; rdLog('车辆瘫痪了！用零件修好才能继续开（改装 → 修车）', '#ef7d57'); showBanner('车辆瘫痪！', '怪物会冲进车里——打退它们，然后用零件修车', 4, '#ef7d57'); sfx('bad'); }
   if (R.broken && R.hpV >= st.hp * 0.3) { R.broken = false; rdLog('车修好了，可以继续上路', '#a7f070'); }
+  if (R.afk && G.state === 'play') rdAfkTick(dt, st);
+}
+
+// ---------- 挂机模式（自动驾驶 + 机械臂回收器） ----------
+function rdSetAfk(on) {
+  const R = rdR(), st = rdStats();
+  if (on && !(st.autopilot && rdSum('armSearch') > 0)) { showBanner('还不能挂机', '需要自动驾驶 + 机械臂回收器', 3, '#ef7d57'); return; }
+  R.afk = on;
+  if (on) { R.armOff = false; R.afkT = 0; rdLog('挂机模式开启：车会自己开、自己搜、自己修。按「停车」退出', '#a7f070'); showBanner('挂机模式', '按「停车」随时接管', 3, '#a7f070'); G.state = 'play'; }
+  else rdLog('挂机模式关闭', '#94b0c2');
+}
+function rdAfkTick(dt, st) {
+  const R = rdR(), me = R.me;
+  if (!st.autopilot || !(rdSum('armSearch') > 0)) { R.afk = false; rdLog('挂机模式关闭了（自动驾驶或机械臂没了 / 停电）', '#ef7d57'); return; }
+  R.afkT = (R.afkT || 0) - dt;
+  if (R.afkT > 0) return;
+  R.afkT = 1; // 每秒想一次
+  const inCar = me.loc !== 'out' && me.loc !== 'site';
+  // 修车：瘫痪了，或者停着时耐久不到一半（先修车，再做弹药）
+  if ((R.broken || (R.speedNow < 1 && R.hpV < st.hp * 0.5)) && G.res.scrap >= 4) rdRepair();
+  // 弹药少了：有工作台、车况还行、零件有富余才做
+  if (G.res.ammo < 20 && G.res.scrap > 30 && st.craft && R.hpV >= st.hp * 0.5) rdMakeAmmo();
+  if (R.broken && R.speedNow < 1 && G.res.scrap < 4 && inCar && !(R.mons || []).some((m) => m.hp > 0)) rdEmergencyRepair();
+  // 停着又没事干：接着开（没油没电就下车去找，12 小时试一次）
+  if (!R.driving && R.speedNow < 1 && inCar && !R.broken && !R.search && !R.reverse && !R.dun) {
+    const noFuel = (st.fuelKm > 0 && G.res.fuel < 1) || (st.powKm > 0 && G.res.power < 1);
+    if (!noFuel) { R.driving = true; R.reverse = null; }
+    else if (st.powKm > 0 && G.res.power < 1 && (rdSum('solar') + (rdVeh().solar || 0)) > 0 && !rdIsNight()) { /* 电车白天等太阳能充电 */ }
+    else if (R.t - (R.afkHikeT || -99) > 12) { R.afkHikeT = R.t; rdHike(); }
+  }
+}
+// 挂机时弹出的选择：直接帮玩家选（优先标了 afk 的选项，选不了就选最后一个能选的）
+function rdAfkPick(options) {
+  const ok = options.filter((o) => !o.disabled);
+  return ok.find((o) => o.afk) || ok[ok.length - 1] || null;
 }
 
 function rdPowerTick(dh, st) {
@@ -335,7 +406,8 @@ function rdPowerTick(dh, st) {
   // 发电机：电量低于一半时自动烧油发电
   const gen = rdSum('gen');
   R.genOn = false;
-  if (gen > 0 && G.res.power < st.battery * 0.5 && G.res.fuel > 1) { prod += gen; G.res.fuel -= gen / 4 * dh; R.genOn = true; }
+  if (gen > 0 && G.res.power < st.battery * 0.5 && G.res.fuel > 1) { prod += gen; G.res.fuel -= gen / 4 * dh * (1 - Math.min(0.8, rdMax('genEff'))); R.genOn = true; } // 大功率柴油机省油
+  prod *= 1 + Math.min(1, rdSum('chargeMul')); // 充电控制器 / 质能反应堆：所有发电加成
   R.powNet = prod - cons; R.powProd = prod; R.powCons = cons;
   G.res.power = Math.max(0, Math.min(st.battery, G.res.power + (prod - cons) * dh));
   const powered = G.res.power > 0.2 || prod >= cons;
@@ -348,6 +420,8 @@ function rdPowerTick(dh, st) {
 // 用电：车外设备、冰箱、净水、空调、植物柜一直开着；电视、游戏机、灶、电脑、医疗舱、工作台、浴室等
 // 只有主角在用的时候才全功率，平时待机只耗 10%（电脑在做研究、自动驾驶模块在开车时也算在用）
 const RD_PW_ONDEMAND = { stove: 1, fun: 1, med: 1, bench: 1, bed: 1, pc: 1, life: 1 };
+// 后来加的默认图纸：蔬菜种植箱、蛋白质合成设备、冷凝净水器（制作时仍要工作台等级够）
+const RD_START_BPS2 = ['life10', 'life11', 'water6', 'life12', 'life13', 'life14', 'life4', 'life5']; // 也包括宠物窝、猫爬架、食盆、玩具篮、窗边软垫
 function rdPowerUse(st) {
   const R = rdR(), me = R.me, inner = new Set();
   let cons = 0;
@@ -358,7 +432,7 @@ function rdPowerUse(st) {
     if (!p) continue;
     inner.add(p);
     if (!(p.pw > 0)) continue;
-    let on = !RD_PW_ONDEMAND[p.kind] || p.act === 'plant' || it === busy || it === rpc || (p.fx.autopilot && R.driving);
+    let on = !RD_PW_ONDEMAND[p.kind] || p.act === 'plant' || p.fx.foodGen || p.fx.waterGen || p.fx.medGen || it === busy || it === rpc || (p.fx.autopilot && R.driving);
     cons += on ? p.pw : p.pw * 0.1;
   }
   for (const p of rdInstalled()) if (p.pw > 0 && !inner.has(p)) cons += p.pw;
@@ -373,7 +447,7 @@ function rdNeedsTick(dh, st) {
   me.water = Math.max(0, me.water - 3.5 * slow * dh);
   if (!sleeping) me.energy = Math.max(0, me.energy - (me.loc === 'drive' ? 5.5 : 4.2) * dh);
   // 心情：舒适度、娱乐让心情变好，饿、渴、累、辐射、受伤让心情变差
-  let dm = -0.7 + st.comfort * 0.8 + (R.pet ? 0.6 : 0);
+  let dm = -0.7 + st.comfort * 0.8 + (R.pet ? 0.6 + (Math.abs(R.pet.ix - me.ix) < 1.2 && me.loc === 'in' ? 0.4 : 0) + ((R.pet.hunger || 0) < 50 ? 0.2 : 0) : 0); // 宠物在身边、吃饱了，心情更好
   if (me.food < 25) dm -= 2;
   if (me.water < 25) dm -= 2;
   if (me.energy < 20) dm -= 1.5;
@@ -402,7 +476,7 @@ function rdNeedsTick(dh, st) {
     R.spoil = (R.spoil || 0) + G.res.food * (1 - keep) * 0.035 / 24 * dh * 24 / 24;
     if (R.spoil >= 1) { const n = Math.floor(R.spoil); R.spoil -= n; G.res.food = Math.max(0, G.res.food - n); if (Math.random() < 0.4) rdLog(n + ' 份食物变质了（装个冰箱就不会坏）', '#94b0c2'); }
   }
-  // 车辆维修：停车时工作台慢慢修车（每点耐久用 0.25 废料）
+  // 车辆维修：停车时工作台慢慢修车（每点耐久用 0.25 零件）
   if (!R.driving && st.repair > 0 && R.hpV < st.hp && G.res.scrap > 0 && R.speedNow < 1) {
     const fix = Math.min(st.hp - R.hpV, st.repair * dh);
     R.hpV += fix; G.res.scrap = Math.max(0, G.res.scrap - fix * 0.2);
@@ -421,9 +495,23 @@ function rdProduceTick(dh, st) {
 }
 
 // ---------- 搜索建筑 ----------
+// 车身中点到建筑门口还差多少像素（正数 = 建筑还在前面）
+function rdParkDist(s) { return s.km * RD_PX_KM + rdVeh().len / 2 - rdVehX(); }
+// 前面刹得住的范围内最近的、没搜过的建筑（不含商人）
+function rdParkAhead() {
+  const R = rdR(), stop = R.speedNow * R.speedNow * RD_KM_RATE * RD_PX_KM / 160;
+  let best = null, bd = 1e9;
+  for (const s of R.sites) {
+    if (s.searched || RD_SITES[s.type].trade) continue;
+    const d = rdParkDist(s);
+    if (d > -10 && d < stop + 40 && d < bd) { bd = d; best = s; }
+  }
+  return best;
+}
 function rdStartSearch(s) {
   const R = rdR(), me = R.me, S = RD_SITES[s.type];
   if (S.trade) { rdOpenTrade(s); return; }
+  if (R.speedNow > 4 && !R.park && rdParkDist(s) > -10) { R.park = { s, arm: false }; return; } // 车还在跑：先靠边停好再下车
   R.driving = false;
   R.search = { site: s, phase: 'walk', t: 0 };
   me.loc = 'out'; me.act = null;
@@ -431,6 +519,13 @@ function rdStartSearch(s) {
   me.face = s.km * RD_PX_KM > me.wx ? 1 : -1;
   R.view = 'out';
   rdLog('停车，下车去搜索' + S.name + (rdIsNight() ? '（天黑了，小心）' : ''), '#ffcd75');
+}
+// 机械臂搜索：车停在建筑旁，主角留在车里，机械臂伸过去翻（比人慢 20%，不沾辐射），搜完接着开
+function rdStartArmSearch(s) {
+  const R = rdR(), S = RD_SITES[s.type];
+  R.driving = false; R.reverse = null;
+  R.search = { site: s, phase: 'arm', t: 0, dur: rdSearchDur(s) * 1.2 * RD_HOUR, resume: true };
+  rdLog('停车，机械臂伸出去搜索' + S.name, '#ffcd75');
 }
 function rdSearchDur(s) {
   const st = rdStats(), me = rdR().me;
@@ -446,14 +541,15 @@ function rdSearchTick(dt) {
     me.face = d > 0 ? 1 : -1;
     if (Math.abs(d) < 3) { sr.phase = 'in'; sr.t = 0; sr.dur = rdSearchDur(s) * RD_HOUR; me.loc = 'site'; }
     else me.wx += Math.sign(d) * Math.min(Math.abs(d), walk * dt);
-  } else if (sr.phase === 'in') {
+  } else if (sr.phase === 'in' || sr.phase === 'arm') {
     sr.t += dt;
+    if (sr.phase === 'arm' && R.driving) { R.search = null; return; } // 玩家自己按了出发：不搜了
     if (sr.t >= sr.dur) rdFinishSearch();
   } else if (sr.phase === 'back') {
     const home = rdVehX() - rdVeh().len * 0.5, d = home - me.wx;
     me.face = d > 0 ? 1 : -1;
     // 有怪物靠近时边打边退
-    if (Math.abs(d) < 3) { me.loc = 'in'; me.act = null; R.search = null; me.ix = 0.6; rdLog('回到了车上', '#94b0c2'); }
+    if (Math.abs(d) < 3) { me.loc = 'in'; me.act = null; R.search = null; me.ix = 0.6; rdLog('回到了车上', '#94b0c2'); rdPetGreet(); } // 宠物跑过来迎接
     else me.wx += Math.sign(d) * Math.min(Math.abs(d), walk * dt);
   }
 }
@@ -479,13 +575,19 @@ function rdFinishSearch() {
     const p = rdRollPart(S, s);
     if (p) { R.inv.push(p.id); got.push('【' + RD_TIER_NAME[p.tier] + '】' + p.name); rdFound(p); }
   }
+  // 低级电脑（旧笔记本 / 车载电脑）：还没有电脑时更容易找到，好尽早开始研究
+  if (S.slots.includes('in')) {
+    const hasPc = R.inner.some((it) => RD_PARTS[it.id] && RD_PARTS[it.id].kind === 'pc') || R.inv.some((id) => RD_PARTS[id] && RD_PARTS[id].kind === 'pc');
+    if (Math.random() < (hasPc ? 0.06 : 0.3)) { const p = RD_PARTS[R.km > 150 && Math.random() < 0.5 ? 'pc2' : 'pc1']; R.inv.push(p.id); got.push('【' + RD_TIER_NAME[p.tier] + '】' + p.name); }
+  }
   // 图纸
   if (Math.random() < 0.12) {
     const p = rdRollPart(S, s);
     if (p && !R.bps[p.id] && !p.alien) { R.bps[p.id] = true; got.push('图纸：' + p.name); }
   }
-  if (S.rad) me.rad = Math.min(100, me.rad + S.rad * (1 - Math.min(1, rdSum('radRes'))));
-  rdLog('搜索' + S.name + '：' + (got.length ? got.join('，') : '什么也没找到'), got.length ? '#a7f070' : '#94b0c2');
+  const arm = sr.phase === 'arm';
+  if (S.rad && !arm) me.rad = Math.min(100, me.rad + S.rad * (1 - Math.min(1, rdSum('radRes'))));
+  rdLog((arm ? '机械臂搜索' : '搜索') + S.name + '：' + (got.length ? got.join('，') : '什么也没找到'), got.length ? '#a7f070' : '#94b0c2');
   showBanner(S.name + ' 搜索完毕', got.slice(0, 4).join('　') || '空手而归', 3, '#a7f070');
   me.mood = Math.min(100, me.mood + (got.length ? 3 : -2));
   sfx('coin');
@@ -493,10 +595,11 @@ function rdFinishSearch() {
   const night = rdIsNight() ? 1.5 : 1;
   if (Math.random() < s.danger * night * (1 + R.km / 1800) * (1 - st.stealth * 0.5)) {
     const n = rdSpawnGroup(s.km * RD_PX_KM + 20, true);
-    if (n) { rdLog('有东西从' + S.name + '里追了出来！', '#ef7d57'); showBanner('遇袭！', '怪物追出来了，快回车上', 3, '#ef7d57'); sfx('bad'); }
+    if (n) { rdLog('有东西从' + S.name + '里追了出来！', '#ef7d57'); showBanner('遇袭！', arm ? '怪物追出来了，车载武器准备' : '怪物追出来了，快回车上', 3, '#ef7d57'); sfx('bad'); }
   }
   // 宠物
   if ((s.type === 'house' || s.type === 'farm') && !R.pet && Math.random() < 0.18) rdOfferPet();
+  if (arm) { R.search = null; if (sr.resume && !R.broken && G.state === 'play') rdToggleDrive(); return; } // 机械臂收回来，接着开
   sr.phase = 'back';
   me.loc = 'out';
 }
@@ -864,7 +967,7 @@ function rdHitMon(m, dmg, fx, ram) {
     const M = RD_MONSTERS[m.type], st = R.st || rdStats();
     rdBurst(m.x, M.fly ? m.y : -M.h / 2, M.glow, 8);
     const got = [];
-    if (!M.drop.scrap && Math.random() < 0.45) { const n = rdGain('scrap', 1); if (n) got.push('+1废料'); }
+    if (!M.drop.scrap && Math.random() < 0.45) { const n = rdGain('scrap', 1); if (n) got.push('+1零件'); }
     for (const k in M.drop) if (Math.random() < M.drop[k]) { let n = 1 + Math.floor(Math.random() * (M.big ? 4 : 2)); if (k === 'scrap') n = Math.round(n * (1 + st.scrapBonus)); n = rdGain(k, n); if (n) got.push('+' + n + RD_RES[k].name); }
     if (got.length) rdFloat(m.x, -M.h - 6, got.join(' '), '#ffcd75');
   }
@@ -889,16 +992,18 @@ function rdFloat(x, y, text, color) { const R = rdR(); R.floats = R.floats || []
 
 // ---------- 主角的自主活动（车内） ----------
 // 每个活动：type · item(用哪件家具) · t(还剩几小时) · 去的位置 tx
-function rdItemAt(it) { // 家具中心在车内的位置（格）
+function rdItemAt(it) { // 家具中心在车内的位置（地面格）；墙上的东西按它所在房间换算成地面格（两套编号不一样）
   const p = RD_PARTS[it.id];
+  if (p.layer === 'wall') { const r = rdRooms().find((rr) => it.cell >= rr.wstart && it.cell < rr.wstart + rr.wcells); if (r) return r.start + (it.cell - r.wstart) + (p.w || 1) / 2; }
   return it.cell + (p.w || 1) / 2;
 }
-function rdFindItem(test) {
+// any = true：停电也算（睡眠舱没电也能当普通床睡）
+function rdFindItem(test, any) {
   const R = rdR();
   let best = null, bv = -1;
   for (const it of R.inner) {
     const p = RD_PARTS[it.id];
-    if (p.pw > 0 && !R.powered) continue;
+    if (p.pw > 0 && !R.powered && !any) continue;
     const v = test(p, it);
     if (v > bv) { bv = v; best = it; }
   }
@@ -944,6 +1049,8 @@ function rdThink(b) { const me = rdR().me; me.bubble = b; me.bubbleT = 2.5; }
 function rdChooseAct(st) {
   const R = rdR(), me = R.me, night = rdIsNight();
   const go = (type, it, hours, extra) => Object.assign({ type, it, t: hours, tx: it ? rdItemAt(it) : me.ix }, extra || {});
+  // 接着上一件事（比如接好咖啡后端去坐着喝）
+  if (me.queue) { const q = me.queue; me.queue = null; return q; }
   // 急救
   if (me.hp < 50 && G.res.med >= 1) { G.res.med--; me.hp = Math.min(rdMaxHp(), me.hp + 30); me.rad = Math.max(0, me.rad - 15); rdThink('heal'); }
   if (me.water < 50 && G.res.water >= 1) { const it = rdFindItem((p) => p.act === 'drink' ? 1 : p.kind === 'fridge' ? 0.5 : 0); return go('drink', it, 0.2); }
@@ -954,8 +1061,10 @@ function rdChooseAct(st) {
     return go('eat', fr, 0.4);
   }
   if (me.energy < 28 || (night && me.energy < 85) || me.energy < 50 && me.mood < 15) {
-    const bed = rdFindItem((p) => p.act === 'sleep' ? p.fx.sleep : 0);
-    return go('sleep', bed, 99, { q: bed ? RD_PARTS[bed.id].fx.sleep : rdVeh().tent ? 0.7 : 0.5, heal: bed ? RD_PARTS[bed.id].fx.sleepHeal || 0 : 0, slowNeeds: bed ? RD_PARTS[bed.id].fx.slowNeeds || 0 : 0, tx: bed ? rdItemAt(bed) : me.ix });
+    // 床：睡眠舱停电了也能睡（当普通床，质量打 75 折，治疗 / 减饥渴这类附加效果没有）
+    const bed = rdFindItem((p) => p.act === 'sleep' ? p.fx.sleep * (p.pw > 0 && R.powered === false ? 0.75 : 1) : 0, true);
+    const bp = bed ? RD_PARTS[bed.id] : null, boff = bp && bp.pw > 0 && R.powered === false;
+    return go('sleep', bed, 99, { q: bp ? bp.fx.sleep * (boff ? 0.75 : 1) : rdVeh().tent && !rdVeh().pod ? 0.7 : 0.5, heal: bp && !boff ? bp.fx.sleepHeal || 0 : 0, slowNeeds: bp && !boff ? bp.fx.slowNeeds || 0 : 0, tx: bed ? rdItemAt(bed) : me.ix });
   }
   if (me.rad > 35) { const sh = rdFindItem((p) => p.fx.radClean || 0); if (sh) return go(RD_PARTS[sh.id].act === 'shower' ? 'shower' : 'heal', sh, 1.5); }
   if (me.hp < rdMaxHp() * 0.8) { const md = rdFindItem((p) => p.act === 'heal' ? p.fx.heal : 0); if (md) return go('heal', md, 2); }
@@ -965,8 +1074,10 @@ function rdChooseAct(st) {
   // 植物
   const plant = rdFindItem((p) => p.act === 'plant' ? 1 : 0);
   if (plant && Math.random() < 0.15) return go('plant', plant, 0.5);
-  // 宠物
-  if (R.pet && Math.random() < 0.12) return go('pet', null, 0.6, { tx: R.pet.ix });
+  // 宠物：给食盆添粮、陪玩（扔球 / 逗猫棒）、摸摸（js/roadpet.js）
+  { const pa = rdPetOwnerAct(go); if (pa) return pa; }
+  // 摆弄车里平时用不上的东西：检修电池、给发电机加油、翻储物箱、看照片、烤暖风、按空调……
+  { const cold = night && !rdSum('warm') && rdStats().comfort < 1.2, it = rdPickUseItem(cold); if (it && ((cold && RD_PARTS[it.id].v === 'heater') || Math.random() < 0.3)) { const m = rdUseMode(RD_PARTS[it.id]); return go('use', it, m.h, { mode: m.mode, fun: m.fun }); } }
   // 娱乐
   if (me.mood < 85 || Math.random() < 0.5) {
     const fun = rdFindItem((p) => p.fx.fun ? p.fx.fun * (0.6 + Math.random() * 0.8) : 0);
@@ -975,6 +1086,8 @@ function rdChooseAct(st) {
   // 发呆：心情差时抱膝坐着，心情好时到处走走、看窗外
   const n = Math.max(1, rdCellCount('floor'));
   if (me.mood < 30 && Math.random() < 0.6) return go('mope', null, 1, { tx: Math.random() * n });
+  const seat = R.inner.find((it) => RD_PARTS[it.id] && RD_PARTS[it.id].fx.sunSeat); // 有窗边软垫：坐在上面看风景
+  if (seat && Math.random() < 0.35) return go('window', seat, 0.8 + Math.random() * 0.8, { fun: 2, seatH: 8 });
   return Math.random() < 0.5 ? go('window', null, 0.6 + Math.random() * 0.8, { tx: Math.random() * n, fun: 1.2 }) : go('wander', null, 0.4 + Math.random() * 0.6, { tx: Math.random() * n, fun: 0.5 });
 }
 function rdActTick(a, dh, st) {
@@ -1002,6 +1115,28 @@ function rdActTick(a, dh, st) {
     if (q.left <= 0) { R.craftQ.shift(); R.inv.push(q.id); rdLog('制作完成：' + RD_PARTS[q.id].name, '#a7f070'); showBanner('制作完成', RD_PARTS[q.id].name + '（在仓库里）', 3, '#a7f070'); sfx('build'); a.done = true; }
   }
 }
+// 车里那些没有专门用途的东西（电池、储物、装饰、洗衣机、蛋白质合成设备……）：挑一件去摆弄；冷的时候优先去烤暖风机
+function rdPickUseItem(cold) {
+  const R = rdR(), list = R.inner.filter((it) => { const p = RD_PARTS[it.id]; return p && !p.act && !p.fx.fun && !p.fx.cargoFold && !p.fx.petBowl && !p.fx.petToy && !p.fx.sunSeat && p.v !== 'curtain' && p.v !== 'wallpaper' && p.v !== 'rug' && !p.fx.floorWood; });
+  if (cold) { const h = list.find((it) => RD_PARTS[it.id].v === 'heater' && R.powered !== false); if (h) return h; }
+  return list.length ? list[Math.floor(Math.random() * list.length)] : null;
+}
+// 摆弄方式：mode 动作 · h 花几小时 · fun 心情
+function rdUseMode(p) {
+  const v = p.v;
+  if (v === 'fusion' || v === 'emcreactor') return { mode: 'look', h: 0.5, fun: 3 };
+  if (v === 'generator' || v === 'diesel') return { mode: 'refuel', h: 0.4, fun: 0.5 };
+  if (p.kind === 'pow') return { mode: 'fix', h: 0.5, fun: 0.5 };
+  if (p.kind === 'store') return { mode: 'rummage', h: 0.4, fun: 0.5 };
+  if (v === 'heater') return { mode: 'warm', h: 0.8, fun: 2 };
+  if (v === 'ac' || v === 'diffuser' || v === 'lights' || v === 'chargectl') return { mode: 'press', h: 0.2, fun: 1 };
+  if (v === 'photo') return { mode: 'look', h: 0.5, fun: 5 };
+  if (v === 'washer') return { mode: 'laundry', h: 0.6, fun: 1 };
+  if (v === 'protein') return { mode: 'collect', h: 0.3, fun: 0.5 };
+  if (v === 'table') return { mode: 'rest', h: 0.8, fun: 2 };
+  if (v === 'petbed' || v === 'cattree') return { mode: 'tidy', h: 0.4, fun: 1 };
+  return { mode: 'look', h: 0.4, fun: 2 };
+}
 function rdActEnd(a) {
   const R = rdR(), me = R.me, st = R.st;
   if (a.type === 'eat' || a.type === 'cook') {
@@ -1017,30 +1152,21 @@ function rdActEnd(a) {
   } else if (a.type === 'drink') {
     if (G.res.water >= 1) { G.res.water--; me.water = Math.min(100, me.water + 35); rdThink('drink'); }
   } else if (a.type === 'coffee') {
-    me.energy = Math.min(100, me.energy + 15); me.mood = Math.min(100, me.mood + 4); rdThink('yum');
+    me.energy = Math.min(100, me.energy + 15); me.mood = Math.min(100, me.mood + 4); rdThink('yum'); rdPetActEnd(a); // 接好咖啡，接着端去坐着喝（js/roadpet.js 的 rdSipAct）
+  } else if (a.type === 'sip') {
+    me.mood = Math.min(100, me.mood + 3);
   } else if (a.type === 'pet') {
-    me.mood = Math.min(100, me.mood + 6); rdThink('love');
+    me.mood = Math.min(100, me.mood + 6); rdThink('love'); rdPetActEnd(a);
   } else if (a.type === 'fun') {
     if (a.fun >= 8) rdThink('happy');
+  } else if (a.type === 'feed' || a.type === 'playpet') {
+    rdPetActEnd(a);
+  } else if (a.type === 'use') {
+    const v = a.it && RD_PARTS[a.it.id] ? RD_PARTS[a.it.id].v : '';
+    if (v === 'photo') rdThink('love'); else if (a.mode === 'warm' || a.mode === 'look' && a.fun >= 3) rdThink('happy');
   }
 }
-function rdPetTick(dt) {
-  const R = rdR(), pet = R.pet, me = R.me;
-  if (!pet) return;
-  pet.t = (pet.t || 0) - dt;
-  if (pet.t <= 0) {
-    pet.t = 2 + Math.random() * 4;
-    const n = Math.max(1, rdCellCount('floor'));
-    const bed = R.inner.find((it) => RD_PARTS[it.id].fx.pet);
-    if (rdIsNight() && bed) pet.tx = rdItemAt(bed);
-    else if (Math.random() < 0.5 && me.loc === 'in') pet.tx = me.ix + (Math.random() - 0.5);
-    else pet.tx = Math.random() * n;
-    pet.sleep = rdIsNight() && !!bed;
-  }
-  const d = (pet.tx || 0) - pet.ix;
-  pet.walking = Math.abs(d) > 0.05;
-  if (pet.walking) { pet.face = d > 0 ? -1 : 1; pet.ix += Math.sign(d) * Math.min(Math.abs(d), 1.6 * dt); }
-}
+// 宠物的生活在 js/roadpet.js（rdPetTick）
 
 // ---------- 研究 / 制作 ----------
 // 能用来做当前研究的电脑（等级够、有电），没有返回 null
@@ -1085,10 +1211,10 @@ function rdFinishResearch() {
   showBanner('研究完成：' + r.name, '可以在「制作」里制作新部件了', 4, '#73eff7');
   sfx('win');
 }
-// 用废料做弹药（需要工作台，马上做好）
+// 用零件做弹药（需要工作台，马上做好）
 function rdMakeAmmo() {
   if (!rdStats().craft) return;
-  if (G.res.scrap < 4) { showBanner('废料不够', '做 10 发弹药需要 4 废料', 2, '#ef7d57'); return; }
+  if (G.res.scrap < 4) { showBanner('零件不够', '做 10 发弹药需要 4 零件', 2, '#ef7d57'); return; }
   const n = rdGain('ammo', 10);
   if (n <= 0) { showBanner('货舱满了', '', 2, '#ef7d57'); return; }
   G.res.scrap -= Math.ceil(4 * n / 10);
@@ -1101,7 +1227,7 @@ function rdQueueCraft(id) {
   rdLog('开始制作：' + p.name + '（需要在工作台干 ' + (1 + p.tier * 1.5) + ' 小时）', '#a7f070');
   return true;
 }
-// 拆解：变成废料，工作台等级够的话还能学会图纸
+// 拆解：变成零件，工作台等级够的话还能学会图纸
 function rdDismantle(idx) {
   const R = rdR(), id = R.inv[idx], p = RD_PARTS[id];
   if (!p) return;
@@ -1111,8 +1237,8 @@ function rdDismantle(idx) {
   let learn = '';
   if (!R.bps[id] && st.craft >= p.tier) { R.bps[id] = true; learn = '，学会了它的图纸'; }
   if (p.alien) rdGain('alien', 2, true);
-  rdLog('拆解 ' + p.name + '：废料 +' + n + (p.alien ? '，外星晶体 +2' : '') + learn, '#94b0c2');
-  showBanner('拆解 ' + p.name, '废料 +' + n + (p.alien ? '，外星晶体 +2' : ''), 2, '#94b0c2');
+  rdLog('拆解 ' + p.name + '：零件 +' + n + (p.alien ? '，外星晶体 +2' : '') + learn, '#94b0c2');
+  showBanner('拆解 ' + p.name, '零件 +' + n + (p.alien ? '，外星晶体 +2' : ''), 2, '#94b0c2');
   sfx('coin');
 }
 
@@ -1121,6 +1247,7 @@ function rdCanModExt() { const R = rdR(); return R.speedNow < 1 && !R.driving; }
 function rdInstall(invIdx, slotKey, mountIdx) {
   const R = rdR(), id = R.inv[invIdx], p = RD_PARTS[id];
   if (!p) return false;
+  if (p.fx.cargoFold) return rdUseFold(id); // 货舱折叠模块：用掉，不占车内格子
   if (p.slot === 'in') {
     const c = rdFreeCell(p);
     if (c < 0) { showBanner('车内放不下', p.name + ' 需要' + (p.layer === 'wall' ? '墙面' : '地面') + ' ' + (p.w || 1) + ' 格空位', 3, '#ef7d57'); return false; }
@@ -1159,13 +1286,13 @@ function rdRepair() {
   const R = rdR(), st = rdStats(), need = Math.ceil(st.hp - R.hpV);
   if (need <= 0) return;
   const cost = Math.min(Math.floor(G.res.scrap), Math.ceil(need / 5));
-  if (cost <= 0) { showBanner('废料不够', '修车需要废料（车瘫痪时可以“应急抢修”）', 2, '#ef7d57'); return; }
+  if (cost <= 0) { showBanner('零件不够', '修车需要零件（车瘫痪时可以“应急抢修”）', 2, '#ef7d57'); return; }
   G.res.scrap -= cost; R.hpV = Math.min(st.hp, R.hpV + cost * 5);
-  rdLog('用 ' + cost + ' 废料修好了车（耐久 ' + Math.round(R.hpV) + '/' + st.hp + '）', '#a7f070');
+  rdLog('用 ' + cost + ' 零件修好了车（耐久 ' + Math.round(R.hpV) + '/' + st.hp + '）', '#a7f070');
   sfx('build');
 }
 
-// 应急抢修：车瘫痪了又没废料时，花 8 小时用手头的东西凑合修到 30%
+// 应急抢修：车瘫痪了又没零件时，花 8 小时用手头的东西凑合修到 30%
 function rdEmergencyRepair() {
   const R = rdR(), me = R.me, st = rdStats();
   if (!R.broken || R.driving) return;
@@ -1175,7 +1302,7 @@ function rdEmergencyRepair() {
   rdLog('拆东墙补西墙，花了 8 小时把车凑合修好了（耐久 ' + Math.round(R.hpV) + '/' + st.hp + '）', '#ffcd75');
   showBanner('应急抢修完成', '车能开了，但只有三成耐久', 3, '#ffcd75');
 }
-// 徒步搜寻：没油或车坏了又没废料时的兜底办法（花 6 小时，可能遇袭）
+// 徒步搜寻：没油或车坏了又没零件时的兜底办法（花 6 小时，可能遇袭）
 function rdHike() {
   const R = rdR(), me = R.me;
   if (R.driving || me.loc === 'out' || me.loc === 'site') return;
@@ -1184,12 +1311,16 @@ function rdHike() {
   if (rdStats().powKm > 0) rdGain('power', 15 + Math.floor(Math.random() * 15)); // 电动车：找个地方充电
   let hurt = '';
   if (Math.random() < 0.35) { const d = 10 + Math.floor(Math.random() * 15); rdHurtMe(d, '徒步时被怪物袭击'); hurt = '，路上被怪物抓伤（生命 -' + d + '）'; }
-  rdLog('徒步在附近搜寻了 6 小时：废料 +' + sc + '，燃油 +' + fu + hurt, '#ffcd75');
-  showBanner('徒步搜寻', '废料 +' + sc + '　燃油 +' + fu, 3, '#ffcd75');
+  rdLog('徒步在附近搜寻了 6 小时：零件 +' + sc + '，燃油 +' + fu + hurt, '#ffcd75');
+  showBanner('徒步搜寻', '零件 +' + sc + '　燃油 +' + fu, 3, '#ffcd75');
 }
 
 // ---------- 随机事件 ----------
-function rdDialog(title, text, options) { G.dialog = { title, text, options }; G.state = 'dialog'; }
+function rdDialog(title, text, options) {
+  const R = G.road;
+  if (R && R.afk && !R.dun) { const o = rdAfkPick(options); rdLog('【挂机】' + title + '：' + (o ? '选了「' + o.label + '」' : '没理会'), '#94b0c2'); if (o && o.action) o.action(); G.state = 'play'; return; }
+  G.dialog = { title, text, options }; G.state = 'dialog';
+}
 function rdRandomEvent() {
   const R = rdR(), st = rdStats();
   const evs = [
@@ -1200,8 +1331,8 @@ function rdRandomEvent() {
   let tot = evs.reduce((s, e) => s + e[1], 0), r = Math.random() * tot, ev = evs[0][0];
   for (const e of evs) { r -= e[1]; if (r <= 0) { ev = e[0]; break; } }
   if (ev === 'trader') {
-    rdDialog('流动商人', '一辆挂满杂货的三轮车靠了过来。“朋友，要不要看看货？只收废料。”', [
-      { label: '看看货', action: () => rdOpenTrade(null) }, { label: '不用了，谢谢', action: () => {} }]);
+    rdDialog('流动商人', '一辆挂满杂货的三轮车靠了过来。“朋友，要不要看看货？只收零件。”', [
+      { label: '看看货', action: () => rdOpenTrade(null) }, { label: '不用了，谢谢', afk: true, action: () => {} }]);
   } else if (ev === 'drop') {
     const ks = ['food', 'water', 'med', 'ammo', 'fuel'], k = ks[Math.floor(Math.random() * ks.length)], n = rdGain(k, 5 + Math.floor(Math.random() * 10));
     rdLog('路边发现一个坠落的补给箱：' + RD_RES[k].name + ' +' + n, '#a7f070');
@@ -1216,7 +1347,7 @@ function rdRandomEvent() {
     showBanner(w.name, w.d, 4, '#ef7d57');
   } else if (ev === 'wreck') {
     rdDialog('路边的废车', '一辆翻倒的车横在路边，看起来还没被人拆过。', [
-      { label: '拆点零件（花 2 小时）', action: () => { R.t += 2; const p = rdRollPart({ slots: ['tires', 'engine', 'armor', 'tank', 'util', 'ram', 'chassis'], partChance: 1 }, null); let s = rdGain('scrap', 6 + Math.floor(Math.random() * 10)); if (p) R.inv.push(p.id); rdLog('拆废车：废料 +' + s + (p ? '，' + p.name : ''), '#a7f070'); if (p) rdFound(p); } },
+      { label: '拆点改装件（花 2 小时）', afk: true, action: () => { R.t += 2; const p = rdRollPart({ slots: ['tires', 'engine', 'armor', 'tank', 'util', 'ram', 'chassis'], partChance: 1 }, null); let s = rdGain('scrap', 6 + Math.floor(Math.random() * 10)); if (p) R.inv.push(p.id); rdLog('拆废车：零件 +' + s + (p ? '，' + p.name : ''), '#a7f070'); if (p) rdFound(p); } },
       { label: '抽点油（花 1 小时）', action: () => { R.t += 1; const n = rdGain('fuel', 4 + Math.floor(Math.random() * 10)); rdLog('从废车里抽了 ' + n + ' 升油', '#a7f070'); } },
       { label: '不管它', action: () => {} }]);
   } else if (ev === 'radio') {
@@ -1226,18 +1357,18 @@ function rdRandomEvent() {
     rdLog('收音机：' + l, '#c8d6e5');
   } else if (ev === 'distress') {
     rdDialog('求救信号', '路边有人挥着红布在求救：“我的车坏了，求你分我一点水和食物吧！”', [
-      { label: '给他 3 食物 + 3 水', disabled: G.res.food < 3 || G.res.water < 3, action: () => {
+      { label: '给他 3 食物 + 3 水', afk: G.res.food >= 10 && G.res.water >= 10, disabled: G.res.food < 3 || G.res.water < 3, action: () => {
         G.res.food -= 3; G.res.water -= 3; R.me.mood = Math.min(100, R.me.mood + 15);
         if (Math.random() < 0.6) { const p = rdRollPart({ slots: ['weapon', 'hand', 'roof', 'in'], partChance: 1 }, null); if (p) { R.inv.push(p.id); rdFound(p); } rdLog('他千恩万谢，送了你一件东西：' + (p ? p.name : '一张旧地图'), '#a7f070'); }
         else rdLog('他千恩万谢地走了。帮助别人让你心情好了很多。', '#a7f070');
       } },
-      { label: '小心有诈，开走', action: () => { R.me.mood = Math.max(0, R.me.mood - 5); } },
+      { label: '小心有诈，开走', afk: true, action: () => { R.me.mood = Math.max(0, R.me.mood - 5); } },
       { label: '下车看看', action: () => { if (Math.random() < 0.5) { rdSpawnGroup(rdVehX() + 60, true); rdLog('是个陷阱！埋伏的怪物冲了出来', '#ef7d57'); } else { const n = rdGain('ammo', 10); rdLog('他已经不行了……你收下了他的遗物：弹药 +' + n, '#94b0c2'); } } }]);
   } else if (ev === 'pet') {
     rdOfferPet();
   } else if (ev === 'alien') {
     rdDialog('外星信号', '车载收音机突然收到一段奇怪的脉冲信号，源头就在前方不远处。', [
-      { label: '去看看', action: () => { R.sites.push({ type: 'alien', km: R.km + 3, seed: Math.floor(Math.random() * 1e6), searched: false, danger: 0.6 }); rdLog('前方 3 公里处出现了外星坠落舱', '#73eff7'); } },
+      { label: '去看看', afk: true, action: () => { R.sites.push({ type: 'alien', km: R.km + 3, seed: Math.floor(Math.random() * 1e6), searched: false, danger: 0.6 }); rdLog('前方 3 公里处出现了外星坠落舱', '#73eff7'); } },
       { label: '太危险了', action: () => {} }]);
   }
 }
@@ -1246,7 +1377,7 @@ function rdOfferPet() {
   const cat = Math.random() < 0.4;
   const hasBed = R.inner.some((it) => RD_PARTS[it.id].fx.pet);
   rdDialog(cat ? '流浪猫' : '流浪狗', (cat ? '一只瘦巴巴的小猫' : '一只脏兮兮的小狗') + '一直跟在你后面，可怜巴巴地看着你。' + (hasBed ? '' : '（车里还没有宠物窝，它可能待不住）'), [
-    { label: '收留它（' + (cat ? '喵' : '汪') + '！）', action: () => { R.pet = { type: cat ? 'cat' : 'dog', ix: 1, name: cat ? '小橘' : '旺财' }; rdLog('收留了' + R.pet.name + '。旅途不再孤单了。', '#ffcd75'); R.me.mood = Math.min(100, R.me.mood + 20); showBanner('新伙伴：' + R.pet.name, '有宠物在，心情会一直变好', 4, '#ffcd75'); } },
+    { label: '收留它（' + (cat ? '喵' : '汪') + '！）', afk: true, action: () => { R.pet = { type: cat ? 'cat' : 'dog', ix: 0, name: cat ? '小橘' : '旺财', hunger: 60 }; rdPetGreet(); if (R.me.loc === 'in') R.me.act = { type: 'pet', it: null, t: 0.6, tx: R.me.ix, fun: 6 }; /* 从车门跑进来，主人蹲下迎接 */ rdLog('收留了' + R.pet.name + '。旅途不再孤单了。', '#ffcd75'); R.me.mood = Math.min(100, R.me.mood + 20); showBanner('新伙伴：' + R.pet.name, '有宠物在，心情会一直变好', 4, '#ffcd75'); } },
     { label: '喂它点吃的就走', disabled: G.res.food < 1, action: () => { G.res.food--; R.me.mood = Math.min(100, R.me.mood + 5); } },
     { label: '狠心离开', action: () => { R.me.mood = Math.max(0, R.me.mood - 8); } }]);
 }
@@ -1294,7 +1425,8 @@ function rdLoadData(d) {
   if (R.chat) R.chat._real = 0;
   if (R.me.loc === 'out' || R.me.loc === 'site') { R.me.loc = 'in'; R.me.ix = 0.6; }
   R.me.act = null;
-  R.powered = undefined;
+  R.powered = undefined; R.park = null;
+  for (const id of RD_START_BPS2) R.bps[id] = true; // 旧存档补上后来加的默认图纸
   rdFixLayout();
   rdFxDirty();
 }

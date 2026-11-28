@@ -206,7 +206,7 @@ function rcWorldEvent() {
     const v = rcVipById('v_huang');
     const n = 15 + Math.floor(Math.random() * 26);
     rcQueue(v, null, { n }, 0, { special: true, act: { type: 'scam', label: '付款', n } });
-    if (Math.random() < 0.6) rcQueue(rcPickSpeaker((p) => p.arch === 'gou' || p.arch === 'vet'), null, {}, 4, { text: rcR(['别信他，黄金眼是骗子', '又来了，上次骗了我二十个废料', '先付款的都是骗子，新人注意', '黄金眼，你还敢出来？']) });
+    if (Math.random() < 0.6) rcQueue(rcPickSpeaker((p) => p.arch === 'gou' || p.arch === 'vet'), null, {}, 4, { text: rcR(['别信他，黄金眼是骗子', '又来了，上次骗了我二十个零件', '先付款的都是骗子，新人注意', '黄金眼，你还敢出来？']) });
   } else if (ev === 'extort') {
     const n = 20 + Math.floor(R.km / 25) + Math.floor(Math.random() * 15);
     C.extort = true;
@@ -338,29 +338,29 @@ function rcAct(m) {
     }
     G.state = 'play';
   } else if (a.type === 'scam') {
-    rdDialog(m.n, m.n + '说只要先付 ' + a.n + ' 废料，马上通过系统传送发货。', [
-      { label: '付款 ' + a.n + ' 废料', disabled: G.res.scrap < a.n, action: () => { a.used = true; G.res.scrap -= a.n; rcScammed(m, a.n); } },
+    rdDialog(m.n, m.n + '说只要先付 ' + a.n + ' 零件，马上通过系统传送发货。', [
+      { label: '付款 ' + a.n + ' 零件', disabled: G.res.scrap < a.n, action: () => { a.used = true; G.res.scrap -= a.n; rcScammed(m, a.n); } },
       { label: '不信，算了', action: () => { a.used = true; } }]);
   } else if (a.type === 'extort') rcExtortDialog(m);
 }
 function rcScammed(m, n) {
   const C = rcC(), v = rcVipById('v_huang');
-  rdLog('付给' + m.n + ' ' + n + ' 废料……', '#ef7d57');
+  rdLog('付给' + m.n + ' ' + n + ' 零件……', '#ef7d57');
   rcQueue(v, null, {}, 1, { text: '收到！马上发货～亲，稍等哦' });
   rcSys('【系统】「' + v.name + '」已将你拉黑。', 9);
   for (let i = 0; i < 3; i++) { const p = rcPickSpeaker(); if (p) rcQueue(p, null, {}, 11 + i * 2.5, { text: rcR(v.lines.exposed) }); }
   rcQueue(rcVipById('v_qian'), null, {}, 15, { text: '{me}，被黄金眼骗了吧？下次来多多杂货铺，童叟无欺'.replace('{me}', C.me) });
-  rdLog('（黄金眼收了废料就把你拉黑了。频道里“先付款”的多半是骗子）', '#94b0c2');
+  rdLog('（黄金眼收了零件就把你拉黑了。频道里“先付款”的多半是骗子）', '#94b0c2');
 }
 // 铁颅帮勒索
 function rcExtortDialog(m) {
   const C = rcC(), R = rdR(), a = m.act;
   if (!a || a.used) return;
   const st = rdStats();
-  rdDialog('铁颅帮的勒索', '雷霸天在频道里点了你的名：交 ' + a.n + ' 废料保护费。\n不交的话，铁颅帮的车队会找上门来。', [
-    { label: '交 ' + a.n + ' 废料', disabled: G.res.scrap < a.n, action: () => {
+  rdDialog('铁颅帮的勒索', '雷霸天在频道里点了你的名：交 ' + a.n + ' 零件保护费。\n不交的话，铁颅帮的车队会找上门来。', [
+    { label: '交 ' + a.n + ' 零件', afk: G.res.scrap >= a.n * 3, disabled: G.res.scrap < a.n, action: () => {
       a.used = true; G.res.scrap -= a.n; C.extort = false; C.heat = 0;
-      rdLog('交了 ' + a.n + ' 废料保护费给铁颅帮', '#94b0c2');
+      rdLog('交了 ' + a.n + ' 零件保护费给铁颅帮', '#94b0c2');
       rcQueue(rcVipById('v_he'), null, {}, 1, { text: C.me + '，理性的选择。已登记，本周你是安全的' });
       rcQueue(rcVipById('v_lei'), null, {}, 3, { text: '识相。' + C.me + '，铁颅帮罩你' });
       for (let i = 0; i < 2; i++) { const p = rcPickSpeaker(); if (p) rcQueue(p, 'raid', { who: C.me }, 5 + i * 2); }
@@ -372,7 +372,7 @@ function rcExtortDialog(m) {
       const win = Math.random() < Math.min(0.85, 0.35 + power / 120 + R.km / 6000);
       if (win) {
         const n = rdGain('scrap', 25 + Math.floor(Math.random() * 30));
-        rdLog('跟铁颅帮的人火拼，打赢了！缴获废料 +' + n, '#a7f070'); showBanner('火拼胜利！', '铁颅帮的车队被打退了，废料 +' + n, 4, '#a7f070'); sfx('win');
+        rdLog('跟铁颅帮的人火拼，打赢了！缴获零件 +' + n, '#a7f070'); showBanner('火拼胜利！', '铁颅帮的车队被打退了，零件 +' + n, 4, '#a7f070'); sfx('win');
         rcQueue(rcVipById('v_pao'), null, {}, 1, { text: '……大炮输了？不可能！' });
         rcQueue(rcVipById('v_lei'), null, {}, 3, { text: C.me + '，你有种。这笔账，铁颅帮记下了' });
         rcQueue(rcVipById('v_zhao'), null, {}, 6, { text: '好样的' + C.me + '！铁颅帮也不是打不过的！' });
@@ -380,7 +380,7 @@ function rcExtortDialog(m) {
         C.heat = (C.heat || 0) + 1;
       } else {
         rdHurtVehicle(st.hp * 0.3, true); G.res.scrap = Math.max(0, G.res.scrap - 20);
-        rdLog('火拼失败，车被打得千疮百孔，还被抢走了 20 废料', '#ef7d57'); showBanner('火拼失败', '车辆受到重创', 4, '#ef7d57'); sfx('bad');
+        rdLog('火拼失败，车被打得千疮百孔，还被抢走了 20 零件', '#ef7d57'); showBanner('火拼失败', '车辆受到重创', 4, '#ef7d57'); sfx('bad');
         rcQueue(rcVipById('v_lei'), null, {}, 1, { text: '不自量力。' + C.me + '，下次记得交钱' });
         rcQueue(rcVipById('v_lin'), null, {}, 5, { text: C.me + '，你受伤了吗？有需要跟我说！' });
       }

@@ -224,6 +224,8 @@ const RDC_CARS = {
   icecream: { build: () => rdcBuildIcecream(), wheels: [-24, -102], r: 11, dustX: -115, driver: [-30, -67], glint: [-34, -70], len: 142, bob: [0, 0, -1, -1], roof: -27,
     bulbs: { x0: -134, x1: -46, y: -84 }, horn: [-50, -94] },
   ebike: { build: () => rdcBuildBike(), wheels: [-12, -52], r: 9, dustX: -62, len: 70, bob: [0, -1, -1, 0], bike: true, rider: true, flag: [-68, -64] },
+  // 电动三轮车（电单车用了货舱折叠模块）：电单车后面挂一个银白科技货舱，第三个轮子在货舱下面
+  trike: { build: () => rdcBuildTrike(), wheels: [-12, -52, -98], r: 9, dustX: -112, len: 118, bob: [0, -1, -1, 0], bike: true, rider: true, flag: [-116, -66] },
 };
 function rdcBuildCourier() {
   const P = RDC_PAL, B = rdcPaper(176, 124, 156, 112);
@@ -914,11 +916,32 @@ function rdcBlob(g, cx, cy, r, col) {
   for (let dy = -r; dy <= r; dy++) { const hw = Math.round(Math.sqrt(r * r - dy * dy) * 1.25); if (hw > 0) g.fillRect(cx - hw, cy + dy, hw * 2, 1); }
 }
 // ---------- 画一辆精细车（目前只有快递车）；x, y 是世界像素的车头/地面；返回车身颠簸（精细像素） ----------
+function rdcBuildTrike() {
+  const bike = rdcBuildBike(), P = RDC_PAL, B = rdcPaper(74, 72, 124, 64);
+  const S = ['#f6f8fa', '#dfe6ec', '#c2ccd6', '#9aa8b6', '#6e7e8e'];
+  rdcBox(B, -66, -26, 18, 3, [P.metal[1], P.metal[2], P.metal[3]], 2); // 拖杆接到电单车后货架
+  for (let y = -60; y <= -20; y++) for (let x = -120; x <= -64; x++) { // 圆角舱体
+    const rx = x < -112 ? -112 - x : x > -72 ? x + 72 : 0, ry = y < -52 ? -52 - y : 0;
+    if (rx * rx + ry * ry > 64) continue;
+    rdcPix(B, x, y, rdcRampAt(S, 0.05 + (y + 60) / 40 * 0.6, x, y), 1);
+  }
+  for (let x = -118; x <= -66; x++) { rdcPix(B, x, -40, '#73eff7', 4); rdcPix(B, x, -39, '#2a9ab0', 4); } // 青色灯带
+  rdcRect(B, -92, -56, 1, 34, S[4], 6); rdcRect(B, -91, -56, 1, 34, S[0], 1); // 舱门缝
+  rdgBall(B, -80, -50, 4, ['#c8f4ff', '#41a6f6', '#2a5ab0'], 3); // 小圆窗
+  rdcRect(B, -108, -30, 8, 2, '#41a6f6', 4); // 指示灯
+  rdcBox(B, -118, -22, 54, 4, [P.dark[0], P.dark[1], P.dark[2]], 6); // 底盘
+  for (let a = Math.PI; a <= 2 * Math.PI; a += 0.03) for (let k = 0; k < 2; k++) rdcPix(B, Math.round(-98 + Math.cos(a) * (12 + k)), Math.round(-9 + Math.sin(a) * (12 + k)), S[2 + k], 2); // 挡泥板
+  rdcOutline(B);
+  const pod = rdcToCanvas(B), ox = 124, oy = 64, w = ox + (bike.cv.width - bike.ox), h = 72;
+  const cv = createCanvas(w, h), wcv = createCanvas(w, h);
+  for (const [dst, a, b] of [[cv, pod.cv, bike.cv], [wcv, pod.white, bike.white]]) { const g = dst.getContext('2d'); g.drawImage(a, 0, oy - pod.oy); g.drawImage(b, ox - bike.ox, oy - bike.oy); }
+  return { cv, white: wcv, ox, oy };
+}
 function rdcHasCar(veh) { return !!RDC_CARS[veh]; }
 function rdcCarRoof(veh) { const cf = RDC_CARS[veh]; return cf && cf.roof; }
 function rdcDrawCar(g, x, y, o) {
   const R = G.road, Q = RD_Q;
-  const key = R.veh, cf = RDC_CARS[key];
+  const key = rdVeh().carKey || R.veh, cf = RDC_CARS[key]; // 电单车进化后用三轮车的画法
   if (!RDC_CACHE[key]) RDC_CACHE[key] = cf.build();
   const car = RDC_CACHE[key];
   // 10 帧/秒的动画帧
