@@ -210,21 +210,79 @@ function genInterior(s, opts) {
     }
     return true;
   };
-  const nearWall = (x, y, w, h) => {
-    for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) {
-      if (t[I(xx - 1, yy)] === IT.WALL || t[I(xx + 1, yy)] === IT.WALL || t[I(xx, yy - 1)] === IT.WALL || t[I(xx, yy + 1)] === IT.WALL) return true;
+  // ---- 摆家具的规则（3/4 俯视角：家具画的是正面，所以「背靠北墙」最自然，其次靠东西两侧，最后才靠南墙） ----
+  const wallRow = (x, y, w) => { for (let k = 0; k < w; k++) if (t[I(x + k, y)] !== IT.WALL) return false; return true; };
+  const wallCol = (x, y, h) => { for (let k = 0; k < h; k++) if (t[I(x, y + k)] !== IT.WALL) return false; return true; };
+  const shuf = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); const q = a[i]; a[i] = a[j]; a[j] = q; } return a; };
+  const wallSpots = (r, w, h, corner) => {
+    const N = [], S = [], B = [];
+    for (let y = r.y0; y <= r.y1 - h + 1; y++) for (let x = r.x0; x <= r.x1 - w + 1; x++) {
+      const n = y === r.y0 && wallRow(x, y - 1, w), s = y + h - 1 === r.y1 && wallRow(x, y + h, w);
+      const sd = (x === r.x0 && wallCol(x - 1, y, h)) || (x + w - 1 === r.x1 && wallCol(x + w, y, h));
+      if (corner && !((n || s) && sd)) continue;
+      if (n) N.push([x, y]); else if (sd) S.push([x, y]); else if (s) B.push([x, y]);
     }
-    return false;
+    return shuf(N).concat(shuf(S), shuf(B));
   };
+  const tryAt = (k, list, w, h) => { for (const [x, y] of list) if (put(k, x, y, w, h)) return [x, y]; return null; };
+  const inRoom = (r, x, y, w, h) => x >= r.x0 && y >= r.y0 && x + w - 1 <= r.x1 && y + h - 1 <= r.y1;
   const place = (r, k, w, h, mode) => {
-    for (let tries = 0; tries < 40; tries++) {
-      const x = ri(r.x0, r.x1 - w + 1), y = ri(r.y0, r.y1 - h + 1);
-      if (x < r.x0 || y < r.y0) return false;
-      if (mode === 'wall' && !nearWall(x, y, w, h)) continue;
-      if (mode === 'free' && w * h > 1 && (x === r.x0 || y === r.y0 || x + w - 1 === r.x1 || y + h - 1 === r.y1) && tries < 25) continue;
-      if (put(k, x, y, w, h)) return true;
+    if (mode === 'wall') return tryAt(k, wallSpots(r, w, h), w, h);
+    if (mode === 'corner') return tryAt(k, wallSpots(r, w, h, true), w, h) || tryAt(k, wallSpots(r, w, h), w, h);
+    // free：离墙至少一格，越靠房间中间越优先
+    const cx = (r.x0 + r.x1 - w + 1) / 2, cy = (r.y0 + r.y1 - h + 1) / 2, list = [];
+    for (let y = r.y0 + 1; y <= r.y1 - h; y++) for (let x = r.x0 + 1; x <= r.x1 - w; x++) list.push([x, y, Math.hypot(x - cx, y - cy) + R() * 1.5]);
+    list.sort((a, b) => a[2] - b[2]);
+    // 先找四周留出一格过道的位置（机器、长桌不会挤成一团），找不到再放宽
+    const roomy = list.filter(([x, y]) => { for (let yy = y - 1; yy <= y + h; yy++) for (let xx = x - 1; xx <= x + w; xx++) if (occ[I(xx, yy)]) return false; return true; });
+    return tryAt(k, roomy, w, h) || tryAt(k, list, w, h) || tryAt(k, wallSpots(r, w, h), w, h);
+  };
+  // 一排紧挨着靠北墙（厨房台面、卫生间洁具），从左边或右边的墙角开始
+  const run = (r, ks) => {
+    const xs = []; for (let x = r.x0; x <= r.x1; x++) xs.push(x);
+    if (R() < 0.5) xs.reverse();
+    let i = 0;
+    for (const x of xs) { if (i >= ks.length) break; if (wallRow(x, r.y0 - 1, 1) && put(ks[i], x, r.y0, 1, 1)) i++; }
+    for (; i < ks.length; i++) place(r, ks[i], 1, 1, 'wall');
+  };
+  // 桌子 + 围着它的椅子
+  const dining = (r, tk, tw, n) => {
+    const p = place(r, tk, tw, 1, 'free');
+    if (!p) return;
+    const [x, y] = p; let c = 0;
+    for (const [a, b] of [[x - 1, y], [x + tw, y], [x, y + 1], [x + tw - 1, y - 1]]) if (c < n && inRoom(r, a, b, 1, 1) && put('chair', a, b, 1, 1)) c++;
+  };
+  // 客厅：电视背靠北墙，前面铺地毯，地毯南边是面朝电视（背对我们）的沙发
+  const living = (r) => {
+    if (r.x1 - r.x0 >= 3 && r.y1 - r.y0 >= 4) {
+      for (const tx of shuf(Array.from({ length: r.x1 - r.x0 - 1 }, (_, k) => r.x0 + 1 + k))) {
+        if (!wallRow(tx, r.y0 - 1, 1) || !put('tv', tx, r.y0, 1, 1)) continue;
+        put('rug', tx - 1, r.y0 + 1, 3, 2);
+        let ok = false;
+        for (const dy of [3, 4]) for (const sx of shuf([tx - 1, tx])) if (!ok && sx + 1 <= r.x1 && r.y0 + dy <= r.y1 && put('sofab', sx, r.y0 + dy, 2, 1)) ok = true;
+        if (!ok) place(r, 'sofa', 2, 1, 'wall');
+        return;
+      }
     }
-    return false;
+    put('rug', r.x0 + 1, r.y0 + 1, Math.min(3, r.x1 - r.x0 - 1), 2);
+    place(r, 'sofa', 2, 1, 'wall'); place(r, 'tv', 1, 1, 'wall');
+  };
+  // 卧室：床头靠北墙，床头柜贴着床，地毯铺在床边
+  const bedroom = (r) => {
+    const p = place(r, 'bed', 1, 2, 'wall');
+    if (p) {
+      const [x, y] = p, side = R() < 0.5 ? -1 : 1;
+      if (!(inRoom(r, x + side, y, 1, 1) && put('drawer', x + side, y, 1, 1)) && !(inRoom(r, x - side, y, 1, 1) && put('drawer', x - side, y, 1, 1))) place(r, 'drawer', 1, 1, 'wall');
+      const rx = side > 0 ? x - 2 : x + 1; // 地毯铺在床的另一边（床头柜那边不铺）
+      if (inRoom(r, rx, y + 1, 2, 1)) put('rug', rx, y + 1, 2, 1);
+    } else place(r, 'drawer', 1, 1, 'wall');
+    place(r, 'wardrobe', 1, 1, 'wall'); place(r, 'plant', 1, 1, 'corner');
+  };
+  // 办公桌：一排排对齐
+  const desks = (r, n) => {
+    let c = 0;
+    for (let y = r.y0 + 1; y <= r.y1 - 1 && c < n; y += 3) for (let x = r.x0 + 1; x + 1 <= r.x1 - 1 && c < n; x += 3) if (put('desk', x, y, 2, 1)) c++;
+    for (; c < n; c++) place(r, 'desk', 2, 1, 'free');
   };
   // 一排排的货架 / 课桌
   const rows = (r, k, len, rowGap, startY) => {
@@ -232,24 +290,42 @@ function genInterior(s, opts) {
       for (let x = r.x0 + 1; x + len - 1 <= r.x1 - 1; x += len + 1) put(k, x, y, len, 1);
     }
   };
+  // 收银台：放在靠近大门的地方
+  const nearDoor = (r, k, w) => {
+    const list = [];
+    for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1 - w + 1; x++) list.push([x, y, Math.abs(x + w / 2 - door.x - 0.5) * 0.6 + (r.y1 - y) + (y === r.y1 ? 3 : 0) + R()]);
+    list.sort((a, b) => a[2] - b[2]);
+    return tryAt(k, list, w, 1);
+  };
 
   for (const r of rooms) {
-    if (r.corridor) { place(r, 'plant', 1, 1, 'wall'); continue; }
+    if (r.corridor) { place(r, 'plant', 1, 1, 'corner'); continue; }
     if (r.kind === 'market' || r.kind === 'store' || r.kind === 'kiosk') {
       rows(r, 'shelf', r.kind === 'market' ? 3 : 2, 3, r.y0 + 1);
-      place(r, 'register', 2, 1, 'free'); place(r, 'fridge', 1, 1, 'wall'); place(r, 'fridge', 1, 1, 'wall');
-      if (r.kind === 'market') { place(r, 'register', 2, 1, 'free'); place(r, 'freezer', 1, 1, 'wall'); }
+      nearDoor(r, 'register', 2); place(r, 'fridge', 1, 1, 'wall'); place(r, 'fridge', 1, 1, 'wall');
+      if (r.kind === 'market') { nearDoor(r, 'register', 2); place(r, 'freezer', 1, 1, 'wall'); }
       continue;
     }
-    if (r.kind === 'warehouse') { rows(r, 'rack', 4, 3, r.y0 + 1); place(r, 'crate', 1, 1, 'wall'); place(r, 'crate', 1, 1, 'wall'); place(r, 'pallet', 1, 1, 'free'); continue; }
+    if (r.kind === 'warehouse') { rows(r, 'rack', 4, 3, r.y0 + 1); place(r, 'crate', 1, 1, 'corner'); place(r, 'crate', 1, 1, 'wall'); place(r, 'pallet', 1, 1, 'free'); continue; }
     if (r.kind === 'classroom') {
-      place(r, 'board', 2, 1, 'wall');
+      const bx = Math.floor((r.x0 + r.x1) / 2) - 1; // 黑板挂在北墙正中
+      if (!(wallRow(bx, r.y0 - 1, 2) && put('board', bx, r.y0, 2, 1))) place(r, 'board', 2, 1, 'wall');
       for (let y = r.y0 + 2; y <= r.y1 - 1; y += 2) for (let x = r.x0 + 1; x <= r.x1 - 1; x += 2) put('schooldesk', x, y, 1, 1);
       continue;
     }
+    switch (r.kind) {
+      case 'living': living(r); place(r, 'bookshelf', 1, 1, 'wall'); place(r, 'drawer', 1, 1, 'wall'); place(r, 'plant', 1, 1, 'corner'); continue;
+      case 'kitchen': run(r, R() < 0.5 ? ['counter', 'stove', 'counter', 'fridge'] : ['fridge', 'counter', 'stove', 'counter']); dining(r, 'table', 1, 2); continue;
+      case 'bathroom': run(r, ['sink', 'toilet']); place(r, 'bathtub', 1, 2, 'corner'); place(r, 'medcab', 1, 1, 'wall'); continue;
+      case 'bedroom': bedroom(r); continue;
+      case 'breakroom': run(r, ['counter', 'fridge', 'vending']); dining(r, 'table', 1, 2); continue;
+      case 'office': desks(r, 2); run(r, ['filing', 'filing', 'cooler']); place(r, 'plant', 1, 1, 'corner'); continue;
+      case 'reception': nearDoor(r, 'desk', 2); run(r, ['vending', 'cooler']); place(r, 'chair', 1, 1, 'wall'); place(r, 'chair', 1, 1, 'wall'); place(r, 'plant', 1, 1, 'corner'); continue;
+      case 'cafeteria': run(r, ['counter', 'counter', 'fridge', 'vending']); place(r, 'ltable', 3, 1, 'free'); place(r, 'ltable', 3, 1, 'free'); continue;
+    }
     for (const [k, w, h, mode] of ROOM_FURN[r.kind] || []) {
       if (mode === 'rug') { if (r.x1 - r.x0 >= w + 1 && r.y1 - r.y0 >= h + 1) put('rug', r.x0 + 1 + ri(0, r.x1 - r.x0 - w - 1), r.y0 + 1 + ri(0, r.y1 - r.y0 - h - 1), w, h); continue; }
-      place(r, k, w, h, mode);
+      place(r, k, w, h, k === 'plant' ? 'corner' : mode);
     }
   }
   return it;
@@ -287,6 +363,7 @@ function interiorConnected(it) {
 const FURN_PAINT = {
   rug: (P, x, y, w, h) => { P(x + 1, y + 1, w - 2, h - 2, '#5d275d'); P(x + 2, y + 2, w - 4, h - 4, '#7a3a6e'); P(x + 3, y + 3, w - 6, 0.5, '#c4a050'); P(x + 3, y + h - 3.5, w - 6, 0.5, '#c4a050'); },
   sofa: (P, x, y, w, h, B) => { B(x + 1, y + 2, w - 2, h - 3, '#7a3a4a'); P(x + 1.5, y + 2.5, w - 3, 4, '#5d2a38'); for (let k = x + 8; k < x + w - 2; k += 8) P(k, y + 7, 0.5, h - 9, '#5d2a38'); },
+  sofab: (P, x, y, w, h, B) => { B(x + 1, y + 2, w - 2, h - 3, '#7a3a4a'); P(x + 1.5, y + h - 6.5, w - 3, 4, '#5d2a38'); P(x + 1.5, y + 2.5, w - 3, 0.5, '#9a5060'); for (let k = x + 8; k < x + w - 2; k += 8) P(k, y + 3, 0.5, h - 10, '#5d2a38'); }, // 背对着我们的沙发（靠背在下面）
   tv: (P, x, y, w, h, B) => { B(x + 3, y + 9, w - 6, 5, '#3a3f4d'); B(x + 1, y + 2, w - 2, 8, '#1a1c2c'); P(x + 2, y + 3, 4, 1, '#566c86'); },
   bookshelf: (P, x, y, w, h, B) => { B(x + 1, y + 1, w - 2, h - 2, '#6e4a2e'); for (let r = 0; r < 3; r++) for (let k = 0; k < 5; k++) P(x + 2.5 + k * 2.2, y + 2.5 + r * 4.3, 1.6, 3.2, ['#b13e53', '#3b5dc9', '#38b764', '#ffcd75', '#94b0c2'][(k + r) % 5]); },
   table: (P, x, y, w, h, B) => { B(x + 1.5, y + 3, w - 3, h - 6, '#a3804f'); P(x + 2, y + 3.5, w - 4, 1, '#c49a64'); },
@@ -339,6 +416,7 @@ function paintFurniture(g, f) {
   const P = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
   const B = (x, y, w, h, c) => { P(x - 0.5, y - 0.5, w + 1, h + 1, K); P(x, y, w, h, c); };
   const px = f.x * T, py = f.y * T, w = f.w * T, h = f.h * T;
+  if (typeof zfnPaint === 'function' && zfnPaint(g, f)) return; // 丧尸末世：精细像素家具（js/zombiefurn.js）
   if (f.k !== 'rug' && f.k !== 'bars') { g.fillStyle = 'rgba(10,10,30,0.25)'; g.fillRect(px + 2, py + h - 2, w - 2, 2); }
   (FURN_PAINT[f.k] || FURN_PAINT.crate)(P, px, py, w, h, B);
 }
@@ -454,15 +532,21 @@ function buildInteriorImage(it) {
   g.fillStyle = '#a7f070'; g.fillRect(D.x * T + 5, D.y * T + 2, T - 10, 1);
   g.fillStyle = '#8f2f2a'; g.fillRect(D.x * T + 2, (D.y - 1) * T + 10, T - 4, 5); // 门垫
   g.fillStyle = '#b13e53'; g.fillRect(D.x * T + 3, (D.y - 1) * T + 11, T - 6, 0.6);
+  // 丧尸末世：地板和墙先换成公路画风，家具（已经是公路画风的精细像素）之后再画上去，不重复调色
+  let gg = g, cc = c;
+  if (G.mode === 'zombie' && typeof zstStyle === 'function') { cc = zstStyle(c, { seed: 5 }); gg = cc.getContext('2d'); gg.setTransform(2, 0, 0, 2, 0, 0); gg.imageSmoothingEnabled = false; }
+  furnishInterior(gg, it);
+  it.img = cc;
+}
+function furnishInterior(g, it) {
   // 家具（地毯先画），每件家具底下一圈柔和阴影
   for (const f of it.furn) if (f.k === 'rug') paintFurniture(g, f);
   for (const f of it.furn) {
     if (f.k === 'rug' || f.k === 'bars') continue;
-    g.fillStyle = 'rgba(10,10,25,0.28)';
+    g.fillStyle = G.mode === 'zombie' ? 'rgba(46,28,58,0.3)' : 'rgba(10,10,25,0.28)';
     g.beginPath(); g.ellipse((f.x + f.w / 2) * T + 1, (f.y + f.h) * T - 1, f.w * T * 0.5, 2.5, 0, 0, 7); g.fill();
   }
   for (const f of it.furn.slice().sort((a, b) => a.y + a.h - b.y - b.h)) if (f.k !== 'rug') paintFurniture(g, f);
-  it.img = c;
 }
 
 // ---------- 进入 / 离开 ----------

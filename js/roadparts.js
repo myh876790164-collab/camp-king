@@ -109,7 +109,8 @@ function rdpUtil(g, x, y, L, p, v, roofY) {
   else if (n === 5) { const S = get('k', 30, 40, 15, 30, (B) => { for (let k = 0; k < 2; k++) rdcBox(B, -8 + k * 9, -18, 8, 18, ['#8a8478', '#5e5a52', '#3e3a34'], 2, 0, 1); rdcRect(B, -8, -10, 17, 2, '#e0c040', 2); }); rdpBlit(g, S, x - L + 3, y - 6); if (R.speedNow > 1) for (let k = 0; k < 5; k++) { const pp = (t * 0.8 + k / 5) % 1; g.globalAlpha = (1 - pp) * 0.45; g.fillStyle = '#c8c4bc'; const sz = 2 + pp * 9; g.fillRect(x - L - pp * 30 - sz / 2, y - 12 - pp * 10 - sz / 2, sz, sz); } g.globalAlpha = 1; }
   else if (n === 7) { const S = get('f', 40, 40, 20, 30, (B) => { for (let k = 0; k < 2; k++) { rdgTube(B, -10, 6, -6 - k * 9, 3, RDP.red, 1); rdcRect(B, 6, -8 - k * 9, 3, 4, RDP.rail[2], 2); } rdcLine(B, 9, -6, 14, -16, '#2a2622', 2); }); rdpBlit(g, S, x - L * 0.45, y - 10); }
   else if (n === 8) { // 机械臂：车顶后部，臂节摆动，爪子开合
-    const bx = x - L + 8, by = y + top, a1 = -1.1 + Math.sin(t * 0.9) * 0.4, a2 = a1 + 1.2 + Math.sin(t * 1.3) * 0.5;
+    const dig = G.road.search && G.road.search.phase === 'arm'; // 机械臂搜索时：伸长了快速翻找
+    const bx = x - L + 8, by = y + top, a1 = dig ? -0.5 + Math.sin(t * 3.2) * 0.55 : -1.1 + Math.sin(t * 0.9) * 0.4, a2 = a1 + (dig ? 0.5 + Math.sin(t * 4.5) * 0.7 : 1.2 + Math.sin(t * 1.3) * 0.5);
     const seg = (x0, y0, a, len, c, w) => { g.fillStyle = c; for (let s = 0; s <= len * Q; s++) g.fillRect(Math.round((x0 + Math.cos(a) * s * q) * Q) / Q - w / 2, Math.round((y0 + Math.sin(a) * s * q) * Q) / Q - w / 2, w, w); return [x0 + Math.cos(a) * len, y0 + Math.sin(a) * len]; };
     g.fillStyle = '#3a3e26'; g.fillRect(bx - 2, by - 2, 4, 2);
     const j = seg(bx, by - 2, a1, 9, '#d0a040', 1.33), k2 = seg(j[0], j[1], a2, 7, '#c09030', 1); g.fillStyle = '#3a3632'; g.fillRect(j[0] - 0.67, j[1] - 0.67, 1.33, 1.33);

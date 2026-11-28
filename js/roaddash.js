@@ -31,6 +31,7 @@ const RD_ICON_MAP = {
   engine: ['............', '...EEEE.....', '....EE......', '.EEEEEEEE.E.', 'EeeeeeeeEEE.', 'EeE....eE.E.', 'EeE....eE...', 'EeE....eEEE.', 'EeeeeeeeE.E.', '.EEEEEEEE...', '............', '............'],
 };
 const RD_ICON_CACHE = {};
+let RD_DASH_SCRAP = true; // 仪表盘上有没有地方显示零件
 function rdIconImg(key) {
   if (RD_ICON_CACHE[key]) return RD_ICON_CACHE[key];
   const fine = typeof rdoResIcon === 'function' ? rdoResIcon(key) : null; // 新的精细像素图标（js/roadicons.js）
@@ -138,6 +139,12 @@ function rdDrawDash(ctx, x, y, w, h) {
   if (rw > 40) {
     rdIcon(ctx, 'ammo', rx + 4, y + 9, 16);
     rdDashText(ctx, String(d.ammo), rx + 24, y + 17, 13, d.ammo < 10 ? pal.hot : pal.text, 'left');
+    RD_DASH_SCRAP = rw > 165; // 放不下（手机竖屏）就显示在下面的信息行（js/roadui.js）
+    if (rw > 165) { // 零件：废土货币，常驻显示在弹药旁边
+      const sx = rx + 66, sc = Math.floor(G.res.scrap || 0);
+      rdIcon(ctx, 'scrap', sx, y + 9, 16);
+      rdDashText(ctx, sc >= 10000 ? (sc / 1000).toFixed(1) + 'k' : String(sc), sx + 20, y + 17, 13, '#ffcd75', 'left');
+    }
     if (rw > 120) {
       const hh = Math.floor(rdHour()), mm = Math.floor((rdHour() % 1) * 60);
       rdDashText(ctx, String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'), rx + rw - 6, y + 17, 13, style === 'analog' ? '#ffcd75' : pal.text, 'right');

@@ -14,7 +14,7 @@ const RD_VEHICLES = {
   },
   garbage: {
     name: '垃圾车', hp: 230, speed: 55, fuel: 0.16, tank: 80, weight: 160, torque: 240, mounts: 2, cells: 6, wcells: 4, cargo: 200, battery: 20, armor: 0.08,
-    color: '#38b764', stripe: '#f4f4f4', len: 54, desc: '又慢又费油，但皮糙肉厚、能装。后斗的压缩机能把垃圾变成宝贝。', perk: '压缩机：搜刮和拆解获得的废料 +40%', scrapBonus: 0.4,
+    color: '#38b764', stripe: '#f4f4f4', len: 54, desc: '又慢又费油，但皮糙肉厚、能装。后斗的压缩机能把垃圾变成宝贝。', perk: '压缩机：搜刮和拆解获得的零件 +40%', scrapBonus: 0.4,
   },
   ebike: {
     name: '电单车', hp: 60, speed: 88, fuel: 0, tank: 0, weight: 25, torque: 50, mounts: 0, cells: 1, wcells: 0, cargo: 70, battery: 60, electric: 0.22, solar: 3,
@@ -102,10 +102,10 @@ rdFamily('ram', 'ram', {}, [
 ]);
 
 // ===== 武器（可以装多门，数量看挂点） =====
-// dmg 伤害 · rate 每秒几发 · range 射程 · ammo 消耗什么(ammo弹药/fuel燃油/power电力/scrap废料/none不消耗) · use 每发消耗
+// dmg 伤害 · rate 每秒几发 · range 射程 · ammo 消耗什么(ammo弹药/fuel燃油/power电力/scrap零件/none不消耗) · use 每发消耗
 // proj 弹道外观 · count 一次几发 · splash 溅射半径 · pierce 穿透 · burn 燃烧 · slow 减速 · chain 连锁 · noAir 打不到飞行怪
 rdFamily('weapon', 'wpn', {}, [
-  { n: '弹弓发射器', t: 1, wt: 4, fx: { dmg: 6, rate: 1.2, range: 110, ammo: 'scrap', use: 0.2, proj: 'rock', noAir: true }, d: '用废料当子弹的大弹弓' },
+  { n: '弹弓发射器', t: 1, wt: 4, fx: { dmg: 6, rate: 1.2, range: 110, ammo: 'scrap', use: 0.2, proj: 'rock', noAir: true }, d: '用零件当子弹的大弹弓' },
   { n: '钉枪炮台', t: 1, wt: 5, fx: { dmg: 4, rate: 3, range: 100, ammo: 'scrap', use: 0.08, proj: 'nail' }, d: '工地钉枪改的连射炮台' },
   { n: '改装猎枪', t: 1, wt: 5, fx: { dmg: 16, rate: 0.9, range: 120, ammo: 'ammo', use: 0.2, proj: 'bullet' }, d: '固定在车顶的猎枪' },
   { n: '车载机枪', t: 2, wt: 9, fx: { dmg: 6, rate: 4, range: 150, ammo: 'ammo', use: 0.12, proj: 'bullet' }, d: '经典的车载机枪' },
@@ -217,7 +217,7 @@ rdFamily('util', 'util', {}, [
   { n: '烟雾发生器', t: 3, wt: 5, fx: { stealth: 0.2 }, d: '路上遇到的怪物少 20%' },
   { n: '电击护栏', t: 3, wt: 6, pw: 0.4, fx: { thorns: 15 }, d: '通电的护栏' },
   { n: '自动灭火系统', t: 4, wt: 5, fx: { regen: 6 }, d: '车辆每小时自动修复 6 点' },
-  { n: '机械臂回收器', t: 4, wt: 8, fx: { scrapBonus: 0.3 }, d: '搜刮和打怪获得的废料 +30%' },
+  { n: '机械臂回收器', t: 4, wt: 8, fx: { scrapBonus: 0.3, armSearch: 1 }, d: '路过建筑自动停车，用机械臂搜索（主角不用下车，搜完自动继续开）；零件 +30%。配合自动驾驶可以开「挂机模式」' },
   { n: 'EMP脉冲器', t: 5, wt: 6, pw: 0.5, fx: { stealth: 0.3, thorns: 10 } },
   { n: '外星隐形力场', t: 6, wt: 2, pw: 1, fx: { stealth: 0.5 }, d: '怪物很难发现你' },
   { n: '外星纳米修复云', t: 6, wt: 2, pw: 0.5, fx: { regen: 25 }, d: '车辆每小时自动修复 25 点' },
@@ -313,6 +313,7 @@ rdFamily('in', 'water', { act: 'drink', v: 'water' }, [
   { n: '反渗透净水机', t: 3, layer: 'wall', pw: 0.3, fx: { waterGen: 4 }, v: 'filter' },
   { n: '大气制水机', t: 4, pw: 0.6, fx: { waterGen: 7 }, v: 'aquagen' },
   { n: '外星分子水合成器', t: 6, pw: 1, fx: { waterGen: 14 }, v: 'synth' },
+  { n: '冷凝净水器', t: 3, pw: 0.8, fx: { waterGen: 6 }, v: 'condenser', d: '用电把空气里的水汽冷凝下来，每天 +6 水（一个人喝够了）' },
 ]);
 // ---- 医疗 ----  heal 使用时每小时回血 · radClean 每小时去辐射 · medGen 每天产药
 rdFamily('in', 'med', { act: 'heal', v: 'med' }, [
@@ -322,7 +323,7 @@ rdFamily('in', 'med', { act: 'heal', v: 'med' }, [
   { n: '外星纳米修复舱', t: 6, pw: 1, fx: { heal: 30, radClean: 20 }, v: 'alienpod' },
   { n: '基因药剂工坊', t: 6, pw: 1, fx: { medGen: 2, heal: 4 }, v: 'synth', d: '每天产出 2 份药品' },
 ]);
-// ---- 电力 ----  battery 电池容量 · gen 发电机(烧油) · genFree 免费发电
+// ---- 电力 ----  battery 电池容量 · gen 发电机(烧油) · genFree 免费发电 · chargeMul 所有发电加成 · genEff 发电机省油
 rdFamily('in', 'pow', { v: 'battery' }, [
   { n: '铅酸电池组', t: 1, fx: { battery: 30 }, v: 'battery' },
   { n: '锂电池组', t: 3, fx: { battery: 80 }, v: 'battery' },
@@ -330,6 +331,11 @@ rdFamily('in', 'pow', { v: 'battery' }, [
   { n: '柴油发电机组', t: 3, w: 2, fx: { gen: 12 }, v: 'generator' },
   { n: '外星聚变电池', t: 6, fx: { battery: 200, genFree: 8 }, v: 'fusion', d: '每小时免费发 8 电' },
   { n: '超级电容墙', t: 4, layer: 'wall', fx: { battery: 60 }, v: 'capwall' },
+  { n: '高能电池组', t: 4, fx: { battery: 150 }, v: 'hibattery', d: '高密度锂电芯，一格能装下以前好几组电池' },
+  { n: '智能充电控制器', t: 3, layer: 'wall', fx: { chargeMul: 0.25 }, v: 'chargectl', d: '所有发电（太阳能、风力、发动机、发电机）+25%' },
+  { n: '大功率柴油发电机', t: 5, w: 2, fx: { gen: 24, genEff: 0.5 }, v: 'diesel', d: '缺电时自动启动，每小时发 24 电；比普通发电机省一半油（每 8 电烧 1 升）' },
+  { n: '军用固态电池阵列', t: 5, w: 2, fx: { battery: 320 }, v: 'ssbattery', d: '军用储能柜，不怕颠簸也不会起火' },
+  { n: '外星质能方程反应堆', t: 6, w: 2, fx: { battery: 400, genFree: 30, chargeMul: 0.2 }, v: 'emcreactor', d: 'E=mc²：把微量物质直接变成能量。每小时免费发 30 电，电池 +400，所有发电再 +20%' },
 ]);
 // ---- 电脑 ----  research 研究等级 · autopilot 自动驾驶（主角开车时也能在车里活动） · nav 导航
 rdFamily('in', 'pc', { act: 'pc', v: 'pc' }, [
@@ -345,7 +351,7 @@ rdFamily('in', 'bench', { act: 'craft', v: 'bench' }, [
   { n: '简易工具箱', t: 1, layer: 'wall', fx: { craft: 1, repair: 3 }, v: 'toolwall' },
   { n: '工作台', t: 2, fx: { craft: 2, repair: 5 }, v: 'bench' },
   { n: '机械车间', t: 3, w: 2, fx: { craft: 3, repair: 10 }, v: 'workshop' },
-  { n: '3D打印机', t: 4, pw: 0.5, fx: { craft: 5, repair: 6 }, v: 'printer', d: '能打印传说级零件' },
+  { n: '3D打印机', t: 4, pw: 0.5, fx: { craft: 5, repair: 6 }, v: 'printer', d: '能打印传说级改装件' },
   { n: '外星物质重组器', t: 6, pw: 1.5, fx: { craft: 6, repair: 15 }, v: 'synth', d: '能制作外星科技部件' },
 ]);
 // ---- 娱乐休闲 ----  fun 使用时每小时心情 · comfort 放着就加心情
@@ -398,6 +404,11 @@ rdFamily('in', 'life', {}, [
   { n: '水培蔬菜柜', t: 3, pw: 0.3, act: 'plant', fx: { foodGen: 3 }, v: 'hydro', anim: 'water' },
   { n: '外星克隆蔬菜舱', t: 6, pw: 1, act: 'plant', fx: { foodGen: 8 }, v: 'synth', anim: 'water' },
   { n: '餐桌椅', t: 2, fx: { comfort: 0.3, dine: 1 }, v: 'table', d: '坐下来好好吃饭，吃饭时心情更好' },
+  { n: '蔬菜种植箱', t: 2, pw: 0.2, act: 'plant', fx: { foodGen: 2 }, v: 'planter', anim: 'water', d: '带补光灯的种植箱，每天 +2 食物' },
+  { n: '蛋白质合成设备', t: 4, pw: 1.2, fx: { foodGen: 4 }, v: 'protein', d: '用电培养藻类和菌丝，压成蛋白块，每天 +4 食物' },
+  { n: '宠物食盆', t: 1, fx: { petBowl: 1, comfort: 0.1 }, v: 'petbowl', d: '主角会往里添粮（每次 0.25 份食物），宠物饿了自己去吃，吃饱了更黏人' },
+  { n: '宠物玩具篮', t: 1, fx: { petToy: 1, comfort: 0.1 }, v: 'pettoy', d: '球、逗猫棒、磨牙绳：主角会陪宠物玩（心情大涨），宠物自己也会玩' },
+  { n: '窗边软垫', t: 2, fx: { sunSeat: 1, comfort: 0.3 }, v: 'windowseat', d: '主角喜欢端着咖啡坐在这儿看风景；白天宠物会趴在上面晒太阳' },
 ]);
 // ---- 储物 ----
 rdFamily('in', 'store', {}, [
@@ -406,6 +417,7 @@ rdFamily('in', 'store', {}, [
   { n: '金属货架', t: 2, fx: { cargo: 50 }, v: 'rack' },
   { n: '弹药箱架', t: 2, layer: 'wall', fx: { cargo: 40 }, v: 'ammorack' },
   { n: '外星压缩储物格', t: 6, layer: 'wall', fx: { cargo: 200 }, v: 'stasis' },
+  { n: '空间折叠货舱模块', t: 5, fx: { cargoFold: 1 }, v: 'foldmod', d: '在仓库里点「使用」：用空间折叠技术把货舱凭空撑大（第 1/2/3 个分别 +150/+200/+350），车内换成银白科技舱；电单车会进化成电动三轮车' },
 ]);
 
 function rdPart(id) { return RD_PARTS[id]; }
@@ -414,7 +426,7 @@ function rdPartsOf(slot) { return RD_PART_LIST.filter((p) => p.slot === slot); }
 // ---------- 资源 ----------
 const RD_RES = {
   fuel: { name: '燃油', color: '#ef7d57' },
-  scrap: { name: '废料', color: '#94b0c2' },
+  scrap: { name: '零件', color: '#94b0c2' },
   food: { name: '食物', color: '#a7f070' },
   water: { name: '水', color: '#41a6f6' },
   med: { name: '药品', color: '#f4f4f4' },
@@ -423,7 +435,7 @@ const RD_RES = {
   alien: { name: '外星晶体', color: '#c27bd6' },
 };
 // 占货舱的资源（燃油在油箱、电在电池里）
-const RD_CARGO_RES = ['scrap', 'food', 'water', 'med', 'ammo', 'alien'];
+const RD_CARGO_RES = ['food', 'water', 'med', 'ammo', 'alien']; // 零件（scrap）是废土货币，不占货舱
 
 // ---------- 地区（每 270 公里换一次风景，越往后越危险） ----------
 const RD_BIOMES = [
@@ -495,7 +507,7 @@ const RD_RESEARCH = [
   { id: 'xmat', name: '外星材料分析', lv: 2, cost: { alien: 5 }, hours: 12, bp: ['armor11'], d: '学会制作外星生物甲壳' },
   { id: 'xbio', name: '基因工程', lv: 3, cost: { alien: 12 }, hours: 20, bp: ['stove8', 'med5', 'life8', 'wpn20'], d: '基因食物合成器、基因药剂工坊、克隆蔬菜舱、生物酸液喷射器' },
   { id: 'xgrav', name: '反重力原理', lv: 3, cost: { alien: 15 }, hours: 24, bp: ['chs5'], d: '学会制作反重力漂浮装置' },
-  { id: 'xspace', name: '空间折叠理论', lv: 3, cost: { alien: 20 }, hours: 24, bp: ['spc1', 'trl6'], d: '空间折叠装置·I型、外星折叠空间舱' },
+  { id: 'xspace', name: '空间折叠理论', lv: 3, cost: { alien: 20 }, hours: 24, bp: ['spc1', 'trl6', 'store6'], d: '空间折叠装置·I型、外星折叠空间舱、空间折叠货舱模块' },
   { id: 'xforge', name: '外星物质重组', lv: 3, cost: { alien: 18 }, hours: 20, bp: ['bench5'], d: '学会制作外星物质重组器（制作外星部件必需）' },
   { id: 'xlaser', name: '定向能武器', lv: 3, cost: { alien: 15 }, hours: 20, bp: ['wpn16', 'hand12'], d: '外星激光阵列、外星离子手枪' },
   { id: 'xplasma', name: '等离子约束', lv: 4, cost: { alien: 25 }, hours: 30, bp: ['wpn17', 'armor12', 'hand11'], d: '等离子炮、外星相位护盾、外星光刃' },
@@ -507,6 +519,7 @@ const RD_RESEARCH = [
   { id: 'turret', name: '自动炮塔', lv: 2, cost: { scrap: 90, ammo: 30 }, hours: 18, bp: ['wpn23', 'wpn25'], d: '自动机枪塔、防空速射炮塔：装在车外，自己转着找怪打' },
   { id: 'turret2', name: '智能火控', lv: 3, cost: { scrap: 150, power: 40 }, hours: 28, bp: ['wpn24', 'wpn26', 'wpn27'], d: '双联自动炮塔、追踪导弹塔、激光点防御塔' },
   { id: 'xturret', name: '外星哨兵协议', lv: 4, cost: { alien: 30 }, hours: 30, bp: ['wpn28'], d: '外星哨兵炮塔：悬浮在车顶自动开火' },
+  { id: 'xemc', name: '质能转换', lv: 5, cost: { alien: 50 }, hours: 40, bp: ['pow11'], d: '学会制作外星质能方程反应堆（E=mc²）' },
   { id: 'xzero', name: '零点能', lv: 5, cost: { alien: 60 }, hours: 48, bp: ['eng12', 'spc3', 'wpn19', 'roof13', 'util11', 'med4'], d: '零点能引擎、空间折叠·III型、虚空光束、光子帆、纳米修复' },
 ];
 

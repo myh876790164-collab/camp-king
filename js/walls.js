@@ -160,7 +160,7 @@ function doorOpen(b) {
 // 画一个墙/门建筑
 function drawWallBuilding(ctx, b) {
   const mask = wallMask(b.x, b.y), style = b.def.wallStyle || 'wood';
-  const im = b.def.door ? wallTileImg(style, mask, doorKind(mask), doorOpen(b)) : wallTileImg(style, mask, 'wall');
+  const im = zstSpr(b.def.door ? wallTileImg(style, mask, doorKind(mask), doorOpen(b)) : wallTileImg(style, mask, 'wall')); // 丧尸末世：公路画风（js/zombiestyle.js）
   ctx.fillStyle = 'rgba(10,10,30,0.22)';
   ctx.fillRect(b.x * T + 1, b.y * T + 14.5, T, 2.5); // 脚下的阴影
   ctx.drawImage(b.hit > 0 ? im.white : im.img, b.x * T, b.y * T, T, T);
@@ -169,7 +169,7 @@ function drawWallBuilding(ctx, b) {
 // 建造预览：假设这里已经有墙，看看会怎么连
 function drawWallPreview(ctx, type, x, y) {
   const def = bdef(type), mask = wallMask(x, y), style = def.wallStyle || 'wood';
-  const im = def.door ? wallTileImg(style, mask, doorKind(mask), false) : wallTileImg(style, mask, 'wall');
+  const im = zstSpr(def.door ? wallTileImg(style, mask, doorKind(mask), false) : wallTileImg(style, mask, 'wall'));
   ctx.drawImage(im.img, x * T, y * T, T, T);
 }
 

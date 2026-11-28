@@ -276,7 +276,16 @@ Object.assign(RDX_THEMES, {
     desc: ['铁颅军阀的废铁堡垒，墙头架着探照灯', '先轰开大门，再顶住打手和枪手', '最后军阀亲自上场：三个阶段，小心火箭弹'],
     goals: '轰开大门（+120）、打倒军阀（+400）、杀敌、活到最后',
     pool: ['raider', 'gunner', 'raider', 'dog'], waveGap: [7, 10], hpMul: 0.65, dmgMul: 0.26,
-    slots: ['weapon', 'hand'], res: { gold: { ammo: 80, scrap: 40, med: 4 }, silver: { ammo: 45, scrap: 20 }, bronze: { ammo: 25 }, fail: { ammo: 8 } },
+    slots: ['weapon', 'hand'], res: { gold: { ammo: 80, scrap: 40, med: 4 }, silver: { ammo: 45, scrap: 20 }, bronze: { ammo: 25 }, fail: {} },
+    // 战败惩罚：被铁颅帮洗劫（零件 35%、弹药 30%、食物和水 20%），车只剩 20% 耐久（rdxExit 里处理）
+    lose(D, rewards) {
+      const cut = { scrap: 0.35, ammo: 0.3, food: 0.2, water: 0.2 }, txt = [];
+      for (const k in cut) { const n = Math.floor((G.res[k] || 0) * cut[k]); if (n > 0) { G.res[k] -= n; rewards.push({ res: k, n: -n }); txt.push(RD_RES[k].name + ' -' + n); } }
+      D.robbed = true;
+      rdLog('在军阀基地战败！铁颅帮把你的车洗劫了一遍' + (txt.length ? '：' + txt.join('、') : '') + '。车被打得只剩两成耐久', '#ef7d57');
+      rcSys('【副本播报】铁颅帮洗劫了 ' + rcC().me + ' 的车！', 0.4);
+      rcQueue(rcVipById('v_lei'), null, {}, 2, { text: '不自量力。' + rcC().me + '，东西我收下了' });
+    },
     enter(D) { const R = G.road; D.gateM = rdxMon('gate', (D.baseKm + 9) * RD_PX_KM); D.bossT = 110; D.marks = []; },
     tick(D, dt) {
       const R = G.road, vx = rdVehX(), L = rdVeh().len; D.note = '';

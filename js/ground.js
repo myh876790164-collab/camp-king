@@ -66,7 +66,8 @@ function cityStain(g, x, y) {
 const GROUND_HD = 2;
 function buildGround() {
   const W = MAP_W * T, H = MAP_H * T, S = GROUND_HD;
-  const colors = Object.assign({}, GROUND_COLORS, G.def.groundColors || {});
+  const zst = G.mode === 'zombie' && typeof zstGround === 'function'; // 丧尸末世：公路求生的画风（js/zombiestyle.js）
+  const colors = Object.assign({}, GROUND_COLORS, G.def.groundColors || {}, zst ? ZST_GROUND : {});
   const pal = {};
   for (const k in colors) {
     const [b, d, l] = colors[k].map(hexRgb);
@@ -242,6 +243,7 @@ function buildGround() {
     }
   }
   if (G.fields) for (const f of G.fields) drawField(g, f, TS);
+  if (zst) zstGround(c);
   G.ground = c;
   G.groundTer = ter; // 渲染水面波光时用（半格精度的地形）
 }

@@ -50,13 +50,14 @@ function rdcPix(B, x, y, col, mat) {
   const px = x + B.ox, py = y + B.oy;
   if (px < 0 || py < 0 || px >= B.w || py >= B.h) return;
   const i = py * B.w + px; B.c[i] = typeof col === 'number' ? col : rdcHex(col); B.m[i] = mat || 1;
+  if (B.pid) B.pid[i] = B.cur; // 人物：记下这个像素属于第几个部件（用来画部件之间的分界线）
 }
 function rdcGet(B, x, y) { const px = x + B.ox, py = y + B.oy; if (px < 0 || py < 0 || px >= B.w || py >= B.h) return -1; return B.c[py * B.w + px]; }
 function rdcMat(B, x, y) { const px = x + B.ox, py = y + B.oy; if (px < 0 || py < 0 || px >= B.w || py >= B.h) return 0; return B.c[py * B.w + px] < 0 ? 0 : B.m[py * B.w + px]; }
 function rdcRect(B, x, y, w, h, col, mat) { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) rdcPix(B, x + i, y + j, col, mat); }
 // 竖向渐变（ramp 从亮到暗），色带交界处用棋盘格抖点过渡
 function rdcRampAt(ramp, t, x, y) {
-  t = t > 1 ? 1 : t > 0 ? t : 0; // 超出范围时取两头的颜色
+  t = t > 1 ? 1 : t > 0 ? t : 0; // 超出范围时取两头的颜色
   const v = t * (ramp.length - 1), i = Math.floor(v), f = v - i;
   const k = Math.min(ramp.length - 1, i + ((f > 0.66 || (f > 0.33 && ((x + y) & 1))) ? 1 : 0));
   return ramp[k];
@@ -138,6 +139,77 @@ function rdcToCanvas(B) {
   return { cv, white: wcv, ox: B.ox, oy: B.oy };
 }
 
+// ---------- 车辆精修（只用在 5 辆车上）：让平面的车身更有体积感 ----------
+// 光从左上来：亮部偏暖黄、暗部偏冷紫（像素画常用的「色相偏移」）；零件往右下投 1 像素影子；
+// 车窗是凹进去的，上沿压暗；清掉孤零零的单个锈点（看着脏乱）；最后用「彩色描边」代替一圈死黑
+function rdcMix(c, t, k) { // c、t 是整数颜色，k = 0~1
+  const r = (c >> 16) & 255, gg = (c >> 8) & 255, b = c & 255;
+  return (Math.round(r + (((t >> 16) & 255) - r) * k) << 16) | (Math.round(gg + (((t >> 8) & 255) - gg) * k) << 8) | Math.round(b + ((t & 255) - b) * k);
+}
+function rdcPolish(B) {
+  const W = B.w, H = B.h, c0 = B.c.slice(), m0 = B.m.slice();
+  const HI = 0xfff2c4, SH = 0x2e1c3a; // 暖高光、冷阴影
+  const at = (px, py) => (px < 0 || py < 0 || px >= W || py >= H) ? -1 : py * W + px;
+  const mt = (px, py) => { const j = at(px, py); return j < 0 || c0[j] < 0 ? 0 : m0[j]; };
+  const paint = m => m === 1 || m === 7;
+  // 每一列从上到下连着的一段车身：算出每个像素在这一段里的上下位置（0 = 顶，1 = 底），用来做整块的明暗
+  const tv = new Float32Array(W * H);
+  for (let px = 0; px < W; px++) for (let py = 0; py < H;) {
+    if (c0[py * W + px] < 0) { py++; continue; }
+    let e = py; while (e < H && c0[e * W + px] >= 0) e++;
+    for (let y = py; y < e; y++) tv[y * W + px] = e - py > 1 ? (y - py) / (e - py - 1) : 0.5;
+    py = e;
+  }
+  // 离轮拱/车底暗部有多近（3 像素内）→ 环境光遮蔽
+  const aoD = (px, py) => { for (let d = 1; d <= 3; d++) for (const [dx, dy] of [[0, d], [d, 0], [-d, 0], [0, -d]]) { const q = mt(px + dx, py + dy); if (q === 6 || q === 5) return d; } return 0; };
+  for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) {
+    const i = py * W + px; if (c0[i] < 0) continue;
+    const m = m0[i], up = mt(px, py - 1), dn = mt(px, py + 1), lf = mt(px - 1, py), rt = mt(px + 1, py), ul = mt(px - 1, py - 1);
+    let c = c0[i];
+    if (paint(m) || m === 2) { // 整块的体积光：上部 1/3 偏亮、下部 1/3 越往下越暗（抖点过渡，不糊）
+      const t = tv[i], dz = ((px + py) & 1) ? 0.04 : -0.04;
+      if (t < 0.3) c = rdcMix(c, HI, Math.max(0, (0.3 - t + dz) * 0.35));
+      else if (t > 0.62) c = rdcMix(c, SH, Math.max(0, (t - 0.62 + dz) * 0.5));
+      const a = aoD(px, py); if (a) c = rdcMix(c, SH, (4 - a) * 0.08);
+    }
+    if (paint(m)) {
+      // 孤立锈点：上下左右四个邻居颜色一样、只有自己不一样 → 抹平
+      const n4 = [at(px, py - 1), at(px, py + 1), at(px - 1, py), at(px + 1, py)];
+      if (n4.every(j => j >= 0 && c0[j] >= 0 && paint(m0[j])) && n4.every(j => c0[j] === c0[n4[0]]) && c !== c0[n4[0]] && rdcHash(px, py, 41) < 0.7) c = c0[n4[0]];
+      if (!up) c = rdcMix(c, HI, 0.32);                 // 顶边轮廓光
+      else if (!lf) c = rdcMix(c, HI, 0.14);            // 左边（车尾）受光
+      if (!dn) c = rdcMix(c, SH, 0.3);                  // 底边压暗
+      else if (!rt && up) c = rdcMix(c, SH, 0.12);      // 右边背光
+      if (ul === 2 || ul === 4 || up === 2) c = rdcMix(c, SH, 0.28); // 零件投下来的影子
+      else if (up === 3 || up === 6) c = rdcMix(c, HI, 0.18);  // 窗台、轮拱下沿的反光
+    } else if (m === 3) { // 玻璃：凹进去，上沿和左沿在阴影里
+      if (paint(up) || up === 2 || up === 8) c = rdcMix(c, SH, 0.45);
+      else if (paint(lf) || lf === 2) c = rdcMix(c, SH, 0.25);
+    } else if (m === 2) { // 金属零件：顶边亮、底边暗，更像圆管/厚板
+      if (!up || paint(up)) c = rdcMix(c, HI, 0.22);
+      if (!dn || paint(dn)) c = rdcMix(c, SH, 0.22);
+    }
+    B.c[i] = c;
+  }
+}
+// 彩色描边：描边颜色取「贴着它的那块颜色」的深色版本（顶边偏亮一点，底边接近死黑），比一圈纯黑更细腻
+function rdcOutSel(B) {
+  const snap = B.c.slice(), W = B.w, H = B.h, o1 = rdcHex(RDC_PAL.out);
+  const get = (px, py) => px >= 0 && py >= 0 && px < W && py < H ? snap[py * W + px] : -1;
+  for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) {
+    const i = py * W + px;
+    if (snap[i] >= 0) continue;
+    const d = get(px, py + 1), s = get(px - 1, py) >= 0 ? get(px - 1, py) : get(px + 1, py), u = get(px, py - 1);
+    if (d < 0 && s < 0 && u < 0) continue;
+    let c;
+    if (d >= 0 && u < 0) c = rdcMix(o1, d, 0.42);       // 车顶上面那条：偏亮
+    else if (u >= 0 && d < 0) c = o1;                    // 车底：最暗
+    else c = rdcMix(o1, s >= 0 ? s : d >= 0 ? d : u, 0.22);
+    B.c[i] = c; B.m[i] = 8;
+  }
+}
+function rdcCarFin(B) { rdcPolish(B); rdcOutSel(B); return rdcToCanvas(B); }
+
 // ---------- 快递车：参照真实的 4.2 米轻型厢式货车（平头驾驶室、车顶导流罩、货厢、侧防护栏、反光贴）----------
 // 真实比例（按 6 米车长 ≈ 138 像素，1 米 ≈ 23 像素）：前悬 1 米，轴距 3.3 米，轮径约 0.9 米，
 // 驾驶室高 2.5 米，货厢顶 3.4 米。末日改装：货厢上开了带铁丝网的小窗、伸出炉子烟囱、焊补丁板、钢管前护杠
@@ -152,6 +224,8 @@ const RDC_CARS = {
   icecream: { build: () => rdcBuildIcecream(), wheels: [-24, -102], r: 11, dustX: -115, driver: [-30, -67], glint: [-34, -70], len: 142, bob: [0, 0, -1, -1], roof: -27,
     bulbs: { x0: -134, x1: -46, y: -84 }, horn: [-50, -94] },
   ebike: { build: () => rdcBuildBike(), wheels: [-12, -52], r: 9, dustX: -62, len: 70, bob: [0, -1, -1, 0], bike: true, rider: true, flag: [-68, -64] },
+  // 电动三轮车（电单车用了货舱折叠模块）：电单车后面挂一个银白科技货舱，第三个轮子在货舱下面
+  trike: { build: () => rdcBuildTrike(), wheels: [-12, -52, -98], r: 9, dustX: -112, len: 118, bob: [0, -1, -1, 0], bike: true, rider: true, flag: [-116, -66] },
 };
 function rdcBuildCourier() {
   const P = RDC_PAL, B = rdcPaper(176, 124, 156, 112);
@@ -255,8 +329,7 @@ function rdcBuildCourier() {
   // —— 前护杠（焊的钢管，生锈）：画在锈之后，自己单独做旧
   rdcBox(B, 3, -44, 3, 26, [M[0], M[1], M[2]], 2); rdcRect(B, 0, -38, 4, 2, M[2], 2); rdcRect(B, 0, -26, 4, 2, M[2], 2);
   for (const [x, y, k] of [[4, -42, 1], [4, -35, 2], [5, -30, 1], [3, -21, 2]]) rdcPix(B, x, y, P.rust[k], 2);
-  rdcOutline(B);
-  return rdcToCanvas(B);
+  return rdcCarFin(B);
 }
 
 // ---------- 通用小零件 ----------
@@ -386,8 +459,7 @@ function rdcBuildGarbage() {
   { const w0 = rdcHex(P.cream[0]), o0 = rdcHex(O[0]); for (let i = 0; i < B.c.length; i++) if (B.c[i] === w0 && B.m[i] === 1) B.c[i] = o0; } // 划痕亮点换成浅橄榄色（米白色在绿漆上像雪花）
   // 挂在后扶手上的一圈铁链（锈后画）
   for (let k = 0; k < 7; k++) { const cx = -166 + k * 2, cy = -60 + Math.round(Math.sin(k / 6 * Math.PI) * 6); rdcPix(B, cx, cy, k & 1 ? M[2] : P.rust[1], 2); rdcPix(B, cx, cy + 1, M[3], 2); }
-  rdcOutline(B);
-  return rdcToCanvas(B);
+  return rdcCarFin(B);
 }
 // 警示灯：灯罩 + 转动的亮点 + 一闪一闪的光晕（10 帧/秒，4 帧转一圈）；on 为假时只画暗着的灯罩
 function rdcBeacon(g, x, y, fr, on, ph) {
@@ -485,8 +557,7 @@ function rdcBuildPickup() {
   rdcBox(B, -32, -46, 3, 12, [M[1], M[2], M[3]], 2); rdcLine(B, -31, -46, -41, -66, M[2], 2); rdcLine(B, -30, -46, -40, -66, M[3], 2); // 涉水喉
   rdcBox(B, -43, -71, 5, 5, [M[1], M[2], M[3]], 2); rdcRect(B, -39, -70, 2, 3, D[2], 6);
   for (const [x, y, k] of [[3, -44, 1], [4, -36, 2], [-79, -70, 1], [-79, -58, 2], [-84, -79, 1], [-31, -40, 2]]) rdcPix(B, x, y, P.rust[k], 2);
-  rdcOutline(B);
-  return rdcToCanvas(B);
+  return rdcCarFin(B);
 }
 // 防滚架上的探照灯：白天暗着，晚上开车时亮，前面一道光束
 function rdcSpot(g, x, y, lit) {
@@ -565,8 +636,7 @@ function rdcBuildIcecream() {
   rdcLine(B, cx - 3, -104, cx + 2, -94, '#7a4e48', 1); rdcLine(B, cx - 2, -104, cx + 3, -94, '#9a6068', 1); // 裂缝
   rdcBox(B, cx - 9, -102, 18, 2, [M[1], M[3]], 2); rdcRivet(B, cx - 7, -102); rdcRivet(B, cx + 6, -102); // 箍着的铁皮
   rdcBox(B, cx - 3, -83, 6, 3, [M[1], M[2]], 2); // 甜筒底座
-  rdcOutline(B);
-  return rdcToCanvas(B);
+  return rdcCarFin(B);
 }
 // 车顶边上一排灯泡：3 帧一轮「跑马灯」；不开时是暗的
 function rdcBulbs(g, X, Y, b, fr, on) {
@@ -645,8 +715,7 @@ function rdcBuildBike() {
   // 脚踏
   rdcRect(B, -32, -15, 4, 2, M[2], 2); rdcPix(B, -32, -15, M[0], 2);
   rdcWeather(B, 21, -0.02, -30);
-  rdcOutline(B);
-  return rdcToCanvas(B);
+  return rdcCarFin(B);
 }
 // 电单车的轮子：细轮胎 + 8 根转动的辐条；hub 为真时是后轮的轮毂电机（大轮毂）
 function rdcBikeWheel(g, cx, cy, r, ph, hub) {
@@ -847,11 +916,32 @@ function rdcBlob(g, cx, cy, r, col) {
   for (let dy = -r; dy <= r; dy++) { const hw = Math.round(Math.sqrt(r * r - dy * dy) * 1.25); if (hw > 0) g.fillRect(cx - hw, cy + dy, hw * 2, 1); }
 }
 // ---------- 画一辆精细车（目前只有快递车）；x, y 是世界像素的车头/地面；返回车身颠簸（精细像素） ----------
+function rdcBuildTrike() {
+  const bike = rdcBuildBike(), P = RDC_PAL, B = rdcPaper(74, 72, 124, 64);
+  const S = ['#f6f8fa', '#dfe6ec', '#c2ccd6', '#9aa8b6', '#6e7e8e'];
+  rdcBox(B, -66, -26, 18, 3, [P.metal[1], P.metal[2], P.metal[3]], 2); // 拖杆接到电单车后货架
+  for (let y = -60; y <= -20; y++) for (let x = -120; x <= -64; x++) { // 圆角舱体
+    const rx = x < -112 ? -112 - x : x > -72 ? x + 72 : 0, ry = y < -52 ? -52 - y : 0;
+    if (rx * rx + ry * ry > 64) continue;
+    rdcPix(B, x, y, rdcRampAt(S, 0.05 + (y + 60) / 40 * 0.6, x, y), 1);
+  }
+  for (let x = -118; x <= -66; x++) { rdcPix(B, x, -40, '#73eff7', 4); rdcPix(B, x, -39, '#2a9ab0', 4); } // 青色灯带
+  rdcRect(B, -92, -56, 1, 34, S[4], 6); rdcRect(B, -91, -56, 1, 34, S[0], 1); // 舱门缝
+  rdgBall(B, -80, -50, 4, ['#c8f4ff', '#41a6f6', '#2a5ab0'], 3); // 小圆窗
+  rdcRect(B, -108, -30, 8, 2, '#41a6f6', 4); // 指示灯
+  rdcBox(B, -118, -22, 54, 4, [P.dark[0], P.dark[1], P.dark[2]], 6); // 底盘
+  for (let a = Math.PI; a <= 2 * Math.PI; a += 0.03) for (let k = 0; k < 2; k++) rdcPix(B, Math.round(-98 + Math.cos(a) * (12 + k)), Math.round(-9 + Math.sin(a) * (12 + k)), S[2 + k], 2); // 挡泥板
+  rdcOutline(B);
+  const pod = rdcToCanvas(B), ox = 124, oy = 64, w = ox + (bike.cv.width - bike.ox), h = 72;
+  const cv = createCanvas(w, h), wcv = createCanvas(w, h);
+  for (const [dst, a, b] of [[cv, pod.cv, bike.cv], [wcv, pod.white, bike.white]]) { const g = dst.getContext('2d'); g.drawImage(a, 0, oy - pod.oy); g.drawImage(b, ox - bike.ox, oy - bike.oy); }
+  return { cv, white: wcv, ox, oy };
+}
 function rdcHasCar(veh) { return !!RDC_CARS[veh]; }
 function rdcCarRoof(veh) { const cf = RDC_CARS[veh]; return cf && cf.roof; }
 function rdcDrawCar(g, x, y, o) {
   const R = G.road, Q = RD_Q;
-  const key = R.veh, cf = RDC_CARS[key];
+  const key = rdVeh().carKey || R.veh, cf = RDC_CARS[key]; // 电单车进化后用三轮车的画法
   if (!RDC_CACHE[key]) RDC_CACHE[key] = cf.build();
   const car = RDC_CACHE[key];
   // 10 帧/秒的动画帧

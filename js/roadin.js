@@ -8,6 +8,7 @@
 // =============================================
 
 const RDI_CACHE = {};
+const RDI_SCIFI = ['#f6f8fa', '#e2e8ee', '#c8d2dc', '#a4b2c0', '#7a8a9a']; // 银白科技舱（货舱折叠模块）
 const RDI_PAL = {
   foam: ['#a89880', '#8a7a64', '#6a5c4a'],             // 保温层（旧了发灰的玻璃棉）
   steel: ['#9a8e7e', '#7e7264', '#665a4e', '#4c433a', '#352e28'], // 车厢内壁铁皮（暖灰、旧）
@@ -111,23 +112,26 @@ function rdiBuildRoom(w, kind, floor, trailer, lit) {
   const ice = !trailer && rdiVeh() === 'icecream', garbage = !trailer && rdiVeh() === 'garbage', pickup = !trailer && rdiVeh() === 'pickup';
   const extra = ice ? 26 : garbage ? 26 : 0;
   const B = rdcPaper(FW + 20, FH + 36 + extra, 10, 13 + extra);
-  const skin = trailer ? rdpTrailerSkin() : rdiSkin();
+  const skin = kind === 'scifi' ? RDI_SCIFI : trailer ? rdpTrailerSkin() : rdiSkin(); // 科技舱：外壳也是银白的
   // —— 外壳切面（上、左、右）：车漆 → 保温棉 → 内衬
+  const foam = kind === 'scifi' ? ['#b4c0cc', '#9aa8b6', '#7a8a9a'] : IP.foam; // 科技舱的夹层是银灰色的
   rdcBox(B, -9, -12, FW + 18, 4, skin, 1);
-  rdcBox(B, -9, -8, FW + 18, 5, IP.foam, 1);
+  rdcBox(B, -9, -8, FW + 18, 5, foam, 1);
   rdcBox(B, -9, -3, FW + 18, 3, [P.metal[1], P.metal[2]], 2);
   for (const sx of [-9, FW + 1]) {
     rdcBox(B, sx, -12, 8, FH + 26, skin, 1);
-    rdcBox(B, sx === -9 ? -6 : FW + 1, -8, 5, FH + 20, IP.foam, 1);
+    rdcBox(B, sx === -9 ? -6 : FW + 1, -8, 5, FH + 20, foam, 1);
     rdcRect(B, sx === -9 ? -1 : FW, -3, 1, FH + 3, P.metal[2], 2);
   }
   // 保温棉的蓬松纹理（抖点）
   for (let y = -8; y < FH + 12; y++) for (let x = -9; x < FW + 9; x++) if (B.c[(y + B.oy) * B.w + x + B.ox] === rdcHex(IP.foam[1]) && rdcHash(x, y, 5) < 0.18) rdcPix(B, x, y, rdcHash(x, y, 6) < 0.5 ? IP.foam[0] : IP.foam[2], 1);
   if (garbage) rdiGarbageHopper(B, FW, skin);
   // —— 后墙
-  const RAMP = kind === 'ply' ? IP.ply : kind === 'paper' ? IP.paper : IP.steel;
+  const sci = kind === 'scifi'; // 货舱折叠模块：银白科技舱（干净的白色面板 + 青色灯带）
+  const RAMP = sci ? RDI_SCIFI : kind === 'ply' ? IP.ply : kind === 'paper' ? IP.paper : IP.steel;
   for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) {
-    let t = 0.15 + (y / FH) * 0.55; // 上亮下暗
+    let t = sci ? 0.08 + (y / FH) * 0.32 : 0.15 + (y / FH) * 0.55; // 上亮下暗
+    if (sci) { const cx = x % (26 * Q), sy = Math.round(FH * 0.62); if (cx === 3 || y === 4 || y === sy + 2) t -= 0.1; if (cx === 26 * Q - 4 || y === sy - 1) t += 0.25; if (y === sy) t = 0.9; } // 面板的凹边
     if (kind === 'steel') { const m = x % 6; t += m === 0 ? -0.2 : m === 4 ? 0.18 : m === 5 ? 0.3 : 0; } // 竖向瓦楞
     if (kind === 'ply') { const n = rdcNoise2(x / 14, y / 2.2, 3 + Math.floor(x / 78)); t += (n - 0.5) * 0.35; } // 木纹
     if (kind === 'paper') { const px = x % 12, py = y % 12; if ((Math.abs(px - 6) + Math.abs(py - 6)) === 4 && ((x + y) & 1)) t += 0.25; } // 褪色的菱形花纹
@@ -140,7 +144,13 @@ function rdiBuildRoom(w, kind, floor, trailer, lit) {
   // 每格一块板：板缝 + 角上的螺丝
   for (let x = 0; x <= FW; x += 26 * Q) {
     if (x > 0 && x < FW) { rdcRect(B, x, 0, 1, FH, RAMP[RAMP.length - 1], 6); rdcRect(B, x + 1, 0, 1, FH, RAMP[0], 1); }
-    if (kind !== 'paper') for (const y of [8, FH - 8]) { if (x > 2) rdcRivet(B, x - 3, y); if (x < FW - 3) rdcRivet(B, x + 2, y); }
+    if (kind !== 'paper' && !sci) for (const y of [8, FH - 8]) { if (x > 2) rdcRivet(B, x - 3, y); if (x < FW - 3) rdcRivet(B, x + 2, y); }
+  }
+  // 科技舱：一条青色灯带 + 每块面板一个小指示灯
+  if (sci) {
+    const ly = Math.round(FH * 0.3);
+    rdcRect(B, 0, ly, FW, 2, '#73eff7', 4); rdcRect(B, 0, ly - 1, FW, 1, '#c8fcff', 4); rdcRect(B, 0, ly + 2, FW, 1, '#2a9ab0', 4);
+    for (let x = 13 * Q; x < FW; x += 26 * Q) { rdcRect(B, x - 2, Math.round(FH * 0.62) + 8, 4, 2, '#41a6f6', 4); }
   }
   // 铁皮车厢：一条货物固定轨（真实货车车厢里都有）+ 锈迹顺着铆钉往下流
   if (kind === 'steel') {
@@ -149,33 +159,35 @@ function rdiBuildRoom(w, kind, floor, trailer, lit) {
     for (let x = 3; x < FW - 3; x += 6) rdcRect(B, x, ty + 1, 3, 3, RDC_PAL.dark[2], 6);
     for (let k = 0; k < FW / 9; k++) { const x = Math.floor(rdcHash(k, 1, 8) * FW), y0 = Math.floor(rdcHash(k, 2, 8) * FH * 0.7), len = 3 + Math.floor(rdcHash(k, 3, 8) * 10); for (let j = 0; j < len; j++) if (rdcMat(B, x, y0 + j) === 1) rdcPix(B, x, y0 + j, j < 2 ? P.rust[1] : P.rust[2], 1); }
   }
-  if (garbage) rdiGarbageRoom(B, FW, FH);
-  if (pickup) rdiPickupRoom(B, FW, FH);
-  if (ice) rdiIceRoom(B, FW, FH);
-  if (trailer) rdpTrailerRoom(B, FW, FH); // 挂车车内按种类换花样（js/roadparts.js）
-  rdiGrime(B, FW, FH, kind);
-  // —— 天花板：暗色顶棚 + 横梁 + 灯具
-  rdcBox(B, 0, 0, FW, 6, [RDC_PAL.dark[0], RDC_PAL.dark[1], RDC_PAL.dark[2]], 6);
-  for (let x = 6; x < FW; x += 39) rdcBox(B, x, 0, 4, 7, [P.metal[2], P.metal[3]], 2);
-  for (let k = 20 * Q; k < FW - 10 * Q; k += 40 * Q) {
+  if (garbage && !sci) rdiGarbageRoom(B, FW, FH);
+  if (pickup && !sci) rdiPickupRoom(B, FW, FH);
+  if (ice && !sci) rdiIceRoom(B, FW, FH);
+  if (trailer && !sci) rdpTrailerRoom(B, FW, FH); // 挂车车内按种类换花样（js/roadparts.js）
+  if (!sci) rdiGrime(B, FW, FH, kind);
+  // —— 天花板：暗色顶棚 + 横梁 + 灯具（科技舱：银白顶板 + 一整条发光灯带）
+  if (sci) { rdcBox(B, 0, 0, FW, 6, [RDI_SCIFI[1], RDI_SCIFI[2], RDI_SCIFI[3]], 2); rdcRect(B, 4, 6, FW - 8, 2, lit ? '#f0fcff' : RDI_SCIFI[3], 4); rdcRect(B, 4, 8, FW - 8, 1, lit ? '#9ce8ff' : RDI_SCIFI[4], 4); }
+  else rdcBox(B, 0, 0, FW, 6, [RDC_PAL.dark[0], RDC_PAL.dark[1], RDC_PAL.dark[2]], 6);
+  if (!sci) for (let x = 6; x < FW; x += 39) rdcBox(B, x, 0, 4, 7, [P.metal[2], P.metal[3]], 2);
+  if (!sci) for (let k = 20 * Q; k < FW - 10 * Q; k += 40 * Q) {
     rdcBox(B, k, 6, 18, 3, [P.metal[1], P.metal[2]], 2);
     rdcRect(B, k + 1, 9, 16, 1, lit ? '#f0e2b8' : P.metal[3], 4); rdcRect(B, k + 2, 10, 14, 1, lit ? '#c8b088' : P.metal[3], 4);
   }
   // —— 地板：表面 + 厚度（看得见的切面）
-  const F = floor === 'wood' ? IP.wood : IP.plate;
+  const F = floor === 'scifi' ? RDI_SCIFI : floor === 'wood' ? IP.wood : IP.plate;
   for (let x = 0; x < FW; x++) for (let y = FH; y < FH + 4; y++) {
     let t = (y - FH) / 4 * 0.5;
-    if (floor === 'wood') { if (x % 27 === 0) t = 0.95; else t += (rdcNoise2(x / 9, y, 4) - 0.5) * 0.4; }
+    if (floor === 'scifi') { t = 0.1 + (y - FH) * 0.15; if (x % (13 * Q) === 0) t = 0.8; if (y === FH && x % (13 * Q) === 6 * Q) { rdcPix(B, x, y, '#73eff7', 4); continue; } }
+    else if (floor === 'wood') { if (x % 27 === 0) t = 0.95; else t += (rdcNoise2(x / 9, y, 4) - 0.5) * 0.4; }
     else { const px = (x + (y - FH) * 2) % 8; if (px === 0 || px === 1) t -= 0.3; if (px === 2) t += 0.35; } // 花纹钢板的凸起
     rdcPix(B, x, y, rdcRampAt(F, Math.max(0, Math.min(1, t)), x, y), floor === 'wood' ? 1 : 2);
   }
-  if (garbage && floor !== 'wood') rdiGarbageFloor(B, FW, FH);
-  if (ice && floor !== 'wood') rdiIceFloor(B, FW, FH);
+  if (garbage && floor === 'plate') rdiGarbageFloor(B, FW, FH);
+  if (ice && floor === 'plate') rdiIceFloor(B, FW, FH);
   rdcBox(B, -9, FH + 4, FW + 18, 8, [RDC_PAL.dark[0], RDC_PAL.dark[1], RDC_PAL.dark[2]], 6);
   for (let x = 4; x < FW; x += 26) rdcRivet(B, x, FH + 7);
   rdcBox(B, -9, FH + 12, FW + 18, 4, skin, 1);
-  // 外壳做旧（只锈外壳，不锈墙）
-  rdiWeatherShell(B, FW, FH);
+  // 外壳做旧（只锈外壳，不锈墙；科技舱不生锈）
+  if (kind !== 'scifi') rdiWeatherShell(B, FW, FH);
   if (ice) rdiIceCone(B, Math.round(FW * 0.4));
   if (pickup) rdiPickupOpen(B, FW, FH);
   rdcOutline(B);
@@ -231,20 +243,52 @@ function rdiBackground(g, vw, vh, floorY, day, b, wheels) {
   g.fillStyle = sg; g.fillRect(0, 0, W, fy + Q * 12);
   const scroll = rdVehX() * Q;
   g.fillStyle = rdMix('#10121f', b.far, day * 0.9);
-  for (let x = 0; x < W; x += 2) { const hh = (14 + rdNoise((x + scroll * 0.05) / 110) * 40 + rdNoise((x + scroll * 0.05) / 37) * 12); g.fillRect(x, fy + 6 * Q - hh, 2, hh); }
-  // 路面（往后滚）
-  const road = fy + 12 * Q, gr = rdMix('#10121f', b.ground, day * 0.8), rc = rdMix('#10121f', b.road, day * 0.85);
-  g.fillStyle = gr; g.fillRect(0, fy + 6 * Q, W, H);
+  // 路面（往后滚）：离地板的距离 = 车外车厢底到地面的距离（同样放大，见 rdiWheelLayout）
+  const road = fy + wheels.gap * Q, hz = road - 6 * Q, gr = rdMix('#10121f', b.ground, day * 0.8), rc = rdMix('#10121f', b.road, day * 0.85);
+  for (let x = 0; x < W; x += 2) { const hh = (14 + rdNoise((x + scroll * 0.05) / 110) * 40 + rdNoise((x + scroll * 0.05) / 37) * 12); g.fillRect(x, hz - hh, 2, hh); }
+  g.fillStyle = sg; g.fillRect(0, fy + Q * 12, W, Math.max(0, hz - fy - Q * 12));
+  g.fillStyle = gr; g.fillRect(0, hz, W, H);
   g.fillStyle = rc; g.fillRect(0, road - 4, W, 30);
   g.fillStyle = rdShade(rc, 0.12); g.fillRect(0, road - 4, W, 1);
   g.fillStyle = rdMix('#10121f', b.snow ? '#94b0c2' : '#c9a86a', day * 0.9);
   const off = ((scroll % 72) + 72) % 72;
   for (let x = -off; x < W; x += 72) g.fillRect(Math.round(x), road + 10, 30, 2);
   g.fillStyle = rdShade(rc, -0.25); for (let x = 0; x < W; x += 3) if (rdHash(Math.floor((x + scroll) / 3)) > 0.8) g.fillRect(x, road + 4 + Math.floor(rdHash(Math.floor((x + scroll) / 3) + 9) * 18), 1, 1);
-  // 大梁 + 轮子
-  for (const s of wheels.spans) { g.fillStyle = RDC_PAL.dark[1]; g.fillRect(Math.round(s[0] * Q), fy + 15, Math.round((s[1] - s[0]) * Q), 7); g.fillStyle = RDC_PAL.dark[0]; g.fillRect(Math.round(s[0] * Q), fy + 15, Math.round((s[1] - s[0]) * Q), 1); }
-  for (const wx of wheels.xs) rdcDrawWheel(g, Math.round(wx * Q), road - 11, 11, RDC_ANIM.ph);
+  // 大梁（纵梁 + 横梁头）+ 轮子（照车外比例放大）
+  const D = RDC_PAL.dark, r = wheels.r;
+  for (const s of wheels.spans) {
+    const X0 = Math.round(s[0] * Q), X1 = Math.round(s[1] * Q), by = fy + 3 * Q;
+    for (let x = X0 + 10; x < X1 - 6; x += 14 * Q) { g.fillStyle = D[2]; g.fillRect(x, fy, 5, 3 * Q); }
+    g.fillStyle = D[1]; g.fillRect(X0, by, X1 - X0, 3 * Q); g.fillStyle = D[0]; g.fillRect(X0, by, X1 - X0, 2); g.fillStyle = D[2]; g.fillRect(X0, by + 3 * Q - 2, X1 - X0, 2);
+  }
+  for (const wx of wheels.xs) {
+    const cx = Math.round(wx * Q), cy = road - r;
+    g.fillStyle = 'rgba(20,12,8,0.35)'; g.fillRect(cx - r, road - 2, r * 2, 4);
+    rdcDrawWheel(g, cx, cy, r, RDC_ANIM.ph);
+  }
   g.restore();
+}
+// 车内剖面的轮子：车外的车有几个轮子、在车身前后什么位置、多大，车内就照比例放大（车头 = 驾驶室右边）
+// 返回 { xs: 轮心 x（世界像素）, r: 轮半径（精细像素）, gap: 地板到路面的距离（世界像素）, spans: 大梁范围 }
+function rdiWheelLayout(lay, ox, camp) {
+  const R = G.road, Q = RD_Q, cf = RDC_CARS[rdVeh().carKey || R.veh], wh = { xs: [], spans: [], r: 11 * Q, gap: 12 };
+  let xx = ox - lay.cab, s = 3;
+  lay.rooms.forEach((r, i) => {
+    if (i > 0) xx -= lay.gap;
+    const left = xx - r.w;
+    if (i === 0 && !r.camp && cf) { // 主车：车头到车厢尾巴
+      const L = lay.cab + r.w; s = L * Q / cf.len;
+      wh.r = Math.round(cf.r * Math.min(s, 3)); // 车厢高度只放大了约 3 倍，轮子跟着高度走，不然显得太大
+      for (const wx of cf.wheels) wh.xs.push(ox + wx * s / Q);
+      wh.spans.push([ox - L + 3, ox - 3]);
+    } else if (!r.camp) { // 挂车：一根轴（长挂车两根），靠后
+      const rr = wh.r / Q; wh.xs.push(left + rr * 1.6); if (r.w > 120) wh.xs.push(left + rr * 4);
+      wh.spans.push([left + 3, xx - 3]);
+    }
+    xx = left;
+  });
+  if (wh.xs.length) wh.gap = Math.ceil(wh.r * 1.72 / Q); // 轮子顶上一小截藏在车厢地板后面（像车外的轮拱）
+  return wh;
 }
 
 // ---------- 房间：贴缓存好的墙地 + 灯光 ----------
