@@ -331,13 +331,12 @@ function rdPowerTick(dh, st) {
   if (R.weather && R.weather.type === 'dust') prod += rdSum('wind') * 0.5;
   const solar = rdSum('solar') + (rdVeh().solar || 0); // 电单车自带折叠太阳能板
   if (solar) prod += day ? solar * (R.weather ? 0.4 : 1) : solar * rdSum('nightSolar');
-  let cons = 0;
-  for (const p of rdInstalled()) if (p.pw > 0) cons += p.pw;
+  const cons = rdPowerUse(st);
   // 发电机：电量低于一半时自动烧油发电
   const gen = rdSum('gen');
   R.genOn = false;
   if (gen > 0 && G.res.power < st.battery * 0.5 && G.res.fuel > 1) { prod += gen; G.res.fuel -= gen / 4 * dh; R.genOn = true; }
-  R.powNet = prod - cons;
+  R.powNet = prod - cons; R.powProd = prod; R.powCons = cons;
   G.res.power = Math.max(0, Math.min(st.battery, G.res.power + (prod - cons) * dh));
   const powered = G.res.power > 0.2 || prod >= cons;
   if (powered !== R.powered) {
@@ -346,6 +345,25 @@ function rdPowerTick(dh, st) {
   }
 }
 
+// 用电：车外设备、冰箱、净水、空调、植物柜一直开着；电视、游戏机、灶、电脑、医疗舱、工作台、浴室等
+// 只有主角在用的时候才全功率，平时待机只耗 10%（电脑在做研究、自动驾驶模块在开车时也算在用）
+const RD_PW_ONDEMAND = { stove: 1, fun: 1, med: 1, bench: 1, bed: 1, pc: 1, life: 1 };
+function rdPowerUse(st) {
+  const R = rdR(), me = R.me, inner = new Set();
+  let cons = 0;
+  const busy = me.act && !me.walking && me.loc === 'in' ? me.act.it : null;
+  const rpc = R.research && R.research.cur ? rdResearchPC(st) : null;
+  for (const it of R.inner) {
+    const p = RD_PARTS[it.id];
+    if (!p) continue;
+    inner.add(p);
+    if (!(p.pw > 0)) continue;
+    let on = !RD_PW_ONDEMAND[p.kind] || p.act === 'plant' || it === busy || it === rpc || (p.fx.autopilot && R.driving);
+    cons += on ? p.pw : p.pw * 0.1;
+  }
+  for (const p of rdInstalled()) if (p.pw > 0 && !inner.has(p)) cons += p.pw;
+  return cons;
+}
 // 需求：饱食、水分、精力、心情、生命、辐射
 function rdNeedsTick(dh, st) {
   const R = rdR(), me = R.me, b = rdBiomeAt(R.km);
@@ -635,7 +653,7 @@ function rdCombat(dt, st) {
     if (m.px != null && dt > 0) m.vx = Math.max(-220, Math.min(220, (m.x - m.px) / dt));
     m.px = m.x;
     // 车开着时，追在车后面又追不上的怪：跟 10 秒就放弃（不会一直吊在射程外面）
-    if (R.speedNow > 8 && m.x < vx - L - 30) { m.lagT = (m.lagT || 0) + dt; if (m.lagT > 10) m.leave = true; } else m.lagT = 0;
+    if (R.speedNow > 8 && m.x < rdRigRear() - 30) { m.lagT = (m.lagT || 0) + dt; if (m.lagT > 10) m.leave = true; } else m.lagT = 0;
   }
   // 太远的怪物消失（被甩掉了）
   R.mons = R.mons.filter((m) => m.hp > 0 && (m.x > vx - 700 && m.x < vx + 900 || RD_MONSTERS[m.type].inert)); // 副本的大门 / 核心离得远也保留
@@ -650,7 +668,7 @@ function rdCombat(dt, st) {
     const fx = w.p.fx, mp = rdMountPos(w.i);
     const ox = vx + mp.x, oy = mp.y;
     const range = fx.range * (1 + st.rangePct) * (night && !fx.turret ? 0.75 : 1); // 炮塔有传感器，晚上不减射程
-    const tgt = fx.turret ? rdTargetTurret(ox, range, fx) : rdTarget(ox, range, fx.noAir);
+    const tgt = fx.turret ? rdTargetTurret(ox, range, fx) : rdTargetGun(range, fx.noAir);
     if (!tgt) continue;
     if (fx.ammo !== 'none' && fx.use > 0) {
       const have = G.res[fx.ammo] || 0;
@@ -687,6 +705,29 @@ function rdCombat(dt, st) {
   for (const p of R.proj) rdProjTick(p, dt);
   R.proj = R.proj.filter((p) => p.life > 0);
 }
+// 整个车队的车尾 x（车 + 挂车）
+function rdRigRear() {
+  const R = rdR(), tr = R.ext.trailer, Lw = tr ? ((typeof RDP_TRL !== 'undefined' && RDP_TRL[tr]) || [30])[0] + 4 : 0;
+  return rdVehX() - rdVeh().len - Lw;
+}
+// 怪物到车身（车头到挂车尾）的水平距离：车载武器的射程从车身边缘算起，车前车后一样远
+// （以前从挂点算，挂点靠车头，车后的怪要多走一整个车身才进射程，看得见却打不到）
+function rdGunDist(m) {
+  const front = rdVehX(), rear = rdRigRear();
+  return m.x > front ? m.x - front : m.x < rear ? rear - m.x : 0;
+}
+// 普通车载武器挑目标：射程内离车身最近的怪
+function rdTargetGun(range, noAir) {
+  const R = rdR();
+  let best = null, bd = range;
+  for (const m of R.mons) {
+    if (m.hp <= 0) continue;
+    if (noAir && RD_MONSTERS[m.type].fly) continue;
+    const d = rdGunDist(m);
+    if (d < bd || (d === bd && !best)) { bd = d; best = m; }
+  }
+  return best;
+}
 // 炮塔挑目标：射程内离车最近（最有威胁）的怪；防空塔优先打飞的
 function rdTargetTurret(ox, range, fx) {
   const R = rdR(), c = rdVehX() - rdVeh().len / 2;
@@ -694,7 +735,7 @@ function rdTargetTurret(ox, range, fx) {
   for (const m of R.mons) {
     if (m.hp <= 0 || m.leave) continue;
     const M = RD_MONSTERS[m.type], my = M.fly ? m.y : -M.h / 2;
-    if (Math.hypot(m.x - ox, my) > range) continue;
+    if (Math.hypot(rdGunDist(m), my) > range) continue;
     const s = Math.abs(m.x - c) * (M.fly && fx.airBonus ? 0.3 : 1);
     if (s < bs) { bs = s; best = m; }
   }
@@ -719,9 +760,11 @@ function rdFire(fx, ox, oy, tgt, mul, mine) {
   sfx(fx.proj === 'laser' || fx.proj === 'beam' || fx.proj === 'rail' || fx.proj === 'arc' ? 'coin' : 'hit');
   // 光束类：瞬间命中
   if (fx.proj === 'laser' || fx.proj === 'beam' || fx.proj === 'rail' || fx.proj === 'arc') {
-    const hits = fx.pierce ? R.mons.filter((m) => m.hp > 0 && Math.abs(m.x - ox) < fx.range * 1.2 && Math.sign(m.x - ox) === Math.sign(tgt.x - ox)) : [tgt];
+    const reach = (m) => mine ? Math.abs(m.x - ox) : rdGunDist(m); // 车载武器从车身边缘算射程
+    const hits = fx.pierce ? R.mons.filter((m) => m.hp > 0 && reach(m) < fx.range * 1.2 && Math.sign(m.x - ox) === Math.sign(tgt.x - ox)) : [tgt];
     for (const m of hits) rdHitMon(m, fx.dmg * mul, fx);
-    R.fx.push({ kind: fx.proj, x: ox, y: oy, x2: fx.pierce ? ox + Math.sign(tgt.x - ox) * fx.range : tgt.x, y2: ty, life: fx.proj === 'rail' ? 0.25 : 0.1, max: 0.25 });
+    const far = Math.max(fx.range, Math.abs(tgt.x - ox) + 20, ...hits.map((m) => Math.abs(m.x - ox) + 20));
+    R.fx.push({ kind: fx.proj, x: ox, y: oy, x2: fx.pierce ? ox + Math.sign(tgt.x - ox) * far : tgt.x, y2: ty, life: fx.proj === 'rail' ? 0.25 : 0.1, max: 0.25 });
     if (fx.chain) { // 闪电链
       let from = tgt; const done = new Set([tgt]);
       for (let c = 0; c < fx.chain; c++) {

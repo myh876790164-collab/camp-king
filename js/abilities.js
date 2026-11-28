@@ -394,7 +394,8 @@ function confusedAI(m, dt) {
 // ---------- 画：变异丧尸光环 + 状态 ----------
 function drawMonsterFx(ctx, m) {
   const c = G.clock;
-  if (m.special) {
+  if (m.special && typeof zpxSpecial === 'function') zpxSpecial(ctx, m); // 像素光环（js/zombievfx.js）
+  else if (m.special) {
     const col = ABIL[m.special].color, r = 7 + Math.sin(G.time * 5 + m.bob) * 1.2;
     ctx.globalAlpha = 0.45;
     ctx.fillStyle = col;
@@ -403,7 +404,7 @@ function drawMonsterFx(ctx, m) {
     ctx.fillStyle = '#1a1c2c'; ctx.fillRect(m.x - 2, m.y - 21, 4, 4);
     ctx.fillStyle = col; ctx.fillRect(m.x - 1.5, m.y - 20.5, 3, 3);
   }
-  if (m.frozenUntil > c) { ctx.fillStyle = 'rgba(169,228,255,0.45)'; ctx.fillRect(m.x - 6, m.y - 14, 12, 15); }
+  if (m.frozenUntil > c && typeof zpxMonsterOver !== 'function') { ctx.fillStyle = 'rgba(169,228,255,0.45)'; ctx.fillRect(m.x - 6, m.y - 14, 12, 15); }
   if (m.rootUntil > c) { ctx.fillStyle = '#38b764'; for (let k = 0; k < 3; k++) ctx.fillRect(m.x - 5 + k * 4, m.y - 4 - k % 2 * 2, 1.5, 6); }
   if (m.confusedUntil > c) drawWorldLabel(ctx, '?', m.x + Math.sin(G.time * 6) * 3, m.y - 20, '#ff9ad5');
 }

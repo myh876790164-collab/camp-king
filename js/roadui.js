@@ -29,7 +29,7 @@ function rdFxText(p) {
   };
   for (const k in f) if (L[k]) out.push(L[k](f[k]));
   if (p.slot === 'in') out.push((p.layer === 'wall' ? '墙面' : '地面') + (p.w || 1) + '格');
-  if (p.pw > 0) out.push('耗电' + p.pw + '/时');
+  if (p.pw > 0) out.push('耗电' + p.pw + '/时' + (p.slot === 'in' && RD_PW_ONDEMAND[p.kind] && p.act !== 'plant' ? '（用时，平时待机1成）' : ''));
   if (p.wt && RD_SLOTS[p.slot].ext) out.push('重' + p.wt);
   return out.join(' · ');
 }
@@ -248,7 +248,7 @@ function rdDrawPanel(ctx) {
   const c = { ctx, x: px + 12, y: top + 4, w: pw - 30 };
   if (R.panel === 'garage') rdPanelGarage(c);
   else if (R.panel === 'pick') rdPanelPick(c);
-  else if (R.panel === 'inv') rdPanelInv(c);
+  else if (R.panel === 'inv') { endScroll(ctx, top); rdPanelInv(ctx, px + 12, top + 4, pw - 30, areaH - 8); return; } // 仓库：格子区和信息栏各自滑动
   else if (R.panel === 'craft') rdPanelCraft(c);
   else if (R.panel === 'research') rdPanelResearch(c);
   else if (R.panel === 'log') rdPanelLog(c);
@@ -300,7 +300,7 @@ function rdPanelGarage(c) {
   const stats = [
     v.name + (st.hover ? '（漂浮）' : ''), '耐久 ' + Math.round(R.hpV) + '/' + st.hp + ' · 护甲 ' + Math.round(st.armor * 100) + '%', '速度 ' + st.speed + ' km/h' + (st.over > 0 ? '（超重！）' : ''),
     st.fuelKm > 0 ? '油耗 ' + st.fuelKm.toFixed(2) + ' 升/公里' : st.powKm > 0 ? '电耗 ' + st.powKm.toFixed(2) + ' 电/公里' : '不耗燃料',
-    '重量 ' + st.weight + '/' + st.torque + ' · 货舱 ' + rdCargoUsed() + '/' + st.cargo, '电力 ' + (R.powNet >= 0 ? '+' : '') + (R.powNet || 0).toFixed(1) + '/时 · 撞击 ' + st.ram,
+    '重量 ' + st.weight + '/' + st.torque + ' · 货舱 ' + rdCargoUsed() + '/' + st.cargo, '电力 ' + (R.powNet >= 0 ? '+' : '') + (R.powNet || 0).toFixed(1) + '/时（发' + (R.powProd || 0).toFixed(1) + ' 用' + (R.powCons || 0).toFixed(1) + '）· 撞击 ' + st.ram,
   ];
   stats.forEach((t, i) => { if (sx + 60 < c.x + c.w) drawText(ctx, t, sx, c.y + 12 + i * 16, i ? 11 : 14, i ? '#c8d6e5' : '#ffcd75', 'left', i === 0); });
   c.y += Math.max(img.lh * sc + 8, stats.length * 16 + 8) + 6;
@@ -378,41 +378,90 @@ function rdPanelPick(c) {
   });
   if (!Object.keys(seen).length) rdLine(c, '仓库里没有这类零件。去搜索建筑、找商人，或者在工作台制作。', 12, '#94b0c2');
 }
-function rdPanelInv(c) {
-  const R = G.road, ctx = c.ctx, st = rdStats();
-  // 物资一览（像素图标）
-  rdHead(c, '物资　货舱 ' + rdCargoUsed() + '/' + st.cargo);
+// ---------- 仓库：小方格（只有图标 + 数量），下面的信息栏显示选中格子的名字和说明（可以滑动看完） ----------
+let RD_INV_SEL = null; // 选中的格子：'res:燃油键名' 或零件 id（不存档）
+const RD_RES_DESC = {
+  fuel: '汽油车、柴油车开车要烧。放在油箱里，不占货舱。加油站、汽修厂、军事检查站容易找到。',
+  power: '用电设备（冰箱、电脑、空调……）和电动车要用。放在电池里，不占货舱。太阳能板、风力发电机、发电机能发电。',
+  scrap: '制作零件、做弹药、修车都要用。拆解零件、卖东西也能换到。占货舱。',
+  food: '主角饿了要吃。没有冰箱的话放久了会坏。占货舱。',
+  water: '主角渴了要喝。净水机、雨水收集棚能自己产水。占货舱。',
+  med: '受伤、辐射高时用来治疗。药店、医院类建筑里多。占货舱。',
+  ammo: '车载武器和随身枪械开火要用。可以在工作台用废料做。占货舱。',
+  alien: '研究外星科技、制作外星部件要用。外星坠落舱和外星怪物身上能找到。占货舱。',
+};
+function rdPanelInv(ctx, x, y, w, h) {
+  const R = G.road, st = rdStats();
   const keys = ['fuel', 'power', 'scrap', 'food', 'water', 'med', 'ammo', 'alien'];
-  const cols = c.w < 420 ? 2 : 4, gap = 6, cw = (c.w - gap * (cols - 1)) / cols, chh = 40;
+  const order = ['weapon', ...RD_EXT_ORDER, 'hand', 'suit', 'in'];
+  const ids = [...new Set(R.inv)].filter((id) => RD_PARTS[id]).sort((a, b) => order.indexOf(RD_PARTS[a].slot) - order.indexOf(RD_PARTS[b].slot) || RD_PARTS[b].tier - RD_PARTS[a].tier);
+  // 选中的东西不在了（装上 / 拆掉）就清掉
+  if (RD_INV_SEL && !(RD_INV_SEL.startsWith('res:') || ids.includes(RD_INV_SEL))) RD_INV_SEL = null;
+  if (!RD_INV_SEL) RD_INV_SEL = ids[0] || 'res:fuel';
+  // 布局：上面格子区，下面信息栏（高度约 4 成，至少 150）
+  const infoH = Math.max(150, Math.min(230, Math.round(h * 0.4))), gridH = h - infoH - 8;
+  const cs = w < 420 ? 46 : 52, gap = 6, cols = Math.max(4, Math.floor((w - 4 + gap) / (cs + gap)));
+  const gx = x + Math.floor((w - 4 - (cols * cs + (cols - 1) * gap)) / 2);
+  // ---- 格子区 ----
+  beginScroll(ctx, 'rinvg', x - 4, y, w + 2, gridH);
+  let cy = y;
+  const head = (t) => { drawText(ctx, t, x, cy + 9, 12, '#ffcd75', 'left'); cy += 20; };
+  const cell = (i, key, draw, badge, border, low) => {
+    const cx = gx + (i % cols) * (cs + gap), yy = cy + Math.floor(i / cols) * (cs + gap), sel = RD_INV_SEL === key;
+    ctx.fillStyle = low ? 'rgba(177,62,83,0.4)' : 'rgba(38,43,68,0.95)'; ctx.fillRect(cx, yy, cs, cs);
+    ctx.strokeStyle = sel ? '#ffcd75' : border || '#333c57'; ctx.lineWidth = sel ? 3 : 1.5; ctx.strokeRect(cx + 1, yy + 1, cs - 2, cs - 2);
+    draw(cx + 6, yy + 6, cs - 12);
+    if (badge) { ctx.font = 'bold 11px ' + FONT; const bw = ctx.measureText(badge).width + 6; ctx.fillStyle = 'rgba(10,10,30,0.85)'; ctx.fillRect(cx + cs - bw - 2, yy + cs - 15, bw, 13); drawText(ctx, badge, cx + cs - 5, yy + cs - 8, 11, low ? '#ef7d57' : '#f4f4f4', 'right'); }
+    addButton(cx, yy, cs, cs, () => { RD_INV_SEL = key; if (G.scroll) G.scroll.rinvi = 0; });
+  };
+  head('物资　货舱 ' + rdCargoUsed() + '/' + st.cargo);
   keys.forEach((k, i) => {
-    const cx = c.x + (i % cols) * (cw + gap), cy = c.y + Math.floor(i / cols) * (chh + gap);
     const cap = k === 'fuel' ? st.tank : k === 'power' ? st.battery : 0;
     const low = (k === 'food' || k === 'water') ? G.res[k] < 3 : k === 'med' ? G.res[k] < 1 : cap ? G.res[k] < cap * 0.15 : false;
-    ctx.fillStyle = low ? 'rgba(177,62,83,0.35)' : 'rgba(38,43,68,0.9)'; ctx.fillRect(cx, cy, cw, chh);
-    rdIcon(ctx, k, cx + 6, cy + 8, 24);
-    drawText(ctx, RD_RES[k].name, cx + 38, cy + 12, 11, '#94b0c2', 'left', false);
-    drawText(ctx, Math.floor(G.res[k] || 0) + (cap ? ' / ' + cap : ''), cx + 38, cy + 28, 14, low ? '#ef7d57' : '#f4f4f4', 'left');
+    cell(i, 'res:' + k, (ix, iy, s) => rdIcon(ctx, k, ix, iy, s), String(Math.floor(G.res[k] || 0)), null, low);
   });
-  c.y += Math.ceil(keys.length / cols) * (chh + gap) + 2;
-  rdLine(c, '废料、食物、水、药、弹药、晶体占货舱；燃油在油箱里，电在电池里', 11, '#94b0c2');
-  rdHead(c, '零件');
-  rdLine(c, '拆解零件可以换废料；工作台等级 ≥ 零件品阶时，拆解还能学会它的图纸（工作台等级：' + (st.craft || '没有工作台') + '）', 11, '#94b0c2');
-  if (!R.inv.length) { rdLine(c, '仓库是空的。', 13, '#566c86'); return; }
-  const order = ['weapon', ...RD_EXT_ORDER, 'hand', 'suit', 'in'];
-  for (const slot of order) {
-    const ids = [...new Set(R.inv.filter((id) => RD_PARTS[id].slot === slot))];
-    if (!ids.length) continue;
-    rdHead(c, RD_SLOTS[slot].name);
-    ids.sort((a, b) => RD_PARTS[b].tier - RD_PARTS[a].tier);
-    for (const id of ids) {
-      const p = RD_PARTS[id], n = R.inv.filter((x) => x === id).length;
-      const learn = !R.bps[id] && st.craft >= p.tier;
-      rdPartRow(c, n > 1 ? '×' + n : '', p, [
-        { l: '装上', c: '#1f5e3a', w: 50, f: () => rdQuickInstall(id) },
-        { l: learn ? '拆解+图纸' : '拆解 +' + rdScrapValue(p), c: '#5d275d', w: learn ? 76 : 70, f: () => askConfirm('拆解 ' + p.name + '？会得到 ' + Math.round(rdScrapValue(p) * (1 + st.scrapBonus)) + ' 废料' + (learn ? '，并学会它的图纸' : '') + '。', () => rdDismantle(R.inv.indexOf(id))) },
-      ]);
-    }
+  cy += Math.ceil(keys.length / cols) * (cs + gap) + 4;
+  head('零件　' + R.inv.length + ' 件');
+  if (!ids.length) { drawText(ctx, '仓库是空的。', x, cy + 8, 13, '#566c86', 'left', false); cy += 24; }
+  ids.forEach((id, i) => { const p = RD_PARTS[id], n = R.inv.filter((q) => q === id).length; cell(i, id, (ix, iy, s) => rdoIcon(ctx, p, ix, iy, s), n > 1 ? '×' + n : '', RD_TIER_COLOR[p.tier]); });
+  cy += Math.ceil(ids.length / cols) * (cs + gap);
+  endScroll(ctx, cy + 4);
+  // ---- 信息栏 ----
+  const iy = y + gridH + 8;
+  ctx.fillStyle = 'rgba(26,28,44,0.95)'; ctx.fillRect(x - 4, iy, w + 8, infoH);
+  ctx.strokeStyle = '#566c86'; ctx.lineWidth = 1; ctx.strokeRect(x - 3.5, iy + 0.5, w + 7, infoH - 1);
+  let title, color = '#ffcd75', text = [], btns = [];
+  if (RD_INV_SEL.startsWith('res:')) {
+    const k = RD_INV_SEL.slice(4), cap = k === 'fuel' ? st.tank : k === 'power' ? st.battery : 0;
+    title = RD_RES[k].name + '　' + Math.floor(G.res[k] || 0) + (cap ? ' / ' + cap : '');
+    color = RD_RES[k].color;
+    text.push(RD_RES_DESC[k]);
+    if (k === 'power') text.push('现在每小时 ' + (R.powNet >= 0 ? '+' : '') + (R.powNet || 0).toFixed(1) + '（发电 ' + (R.powProd || 0).toFixed(1) + '，用电 ' + (R.powCons || 0).toFixed(1) + '）');
+    if (!cap) text.push('货舱：' + rdCargoUsed() + ' / ' + st.cargo);
+  } else {
+    const id = RD_INV_SEL, p = RD_PARTS[id], n = R.inv.filter((q) => q === id).length;
+    const learn = !R.bps[id] && st.craft >= p.tier, scrap = Math.round(rdScrapValue(p) * (1 + st.scrapBonus));
+    title = rdPartLabel(p) + (n > 1 ? '　×' + n : ''); color = RD_TIER_COLOR[p.tier];
+    text.push('种类：' + RD_SLOTS[p.slot].name);
+    text.push('效果：' + (rdFxText(p) || '无'));
+    if (p.d) text.push(p.d);
+    text.push('拆解得到 ' + scrap + ' 废料' + (learn ? '，并学会它的图纸' : R.bps[id] ? '（已经会做了）' : '（工作台 Lv' + p.tier + ' 拆解才能学会图纸，现在：' + (st.craft || '没有工作台') + '）'));
+    btns = [
+      { l: '装上', c: '#1f5e3a', w: 54, f: () => rdQuickInstall(id) },
+      { l: learn ? '拆解+图纸' : '拆解', c: '#5d275d', w: learn ? 80 : 54, f: () => askConfirm('拆解 ' + p.name + '？会得到 ' + scrap + ' 废料' + (learn ? '，并学会它的图纸' : '') + '。', () => rdDismantle(R.inv.indexOf(id))) },
+    ];
   }
+  // 标题行 + 按钮（固定不动）
+  let bx = x + w;
+  for (let i = btns.length - 1; i >= 0; i--) { const b = btns[i]; bx -= b.w; drawButton(ctx, bx, iy + 6, b.w, 30, b.l, b.f, { color: b.c, size: 12 }); bx -= 4; }
+  const tl = wrapText(ctx, title, bx - x - 6, 14);
+  drawText(ctx, tl[0] + (tl.length > 1 ? '…' : ''), x + 2, iy + 21, 14, color, 'left');
+  // 说明文字（太长就滑动看）
+  const ty = iy + 42;
+  beginScroll(ctx, 'rinvi', x, ty, w - 4, infoH - 46);
+  const c = { ctx, x: x + 2, y: ty + 2, w: w - 12 };
+  for (const t of text) { rdLine(c, t, 12, '#c8d6e5'); c.y += 3; }
+  endScroll(ctx, c.y);
 }
 function rdQuickInstall(id) {
   const R = G.road, p = RD_PARTS[id], i = R.inv.indexOf(id), st = rdStats();

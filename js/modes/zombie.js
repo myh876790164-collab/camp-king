@@ -1178,6 +1178,7 @@ MODES.zombie = {
     hudExtra(ctx) { drawBuffStrip(ctx); },
     onSpawn(m) { maybeSpecial(m); },
     drawMonsterFx(ctx, m) { drawMonsterFx(ctx, m); },
+    drawMonsterOver(ctx, m, top, w, h) { zpxMonsterOver(ctx, m, top, w, h); }, // 着火 / 冻结（js/zombievfx.js）
     monsterAI(m, dt) {
       const p = G.player;
       if (confusedAI(m, dt)) return true;

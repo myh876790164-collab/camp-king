@@ -82,9 +82,9 @@ function render() {
         const k = Math.sin(G.time * 1.7 + x * 0.7 + y * 0.45) * 0.035 * tall;
         const baseY = y * T + 15;
         ctx.setTransform(zd, 0, -k * zd, zd, ox + k * baseY * zd, oy);
-        ctx.drawImage(SPR[key].img, sx, y * T, 16, 16);
+        ctx.drawImage(zstSpr(SPR[key]).img, sx, y * T, 16, 16);
         ctx.setTransform(zd, 0, 0, zd, ox, oy);
-      } else ctx.drawImage(SPR[key].img, sx, y * T, 16, 16);
+      } else ctx.drawImage(zstSpr(SPR[key]).img, sx, y * T, 16, 16); // 丧尸末世换成公路画风（js/zombiestyle.js）
       ctx.globalAlpha = 1;
       if (def.res && n.amount < n.max) hpBar(ctx, x * T + 3, y * T + 15, 10, n.amount / n.max, '#ffcd75');
       if (def.search && !searched && G.phase === 'day') {
@@ -102,7 +102,7 @@ function render() {
   for (const b of G.buildings) {
     const s = b.size * T;
     if (isWallLike(b)) drawWallBuilding(ctx, b); // 墙和门自动拼接（js/walls.js）
-    else { const spr = buildingSprite(b); ctx.drawImage(b.hit > 0 ? spr.white : spr.img, b.x * T, b.y * T, s, s); }
+    else { const spr = zstSpr(buildingSprite(b)); ctx.drawImage(b.hit > 0 ? spr.white : spr.img, b.x * T, b.y * T, s, s); }
     for (let i = 1; i < b.level; i++) {
       ctx.fillStyle = '#1a1c2c';
       ctx.fillRect(b.x * T + i * 3 - 2.5, b.y * T + 0.5, 3, 3);
@@ -140,7 +140,7 @@ function render() {
     ctx.globalAlpha = 0.6;
     const bd = bdef(G.buildMode);
     if (bd.wall || bd.door) drawWallPreview(ctx, G.buildMode, hx, hy);
-    else ctx.drawImage(SPR[bd.sprite || G.buildMode].img, hx * T, hy * T, 16, 16);
+    else ctx.drawImage(zstSpr(SPR[bd.sprite || G.buildMode]).img, hx * T, hy * T, 16, 16);
     ctx.globalAlpha = 1;
     ctx.fillStyle = ok ? 'rgba(56,183,100,0.35)' : 'rgba(177,62,83,0.45)';
     ctx.fillRect(hx * T, hy * T, T, T);
@@ -161,7 +161,8 @@ function render() {
     if (m.slowUntil > G.clock) ctx.globalAlpha = 0.75;
     ctx.drawImage(img, Math.round(m.x - w / 2), Math.round(top + bob), w, h);
     ctx.globalAlpha = 1;
-    if (m.burnUntil > G.clock) { ctx.fillStyle = '#ef7d57'; ctx.fillRect(m.x - 1 + Math.sin(G.time * 30) * 2, top + bob + h * 0.3, 2, 2); }
+    if (hooks.drawMonsterOver) hooks.drawMonsterOver(ctx, m, top + bob, w, h); // 丧尸模式：火焰龙卷风、冰晶外壳（js/zombievfx.js）
+    else if (m.burnUntil > G.clock) { ctx.fillStyle = '#ef7d57'; ctx.fillRect(m.x - 1 + Math.sin(G.time * 30) * 2, top + bob + h * 0.3, 2, 2); }
     if (m.hp < m.maxHp) hpBar(ctx, m.x - 5 * s, top + (m.def.fly ? 4 : 2) - 3, 10 * s, m.hp / m.maxHp, '#b13e53');
   }
 
@@ -181,6 +182,7 @@ function render() {
 }
 
 function drawProjectilesAndEffects(ctx) {
+  const pxz = G.mode === 'zombie' && typeof zpxEffect === 'function';
   ctx.lineWidth = 1;
   ctx.strokeStyle = '#f4f4f4';
   ctx.beginPath();
@@ -199,6 +201,7 @@ function drawProjectilesAndEffects(ctx) {
   }
   ctx.stroke();
   for (const p of G.projectiles) {
+    if (p.ab && pxz && zpxTrail(ctx, p)) continue; // 异能子弹（丧尸模式用像素版，js/zombievfx.js）
     if (p.ab && typeof drawAbTrail === 'function' && drawAbTrail(ctx, p)) continue; // 异能子弹
     if (p.kind === 'blade') { // 御剑：银色飞刃
       ctx.strokeStyle = '#dff6ff'; ctx.lineWidth = 2;
@@ -222,6 +225,7 @@ function drawProjectilesAndEffects(ctx) {
   for (const e of G.effects) {
     const k = e.t / e.life;
     ctx.globalAlpha = 1 - k;
+    if (pxz && zpxEffect(ctx, e, k)) continue; // 丧尸模式：程序化像素特效（js/zombievfx.js）
     if (e.type === 'custom') { // 自带画法的特效（异能挥砍、粒子）
       e.draw(ctx, e, k);
     } else if (e.type === 'p') {
