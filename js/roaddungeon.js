@@ -104,7 +104,8 @@ function rdxExit() {
   R.dun = null; R.dunStash = null;
   R.dunNextKm = R.km + 250 + Math.random() * 100;
   G.state = 'play';
-  showBanner('回到了公路', '一切还是离开时的样子', 3, '#c27bd6');
+  if (D.robbed) showBanner('回到了公路', '车只剩两成血，物资被军阀抢走了一大块', 4, '#ef7d57');
+  else showBanner('回到了公路', '一切还是离开时的样子', 3, '#c27bd6');
 }
 
 // ---------- 副本里每帧 ----------
@@ -235,6 +236,7 @@ function rdxFinish() {
   const res = T.res[tier], mul = T.rewardMul ? T.rewardMul(D) : 1;
   for (const k in res) { const got = rdGain(k, Math.max(1, Math.round(res[k] * mul))); if (got > 0) rewards.push({ res: k, n: got }); }
   if (T.bonus) T.bonus(D, tier, rewards); // 主题的额外奖励（矿石、外星晶体……）
+  if (tier === 'fail' && T.lose) T.lose(D, rewards); // 主题的战败惩罚（军阀基地：被抢物资），损失记成负数
   // 零件：冠军必得一个高 2 品阶的主题零件，前三 50% 得高 1 品阶
   const inst = rdInstalled().filter((p) => p.slot !== 'in'), avg = inst.length ? inst.reduce((s, p) => s + p.tier, 0) / inst.length : 1;
   const want = tier === 'gold' ? 2 : tier === 'silver' && Math.random() < 0.5 ? 1 : -1;
@@ -352,13 +354,14 @@ function rdxResult(ctx, D, T) {
   drawText(ctx, '排名', x + 14, yy, 11, '#94b0c2', 'left', false); drawText(ctx, '击杀', x + w * 0.55, yy, 11, '#94b0c2', 'center', false); drawText(ctx, '路程', x + w * 0.7, yy, 11, '#94b0c2', 'center', false); drawText(ctx, '分数', x + w - 14, yy, 11, '#94b0c2', 'right', false);
   yy += 18;
   Rz.list.forEach((r, i) => { if (r.me) { ctx.fillStyle = 'rgba(255,205,117,0.16)'; ctx.fillRect(x + 6, yy - 10, w - 12, 20); } const c = r.out ? '#6a7484' : r.me ? '#ffcd75' : r.color; drawText(ctx, (i + 1) + '. ' + r.name + (r.out ? '（淘汰）' : ''), x + 14, yy, 12, c, 'left', false); drawText(ctx, String(r.killN), x + w * 0.55, yy, 12, c, 'center', false); drawText(ctx, r.dist.toFixed(1), x + w * 0.7, yy, 12, c, 'center', false); drawText(ctx, String(Math.round(r.score)), x + w - 14, yy, 12, c, 'right', false); yy += 22; });
-  yy += 6; drawText(ctx, '获得奖励', x + 14, yy, 13, '#a7f070', 'left'); yy += 14;
+  const lost = Rz.rewards.some((rw) => rw.n < 0);
+  yy += 6; drawText(ctx, lost ? '战败损失' : '获得奖励', x + 14, yy, 13, lost ? '#ef7d57' : '#a7f070', 'left'); yy += 14;
   Rz.rewards.forEach((rw, i) => {
     const cx = x + 14 + (i % 2) * (w - 28) / 2, cy = yy + Math.floor(i / 2) * 30;
-    if (rw.res) { rdIcon(ctx, rw.res, cx, cy, 24); drawText(ctx, RD_RES[rw.res].name + ' +' + rw.n, cx + 30, cy + 12, 12, '#f4f4f4', 'left', false); }
+    if (rw.res) { rdIcon(ctx, rw.res, cx, cy, 24); drawText(ctx, RD_RES[rw.res].name + (rw.n < 0 ? ' ' : ' +') + rw.n, cx + 30, cy + 12, 12, rw.n < 0 ? '#ef7d57' : '#f4f4f4', 'left', false); }
     else { const p = RD_PARTS[rw.part || rw.bp]; rdoIcon(ctx, p, cx, cy, 26); drawText(ctx, (rw.bp ? '图纸：' : '') + p.name, cx + 32, cy + 13, 12, RD_TIER_COLOR[p.tier], 'left', false); }
   });
-  if (!Rz.rewards.length) drawText(ctx, '（货舱满了，什么也没装下）', x + 14, yy + 10, 12, '#94b0c2', 'left', false);
+  if (!Rz.rewards.length) drawText(ctx, Rz.tier === 'fail' ? '（什么也没拿到）' : '（货舱满了，什么也没装下）', x + 14, yy + 10, 12, '#94b0c2', 'left', false);
   drawButton(ctx, sw / 2 - 70, y + h - 46, 140, 36, '返回公路', () => { D.phase = 'warpOut'; D.pt = 0; }, { color: '#5d275d', size: 14 });
 }
 // 公路上：警报倒计时

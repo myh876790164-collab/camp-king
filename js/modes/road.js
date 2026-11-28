@@ -172,8 +172,10 @@ function rdRefit() {
 // ---------- 资源 ----------
 function rdCargoUsed() { return RD_CARGO_RES.reduce((s, k) => s + Math.max(0, Math.floor(G.res[k] || 0)), 0); }
 // 获得资源（货舱 / 油箱 / 电池装不下的会丢掉），返回实际得到多少
-function rdGain(k, n) {
+// over = true：卖东西、拆解换来的废料一定到手（货舱可以暂时超载，满了就捡不了新东西）
+function rdGain(k, n, over) {
   if (n <= 0) return 0;
+  if (over && RD_CARGO_RES.includes(k)) { G.res[k] = (G.res[k] || 0) + n; return n; }
   const st = rdStats();
   let room = Infinity;
   if (k === 'fuel') room = st.tank - G.res.fuel;
@@ -1062,12 +1064,13 @@ function rdDismantle(idx) {
   if (!p) return;
   R.inv.splice(idx, 1);
   const st = rdStats();
-  const n = rdGain('scrap', Math.round(rdScrapValue(p) * (1 + st.scrapBonus)));
+  const n = rdGain('scrap', Math.round(rdScrapValue(p) * (1 + st.scrapBonus)), true);
   let learn = '';
   if (!R.bps[id] && st.craft >= p.tier) { R.bps[id] = true; learn = '，学会了它的图纸'; }
-  if (p.alien && n === 0) {}
-  if (p.alien) rdGain('alien', 2);
+  if (p.alien) rdGain('alien', 2, true);
   rdLog('拆解 ' + p.name + '：废料 +' + n + (p.alien ? '，外星晶体 +2' : '') + learn, '#94b0c2');
+  showBanner('拆解 ' + p.name, '废料 +' + n + (p.alien ? '，外星晶体 +2' : ''), 2, '#94b0c2');
+  sfx('coin');
 }
 
 // ---------- 安装 / 卸下 ----------

@@ -491,14 +491,14 @@ function rdPanelTrade(c) {
   rdHead(c, '卖物资（换废料）');
   for (const k of ['food', 'water', 'med', 'ammo', 'fuel']) {
     const n = k === 'ammo' ? 10 : 5, price = Math.floor(RD_PRICES[k] * n * 0.5 * T.sell);
-    rdPartRow(c, '', null, [{ l: '卖 ' + n, c: '#5d275d', w: 56, dim: G.res[k] < n, f: () => { G.res[k] -= n; rdGain('scrap', price); sfx('coin'); } }], RD_RES[k].name + ' ×' + n + '：+' + price + ' 废料（你有 ' + Math.floor(G.res[k]) + '）');
+    rdPartRow(c, '', null, [{ l: '卖 ' + n, c: '#5d275d', w: 56, dim: G.res[k] < n, f: () => { G.res[k] -= n; rdGain('scrap', price, true); rdLog('卖出 ' + RD_RES[k].name + ' ×' + n + '：废料 +' + price, '#a7f070'); sfx('coin'); } }], RD_RES[k].name + ' ×' + n + '：+' + price + ' 废料（你有 ' + Math.floor(G.res[k]) + '）');
   }
   rdHead(c, '卖零件');
   const seen = {};
   R.inv.forEach((id) => {
     if (seen[id]) return; seen[id] = true;
     const p = RD_PARTS[id], price = Math.round(rdScrapValue(p) * 1.5 * T.sell);
-    rdPartRow(c, '', p, [{ l: '卖 ' + price, c: '#5d275d', w: 60, f: () => { const i = R.inv.indexOf(id); if (i >= 0) { R.inv.splice(i, 1); rdGain('scrap', price); sfx('coin'); } } }]);
+    rdPartRow(c, '', p, [{ l: '卖 ' + price, c: '#5d275d', w: 60, f: () => { const i = R.inv.indexOf(id); if (i >= 0) { R.inv.splice(i, 1); rdGain('scrap', price, true); rdLog('卖出 ' + p.name + '：废料 +' + price, '#a7f070'); showBanner('卖出 ' + p.name, '废料 +' + price, 2, '#a7f070'); sfx('coin'); } } }]);
   });
 }
 

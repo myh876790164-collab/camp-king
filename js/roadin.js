@@ -231,20 +231,52 @@ function rdiBackground(g, vw, vh, floorY, day, b, wheels) {
   g.fillStyle = sg; g.fillRect(0, 0, W, fy + Q * 12);
   const scroll = rdVehX() * Q;
   g.fillStyle = rdMix('#10121f', b.far, day * 0.9);
-  for (let x = 0; x < W; x += 2) { const hh = (14 + rdNoise((x + scroll * 0.05) / 110) * 40 + rdNoise((x + scroll * 0.05) / 37) * 12); g.fillRect(x, fy + 6 * Q - hh, 2, hh); }
-  // 路面（往后滚）
-  const road = fy + 12 * Q, gr = rdMix('#10121f', b.ground, day * 0.8), rc = rdMix('#10121f', b.road, day * 0.85);
-  g.fillStyle = gr; g.fillRect(0, fy + 6 * Q, W, H);
+  // 路面（往后滚）：离地板的距离 = 车外车厢底到地面的距离（同样放大，见 rdiWheelLayout）
+  const road = fy + wheels.gap * Q, hz = road - 6 * Q, gr = rdMix('#10121f', b.ground, day * 0.8), rc = rdMix('#10121f', b.road, day * 0.85);
+  for (let x = 0; x < W; x += 2) { const hh = (14 + rdNoise((x + scroll * 0.05) / 110) * 40 + rdNoise((x + scroll * 0.05) / 37) * 12); g.fillRect(x, hz - hh, 2, hh); }
+  g.fillStyle = sg; g.fillRect(0, fy + Q * 12, W, Math.max(0, hz - fy - Q * 12));
+  g.fillStyle = gr; g.fillRect(0, hz, W, H);
   g.fillStyle = rc; g.fillRect(0, road - 4, W, 30);
   g.fillStyle = rdShade(rc, 0.12); g.fillRect(0, road - 4, W, 1);
   g.fillStyle = rdMix('#10121f', b.snow ? '#94b0c2' : '#c9a86a', day * 0.9);
   const off = ((scroll % 72) + 72) % 72;
   for (let x = -off; x < W; x += 72) g.fillRect(Math.round(x), road + 10, 30, 2);
   g.fillStyle = rdShade(rc, -0.25); for (let x = 0; x < W; x += 3) if (rdHash(Math.floor((x + scroll) / 3)) > 0.8) g.fillRect(x, road + 4 + Math.floor(rdHash(Math.floor((x + scroll) / 3) + 9) * 18), 1, 1);
-  // 大梁 + 轮子
-  for (const s of wheels.spans) { g.fillStyle = RDC_PAL.dark[1]; g.fillRect(Math.round(s[0] * Q), fy + 15, Math.round((s[1] - s[0]) * Q), 7); g.fillStyle = RDC_PAL.dark[0]; g.fillRect(Math.round(s[0] * Q), fy + 15, Math.round((s[1] - s[0]) * Q), 1); }
-  for (const wx of wheels.xs) rdcDrawWheel(g, Math.round(wx * Q), road - 11, 11, RDC_ANIM.ph);
+  // 大梁（纵梁 + 横梁头）+ 轮子（照车外比例放大）
+  const D = RDC_PAL.dark, r = wheels.r;
+  for (const s of wheels.spans) {
+    const X0 = Math.round(s[0] * Q), X1 = Math.round(s[1] * Q), by = fy + 3 * Q;
+    for (let x = X0 + 10; x < X1 - 6; x += 14 * Q) { g.fillStyle = D[2]; g.fillRect(x, fy, 5, 3 * Q); }
+    g.fillStyle = D[1]; g.fillRect(X0, by, X1 - X0, 3 * Q); g.fillStyle = D[0]; g.fillRect(X0, by, X1 - X0, 2); g.fillStyle = D[2]; g.fillRect(X0, by + 3 * Q - 2, X1 - X0, 2);
+  }
+  for (const wx of wheels.xs) {
+    const cx = Math.round(wx * Q), cy = road - r;
+    g.fillStyle = 'rgba(20,12,8,0.35)'; g.fillRect(cx - r, road - 2, r * 2, 4);
+    rdcDrawWheel(g, cx, cy, r, RDC_ANIM.ph);
+  }
   g.restore();
+}
+// 车内剖面的轮子：车外的车有几个轮子、在车身前后什么位置、多大，车内就照比例放大（车头 = 驾驶室右边）
+// 返回 { xs: 轮心 x（世界像素）, r: 轮半径（精细像素）, gap: 地板到路面的距离（世界像素）, spans: 大梁范围 }
+function rdiWheelLayout(lay, ox, camp) {
+  const R = G.road, Q = RD_Q, cf = RDC_CARS[R.veh], wh = { xs: [], spans: [], r: 11 * Q, gap: 12 };
+  let xx = ox - lay.cab, s = 3;
+  lay.rooms.forEach((r, i) => {
+    if (i > 0) xx -= lay.gap;
+    const left = xx - r.w;
+    if (i === 0 && !r.camp && cf) { // 主车：车头到车厢尾巴
+      const L = lay.cab + r.w; s = L * Q / cf.len;
+      wh.r = Math.round(cf.r * Math.min(s, 3)); // 车厢高度只放大了约 3 倍，轮子跟着高度走，不然显得太大
+      for (const wx of cf.wheels) wh.xs.push(ox + wx * s / Q);
+      wh.spans.push([ox - L + 3, ox - 3]);
+    } else if (!r.camp) { // 挂车：一根轴（长挂车两根），靠后
+      const rr = wh.r / Q; wh.xs.push(left + rr * 1.6); if (r.w > 120) wh.xs.push(left + rr * 4);
+      wh.spans.push([left + 3, xx - 3]);
+    }
+    xx = left;
+  });
+  if (wh.xs.length) wh.gap = Math.ceil(wh.r * 1.72 / Q); // 轮子顶上一小截藏在车厢地板后面（像车外的轮拱）
+  return wh;
 }
 
 // ---------- 房间：贴缓存好的墙地 + 灯光 ----------

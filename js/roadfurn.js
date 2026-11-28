@@ -152,8 +152,14 @@ function rdfOverlay(g) {
   const x0 = U.v === 'sleepbag' ? 22 : U.v === 'bigbed' ? 50 : U.v === 'bunk' ? 26 : 34, x1 = U.W - 8;
   g.save(); g.translate(U.X, U.base); g.scale(1 / Q, 1 / Q);
   const breathe = Math.round(Math.sin(G.time * 1.6));
-  for (let x = x0; x < x1; x++) { const h = 9 + (x < x0 + 20 ? breathe : 0); for (let k = 0; k < h; k++) { g.fillStyle = rdcRampAt(R2, 0.1 + k / h * 0.7, x, k); g.fillRect(x, y + k - (x < x0 + 20 ? breathe : 0), 1, 1); } }
-  g.fillStyle = R2[0]; g.fillRect(x0, y - (breathe), x1 - x0, 1);
+  // 被子盖住真人比例的身体（躺着约 20 精细像素厚，屈腿睡时膝盖拱起来更高）
+  const curl = U.W < 2 * RD_CELL * Q, th = 20;
+  for (let x = x0; x < x1; x++) {
+    const kn = curl ? Math.max(0, 14 - Math.abs(x - (x0 + 32)) * 0.7) : 0; // 膝盖拱起的鼓包
+    const h = th + Math.round(kn) + (x < x0 + 30 ? breathe : 0), top = y + 9 - h;
+    for (let k = 0; k < h; k++) { g.fillStyle = rdcRampAt(R2, 0.1 + k / h * 0.7, x, k); g.fillRect(x, top + k, 1, 1); }
+    g.fillStyle = R2[0]; g.fillRect(x, top, 1, 1);
+  }
   g.restore();
 }
 

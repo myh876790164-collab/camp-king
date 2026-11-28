@@ -504,9 +504,7 @@ function rdDrawInterior(g) {
   const lit = R.powered !== false, night = day < 0.5;
   const curtain = rdSum('curtain') || R.inner.some((it) => RD_PARTS[it.id].v === 'curtain');
   // 轮子和大梁的位置：驾驶室下面一个前轮，每个车厢靠后一个后轮
-  const wh = { xs: [], spans: [] };
-  { let xx = ox - lay.cab; if (!camp) { wh.xs.push(ox - 14); wh.spans.push([xx, ox - 2]); }
-    lay.rooms.forEach((r, i) => { if (i > 0) xx -= lay.gap; if (!r.camp) { wh.xs.push(xx - r.w + Math.min(28, r.w / 2)); if (r.w > 120) wh.xs.push(xx - r.w + 52); wh.spans.push([xx - r.w + 4, xx]); } xx -= r.w; }); }
+  const wh = rdiWheelLayout(lay, ox, camp); // 照着车外那辆车的比例放大（js/roadin.js）
   rdiBackground(g, vw, vh, floorY, day, b, wh);
   // 每个房间
   let x = ox - lay.cab;
@@ -669,34 +667,42 @@ function rdDrawItem(g, o, xr, base, wall, lay) {
   if (t >= 6 && v !== 'synth') { g.globalAlpha = 0.3 + Math.sin(G.time * 3) * 0.15; g.fillStyle = '#73eff7'; g.fillRect(x + 2, base - 1, w - 4, 1); g.globalAlpha = 1; }
   if (off && (p.pw || 0) > 0) { g.fillStyle = '#b13e53'; g.fillRect(x + w - 5, base - 4, 2, 2); }
 }
-// 主角在车内
+// 主角在车内（真人比例，js/roadhero.js 的 rdhPersonIn）：坐的高度、躺的位置按家具的真实尺寸算
 function rdDrawMeInside(g, lay, ox, floorY, ceil) {
   const R = G.road, me = R.me;
-  if (me.loc === 'out' || me.loc === 'site') {
-    // 车里空着：提示人在外面
-    return;
-  }
+  if (me.loc === 'out' || me.loc === 'site') return; // 车里空着：人在外面
+  const HEAD = 36; // 站着时头顶离地多高（世界像素）
   if (me.loc === 'drive') {
-    const x = rdVeh().tent ? ox - 20 : ox - lay.cab + 10;
-    rdiFine(g, x, floorY - 12, [-14, -26, 28, 30], (gg, ax, ay) => rdDrawPerson(gg, ax, ay, { pose: 'drive', face: 1 }));
-    if (me.bubble) rdDrawBubble(g, x + 2, floorY - 28, me.bubble);
+    const x = rdVeh().tent ? ox - 20 : ox - lay.cab + 11;
+    rdhPersonIn(g, x, floorY, { pose: 'drive', face: 1, seat: 13 }); // 坐在驾驶座坐垫上（坐垫离地 13）
+    if (me.bubble) rdDrawBubble(g, x + 2, floorY - 13 - 25, me.bubble);
     return;
   }
-  const px = rdCellX(lay, ox, Math.floor(me.ix), 'floor') - (me.ix % 1) * RD_CELL;
+  let px = rdCellX(lay, ox, Math.floor(me.ix), 'floor') - (me.ix % 1) * RD_CELL;
   const a = me.act;
-  let pose = me.walking ? 'walk' : 'stand', hold = null, y = floorY, extra = null;
-  const itemTop = (h) => floorY - h;
+  let pose = me.walking ? 'walk' : 'stand', hold = null, y = floorY, seat = 0, stool = false;
   if (a && !me.walking) {
     const p = a.it ? RD_PARTS[a.it.id] : null, v = p ? p.v : '';
+    // 正在用的家具占的位置（左边缘 x0、宽 w）
+    const span = p ? [rdCellX(lay, ox, a.it.cell, p.layer || 'floor') - (p.w || 1) * RD_CELL, (p.w || 1) * RD_CELL] : null;
+    const lieOn = (h) => { // 躺在床上：两格宽的床伸直躺，一格的床曲着腿躺；头靠枕头那头（左边）
+      y = floorY - h;
+      if (!span) { pose = 'curl'; return; }
+      pose = span[1] >= 2 * RD_CELL ? 'lie' : 'curl';
+      px = span[0] + (pose === 'lie' ? 22 : 19); // 屈腿躺约 25 宽：一格床（26）正好放下
+    };
     switch (a.type) {
-      case 'sleep': pose = 'lie'; y = floorY - (v === 'cardboard' ? 2 : v === 'sleepbag' ? 3 : v === 'cot' ? 8 : v === 'bunk' ? 8 : v === 'capsule' || v === 'alienpod' || v === 'cryo' ? 7 : v === 'hammock' ? floorY - ceil - 24 : p ? 9 : 0); if (!p) extra = 'curl'; if (v === 'hammock') y = ceil + 26; break;
+      case 'sleep':
+        if (v === 'hammock') { pose = 'curl'; y = ceil + 30; if (span) px = rdCellX(lay, ox, a.it.cell, 'wall') - RD_CELL + 19; }
+        else lieOn(v === 'cardboard' ? 2 : v === 'sleepbag' ? 3 : v === 'cot' ? 8 : v === 'bunk' ? 8 : v === 'capsule' || v === 'alienpod' || v === 'cryo' ? 7 : p ? 9 : 0);
+        break;
       case 'cook': hold = 'arms'; break;
-      case 'eat': hold = 'can'; if (rdSum('dine')) { pose = 'sit'; } break;
+      case 'eat': hold = 'can'; if (rdSum('dine')) { pose = 'sit'; seat = 9; stool = true; } break;
       case 'drink': hold = 'cup'; break;
       case 'coffee': hold = 'cup'; break;
-      case 'heal': if (v === 'medbed') { pose = 'lie'; y = floorY - 10; } break;
+      case 'heal': if (v === 'medbed') lieOn(11); break;
       case 'shower': break;
-      case 'research': if (v === 'laptop' || v === 'carpc') { pose = 'sit'; y = floorY - 7; } hold = 'arms'; break; // 笔记本 / 车载电脑：坐在凳子上对着桌上的电脑打字
+      case 'research': if (v === 'laptop' || v === 'carpc') { pose = 'sit'; seat = 8.7; } hold = 'arms'; break; // 笔记本 / 车载电脑：坐在凳子上对着桌上的电脑打字
       case 'craft': hold = 'arms'; break;
       case 'plant': hold = 'can'; break;
       case 'pet': pose = 'sitfloor'; break;
@@ -704,9 +710,12 @@ function rdDrawMeInside(g, lay, ox, floorY, ceil) {
       case 'window': break;
       case 'fun': {
         const an = a.anim;
-        if (an === 'sit' || an === 'sofa' || an === 'watch' || an === 'game') { pose = 'sit'; y = floorY - (an === 'sofa' ? 6 : an === 'sit' ? 3 : 0); if (an === 'game') hold = 'arms'; if (v === 'laptop' || v === 'carpc') y = floorY - 7; }
+        if (v === 'laptop' || v === 'carpc') { pose = 'sit'; seat = 8.7; if (an === 'game') hold = 'arms'; }
+        else if (an === 'sit') { pose = 'sit'; seat = 8; if (span) px = span[0] + span[1] / 2 - 3; }   // 懒人沙发（陷进去一点）
+        else if (an === 'sofa') { pose = 'sit'; seat = v === 'massage' ? 12 : 10.5; if (span) px = span[0] + span[1] / 2 - 3; }
+        else if (an === 'watch' || an === 'game') { pose = 'sitfloor'; if (an === 'game') hold = 'arms'; } // 没有椅子：盘腿坐地上
         else if (an === 'sitfloor' || an === 'read') { pose = 'sitfloor'; }
-        else if (an === 'guitar' || an === 'music') { pose = 'sit'; hold = 'arms'; }
+        else if (an === 'guitar' || an === 'music') { pose = 'sit'; seat = 9; stool = true; hold = an === 'guitar' ? 'arms' : 'mic'; }
         else if (an === 'run') { pose = 'run'; y = floorY - 4; }
         else if (an === 'lift') { hold = 'bar'; }
         else if (an === 'sing') { hold = 'mic'; }
@@ -720,25 +729,28 @@ function rdDrawMeInside(g, lay, ox, floorY, ceil) {
     }
   }
   const face = a && !me.walking && a.it ? 1 : me.face;
-  if (a && a.type === 'shower' && !me.walking) g.globalAlpha = 0.6;
-  const showerA = g.globalAlpha; g.globalAlpha = 1;
-  rdiFine(g, px, y, [-16, -30, 32, 34], (gg, ax, ay) => { gg.globalAlpha = showerA; rdDrawPerson(gg, ax, ay, { pose, face, hold, curl: extra === 'curl' }); }, 'floor');
-  g.globalAlpha = 1;
+  const lying = pose === 'lie' || pose === 'curl';
+  // 头顶高度：站 36，坐着 = 座位 + 25，坐地上 21，躺着 = 床面 + 9
+  const top = lying ? y - 9 : pose === 'sit' ? y - seat - 25 : pose === 'sitfloor' || pose === 'hug' ? y - 21 : y - HEAD;
+  const shA = a && a.type === 'shower' && !me.walking ? 0.6 : 1;
+  g.globalAlpha = shA; rdhPersonIn(g, px, y, { pose, face, hold, seat, stool }); g.globalAlpha = 1;
   // 活动特效
   if (a && !me.walking) {
-    if (a.type === 'sleep') rdZzz(g, px + 4, y - 8);
-    if (a.type === 'fun' && (a.anim === 'guitar' || a.anim === 'music' || a.anim === 'sing' || a.anim === 'dance')) { rdNotes(g, px + 6, y - 14); if (a.anim === 'guitar') { g.fillStyle = '#a8794f'; g.fillRect(px - 1, y - 8, 6, 4); g.fillStyle = '#6e4a2e'; g.fillRect(px + 4, y - 11, 6, 1); } }
-    if (a.type === 'fun' && a.anim === 'read') { g.fillStyle = '#b13e53'; g.fillRect(px + 2, y - 8, 4, 3); g.fillStyle = '#f4f4f4'; g.fillRect(px + 3, y - 8, 1, 3); }
-    if (a.type === 'cook') { g.globalAlpha = 0.5; g.fillStyle = '#f4f4f4'; g.fillRect(px - 6 + Math.round(Math.sin(G.time * 3)), y - 22, 1, 3); g.globalAlpha = 1; }
-    if (a.type === 'mope') { g.fillStyle = '#566c86'; g.fillRect(px - 3, y - 20, 8, 2); g.fillStyle = '#41a6f6'; if (Math.sin(G.time * 5) > 0) g.fillRect(px - 1, y - 17, 1, 2); }
-    if (a.type === 'window') { /* 看着窗外 */ }
+    if (a.type === 'sleep') rdZzz(g, px - 10, top - 4);
+    if (a.type === 'fun' && (a.anim === 'guitar' || a.anim === 'music' || a.anim === 'sing' || a.anim === 'dance')) {
+      rdNotes(g, px + 8, top + 2);
+      if (a.anim === 'guitar') { const gy = y - seat - 6; g.fillStyle = '#6e4a2e'; g.fillRect(px + 2, gy - 3, 10, 6); g.fillStyle = '#a8794f'; g.fillRect(px + 2, gy - 2, 9, 4); g.fillStyle = '#3a2618'; g.fillRect(px + 6, gy - 1, 2, 2); g.fillStyle = '#6e4a2e'; g.fillRect(px + 11, gy - 2, 10, 1); }
+    }
+    if (a.type === 'fun' && a.anim === 'read') { const by = y - 11; g.fillStyle = '#8a2f30'; g.fillRect(px + 6, by, 5, 4); g.fillStyle = '#ece4d6'; g.fillRect(px + 6.5, by + 0.4, 4, 3.2); g.fillStyle = '#8a2f30'; g.fillRect(px + 8.3, by, 0.6, 4); }
+    if (a.type === 'cook') { g.globalAlpha = 0.5; g.fillStyle = '#f4f4f4'; g.fillRect(px + 14 + Math.round(Math.sin(G.time * 3)), y - 26, 1, 3); g.globalAlpha = 1; }
+    if (a.type === 'mope') { g.fillStyle = '#566c86'; g.fillRect(px - 3, top - 7, 12, 3); g.fillStyle = '#41a6f6'; if (Math.sin(G.time * 5) > 0) g.fillRect(px + 1, top - 3, 1, 2); }
   }
   // 冷：发抖
   const cold = rdIsNight() && !rdSum('warm') && rdStats().comfort < 1.2 && (!a || a.type !== 'sleep');
   let bub = me.bubbleT > 0 ? me.bubble : null;
   if (!bub) bub = me.food < 25 ? 'hungry' : me.water < 25 ? 'thirsty' : me.energy < 20 ? 'tired' : me.rad > 50 ? 'rad' : cold ? 'cold' : me.mood < 25 ? 'sad' : (a && a.type === 'fun' && a.fun >= 8 && me.mood > 70 ? 'happy' : null);
   if (me.bubbleT > 0) me.bubbleT -= 1 / 60;
-  if (bub) rdDrawBubble(g, px + 2, y - 18, bub);
+  if (bub) rdDrawBubble(g, px + 2, top - 2, bub);
 }
 
 // ---------- 模式图标 ----------
